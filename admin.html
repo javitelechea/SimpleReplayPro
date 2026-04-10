@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SimpleReplay — Admin</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+      color: #0f172a;
+      line-height: 1.45;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; }
+    .sub { color: #64748b; font-size: 0.9rem; margin: 0 0 20px; }
+    .card {
+      background: #fff;
+      border: 1px solid #dbe3f4;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 1100px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    }
+    button {
+      cursor: pointer;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      font-size: 0.9rem;
+      transition: all .15s ease;
+    }
+    button:hover { border-color: #94a3b8; }
+    button.primary {
+      background: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+    }
+    button.primary:hover { background: #1d4ed8; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    th {
+      color: #475569;
+      font-weight: 600;
+      background: #f8fafc;
+    }
+    .mono { font-family: ui-monospace, monospace; font-size: 0.75rem; word-break: break-all; }
+    select { padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; max-width: 140px; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      border: 1px solid #dbeafe;
+      background: #eff6ff;
+      color: #1e3a8a;
+    }
+    .pill.access {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+      color: #334155;
+    }
+    .grant-cell { font-size: 0.78rem; color: #475569; }
+    .grant-cell.grant-expired { color: #b91c1c; font-weight: 500; }
+    .grant-cell.grant-ok { color: #15803d; }
+    .grant-cell.grant-muted { color: #94a3b8; }
+    .grant-cell .subline { color: #94a3b8; font-size: 0.72rem; display: block; margin-top: 2px; }
+    #status-msg { margin: 0 0 16px; font-size: 0.85rem; min-height: 1.2em; }
+    .row-actions { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    a { color: #2563eb; }
+    .filters {
+      margin: 0 0 12px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+    .filter-group.search-grow {
+      flex: 1 1 220px;
+      min-width: 180px;
+    }
+    .filter-group.search-grow input[type="search"] {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.9rem;
+    }
+    th.th-sort-wrap { padding: 0; vertical-align: bottom; }
+    button.th-sort {
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      border: none;
+      background: transparent;
+      font: inherit;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    button.th-sort:hover { background: #eef2f7; }
+    button.th-sort .sort-ind { font-size: 0.65rem; opacity: 0.35; flex-shrink: 0; }
+    button.th-sort.is-active { background: #e8eef5; }
+    button.th-sort.is-active .sort-ind { opacity: 1; }
+    .filter-group label {
+      display: block;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+    .btn-icon {
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .dialog-backdrop[hidden] { display: none; }
+    .dialog {
+      width: 100%;
+      max-width: 380px;
+      background: #fff;
+      border: 1px solid #dbe3f4;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    }
+    .dialog h3 { margin: 0 0 12px; font-size: 1rem; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 0.82rem; color: #475569; margin-bottom: 6px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+    .admin-nav { margin: 0 0 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .admin-nav .nav-btn.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #fff;
+    }
+    .admin-section[hidden] { display: none; }
+    .db-controls {
+      margin: 0 0 12px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+    .db-controls input,
+    .db-controls select {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.9rem;
+      min-width: 130px;
+    }
+    .db-results { margin-top: 12px; }
+    .db-meta { color: #475569; font-size: 0.85rem; margin-bottom: 8px; }
+    .db-table-wrap { overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .db-note { color: #64748b; font-size: 0.82rem; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Panel admin</h1>
+  <p class="sub">SimpleReplay — usuarios Firestore (<code>users</code>)</p>
+  <p id="status-msg"></p>
+
+  <div id="view-login" class="card">
+    <p>Iniciá sesión con Google para continuar.</p>
+    <button type="button" id="btn-login" class="primary">Iniciar sesión con Google</button>
+  </div>
+
+  <div id="view-denied" class="card" hidden>
+    <p><strong>Acceso denegado.</strong> Esta página solo está disponible para el administrador.</p>
+    <p><a href="index.html">Volver a la app</a></p>
+    <div class="row-actions">
+      <button type="button" id="btn-logout-denied">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div id="view-panel" class="card" hidden>
+    <div class="row-actions">
+      <button type="button" id="btn-logout">Cerrar sesión</button>
+      <a href="index.html">Ir a la app</a>
+    </div>
+    <div class="admin-nav">
+      <button type="button" class="nav-btn active" data-section="users">Usuarios</button>
+      <button type="button" class="nav-btn" data-section="db">Reporte proyectos</button>
+    </div>
+
+    <section id="section-users" class="admin-section">
+      <div class="filters">
+      <div class="filter-group search-grow">
+        <label for="user-search">Buscar</label>
+        <input type="search" id="user-search" placeholder="Email, nombre o UID…" autocomplete="off" />
+      </div>
+      <div class="filter-group">
+        <label for="filter-plan">Filtrar plan</label>
+        <select id="filter-plan">
+          <option value="all">Todos</option>
+          <option value="free">free</option>
+          <option value="pro">pro</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-access">Filtrar accessType</label>
+        <select id="filter-access">
+          <option value="all">Todos</option>
+          <option value="free">free</option>
+          <option value="paid">paid</option>
+          <option value="granted">granted</option>
+        </select>
+      </div>
+      <button type="button" id="btn-clear-filters">Limpiar filtros</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="uid">UID<span class="sort-ind" aria-hidden="true"></span></button></th>
+          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="email">Email<span class="sort-ind" aria-hidden="true"></span></button></th>
+          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="name">Nombre<span class="sort-ind" aria-hidden="true"></span></button></th>
+          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="plan">plan<span class="sort-ind" aria-hidden="true"></span></button></th>
+          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="accessType">accessType<span class="sort-ind" aria-hidden="true"></span></button></th>
+          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="grant">Grant (restante)<span class="sort-ind" aria-hidden="true"></span></button></th>
+          <th>Editar</th>
+        </tr>
+      </thead>
+      <tbody id="users-tbody"></tbody>
+    </table>
+    </section>
+
+    <section id="section-db" class="admin-section" hidden>
+      <div class="db-controls">
+        <div class="filter-group">
+          <label for="db-collection">Dataset</label>
+          <select id="db-collection">
+            <option value="projects">projects</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="db-limit">Límite</label>
+          <input type="number" id="db-limit" min="1" max="500" value="50" />
+        </div>
+        <button type="button" id="btn-db-load" class="primary">Cargar</button>
+      </div>
+      <div class="db-results">
+        <div id="db-meta" class="db-meta">Elegí una colección y tocá “Cargar”.</div>
+        <div class="db-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Proyecto</th>
+                <th>Creador (UID)</th>
+                <th>Email</th>
+                <th>Clips</th>
+                <th>Playlists</th>
+                <th>Creado</th>
+                <th>Actualizado</th>
+              </tr>
+            </thead>
+            <tbody id="db-tbody">
+              <tr><td colspan="8">Sin datos cargados.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="db-note">Tip: esta vista está pensada para monitoreo rápido, no para editar documentos.</p>
+      </div>
+    </section>
+  </div>
+
+  <div id="edit-modal" class="dialog-backdrop" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+      <h3 id="edit-title">Editar membresía</h3>
+      <div class="field">
+        <label for="edit-plan">Plan</label>
+        <select id="edit-plan">
+          <option value="free">free</option>
+          <option value="pro">pro</option>
+        </select>
+      </div>
+      <div class="field" id="access-type-wrap">
+        <label for="edit-access">AccessType</label>
+        <select id="edit-access">
+          <option value="free">free</option>
+          <option value="paid">paid</option>
+          <option value="granted">granted</option>
+        </select>
+      </div>
+      <div class="field" id="grant-days-wrap" hidden>
+        <label for="edit-grant-days">Grant por</label>
+        <select id="edit-grant-days">
+          <option value="1" selected>1 mes</option>
+          <option value="3">3 meses</option>
+          <option value="6">6 meses</option>
+          <option value="12">12 meses</option>
+          <option value="infinite">Infinito</option>
+        </select>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="btn-cancel-edit">Cancelar</button>
+        <button type="button" id="btn-save-edit" class="primary">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/adminPage.js"></script>
+</body>
+</html>

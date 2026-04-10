@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SimpleReplay — Video Analysis</title>
+  <meta name="description"
+    content="Aplicación de videoanálisis deportivo. Analiza partidos, crea clips, playlists y marca jugadas." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Aldrich&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/index.css" />
+</head>
+
+<body>
+  <!-- ═══════ HEADER ═══════ -->
+  <header id="app-header">
+    <div class="header-left" id="logo-home" style="cursor: pointer;" title="Ir al inicio">
+      <svg class="logo-icon" width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="6" fill="url(#logoGrad)" />
+        <polygon points="11,7 22,14 11,21" fill="#fff" />
+        <defs>
+          <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28">
+            <stop offset="0%" stop-color="#6366f1" />
+            <stop offset="100%" stop-color="#06b6d4" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <h1 class="app-title"><span class="app-title-simple">simple</span><span class="app-title-replay">replay</span></h1>
+    </div>
+
+    <div class="header-center">
+      <div class="mode-toggle" id="mode-toggle">
+        <button class="mode-btn active" data-mode="analyze" id="btn-mode-analyze">
+          Analizar
+        </button>
+        <button class="mode-btn" data-mode="view" id="btn-mode-view">
+          Ver
+        </button>
+        <button class="mode-btn" data-mode="share" id="btn-mode-share">
+          Compartir
+        </button>
+        <div class="mode-slider" id="mode-slider"></div>
+        <span class="read-only-label">Modo solo lectura</span>
+      </div>
+      <div class="mobile-mode-wrap">
+        <button id="btn-mobile-mode" class="btn btn-ghost btn-sm" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span id="mobile-mode-label">Analizar</span> ▾
+        </button>
+        <div id="mobile-mode-menu" class="mobile-mode-menu" hidden>
+          <button class="mobile-mode-item" data-mode="analyze" type="button">Analizar</button>
+          <button class="mobile-mode-item" data-mode="view" type="button">Ver</button>
+          <button class="mobile-mode-item" data-mode="share" type="button">Compartir</button>
+        </div>
+      </div>
+      <div class="novedades-wrapper" id="novedades-wrapper" style="display:none; position:relative; margin-left:12px;">
+        <button id="btn-novedades" class="btn btn-sm btn-ghost novedades-btn" title="Novedades">
+          🛎️
+          <span id="novedades-badge" class="novedades-badge" style="display:none;">0</span>
+        </button>
+        <div id="novedades-dropdown" class="novedades-dropdown" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <h3 id="current-project-title" class="project-title-header project-title-header--compact"
+        style="margin:0 8px; font-size: 0.88rem; font-weight: 500; color: var(--text);"></h3>
+      <button id="btn-new-game" class="btn btn-primary btn-sm btn-header-icon" title="Nuevo proyecto" aria-label="Nuevo proyecto">＋</button>
+      <input type="file" id="input-import-xml" accept=".xml" style="display:none;" />
+      <input type="file" id="input-relink-video" accept="video/*" style="display:none;" />
+      <div class="header-divider"></div>
+
+      <button id="btn-save-project" class="btn btn-save btn-sm" title="Guardar proyecto">💾</button>
+      <div class="header-nav-wrap">
+        <button id="btn-header-nav" type="button" class="btn btn-ghost btn-sm btn-header-icon" title="Menú del proyecto" aria-label="Menú" aria-haspopup="menu" aria-expanded="false">
+          <svg class="header-nav-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <div id="header-nav-menu" class="header-actions-menu" hidden>
+          <button id="btn-open-preferences" class="header-action-item header-action-item--tool" type="button" title="Preferencias"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M12 8v5l3 2M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Preferencias</span></button>
+          <div class="header-action-sep" aria-hidden="true"></div>
+          <button id="btn-my-projects" class="header-action-item header-action-item--panel" type="button" title="Mis proyectos"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--panel" viewBox="0 0 24 24" fill="none"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.3a2 2 0 0 1 1.4.57l.74.73a2 2 0 0 0 1.4.58H19.5A1.5 1.5 0 0 1 21 9.38V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span>Proyectos</span></button>
+          <button id="btn-open-buttonboards" class="header-action-item header-action-item--panel" type="button" title="Ventanas de código" style="display:none;"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--panel" viewBox="0 0 24 24" fill="none"><rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span>Ventanas de código</span></button>
+          <div class="header-action-sep" aria-hidden="true"></div>
+          <button id="btn-relink-video" class="header-action-item header-action-item--tool" type="button" style="display:none;" title="Re-vincular video local"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M15 7h4v4M9 17H5v-4M19 11a7 7 0 0 0-12-3M5 13a7 7 0 0 0 12 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Vincular video</span></button>
+          <button id="btn-import-xml" class="header-action-item header-action-item--tool" type="button" title="Importar proyecto desde XML"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M12 4v11M8 11l4 4 4-4M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Importar XML</span></button>
+        </div>
+      </div>
+      <div class="auth-menu-wrap">
+        <button type="button" id="auth-menu-trigger" class="auth-icon-btn" title="Cuenta" aria-label="Cuenta" aria-haspopup="menu" aria-expanded="false">
+          <span class="auth-user-icon">👤</span>
+          <span class="auth-status-dot" aria-hidden="true"></span>
+        </button>
+        <div id="auth-menu" class="auth-menu" hidden>
+          <div id="auth-menu-name" class="auth-menu-name">No logueado</div>
+          <div id="auth-menu-plan" class="auth-menu-plan">Plan: FREE</div>
+          <div id="auth-menu-grant" class="auth-menu-grant" style="display:none;"></div>
+          <div class="auth-menu-actions">
+            <button type="button" id="auth-menu-login" class="btn btn-outline btn-sm">Iniciar sesión con Google</button>
+            <button type="button" id="auth-menu-logout" class="btn btn-ghost btn-sm" style="display:none;">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════ MAIN LAYOUT ═══════ -->
+  <main id="app-main">
+    <!-- Video Area -->
+    <section id="video-area">
+      <div id="player-container">
+        <div id="youtube-player"></div>
+        <div id="no-game-overlay" class="player-overlay">
+          <div class="overlay-content">
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+              <circle cx="32" cy="32" r="30" stroke="#6366f1" stroke-width="2" stroke-dasharray="6 4" opacity="0.4" />
+              <polygon points="26,18 48,32 26,46" fill="#6366f1" opacity="0.5" />
+            </svg>
+            <p>Selecciona o crea un partido para empezar</p>
+          </div>
+        </div>
+        <!-- Drawing Canvas Overlay -->
+        <canvas id="drawing-canvas" class="drawing-canvas"></canvas>
+        <!-- Drawing Toolbar -->
+        <div id="drawing-toolbar" class="drawing-toolbar">
+          <div class="draw-toolbar-group">
+            <span class="draw-color-swatch active" data-color="#ff3b3b" style="background:#ff3b3b;" title="Rojo"></span>
+            <span class="draw-color-swatch" data-color="#ffdd00" style="background:#ffdd00;" title="Amarillo"></span>
+            <span class="draw-color-swatch" data-color="#00d26a" style="background:#00d26a;" title="Verde"></span>
+            <span class="draw-color-swatch" data-color="#0099ff" style="background:#0099ff;" title="Azul"></span>
+            <span class="draw-color-swatch" data-color="#ffffff" style="background:#ffffff;border:1px solid #555;"
+              title="Blanco"></span>
+          </div>
+          <div class="draw-toolbar-group">
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-eraser" title="Borrador">🧹</button>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-line" title="Línea recta (o Shift+drag)">📏</button>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-arrow" title="Flecha">➡️</button>
+            <input type="range" id="draw-size" min="2" max="12" value="4" class="draw-size-slider" title="Grosor" />
+          </div>
+          <div class="draw-toolbar-group">
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-undo" title="Deshacer">↩️</button>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-clear" title="Limpiar">🗑️</button>
+          </div>
+          <div class="draw-toolbar-group draw-toolbar-actions">
+            <input type="text" id="draw-description" class="draw-description-input" placeholder="Descripción del dibujo…" autocomplete="off" />
+            <button class="btn btn-xs btn-primary" data-action="draw-save">💾 Guardar</button>
+            <button class="btn btn-xs btn-ghost" data-action="draw-cancel">✕</button>
+          </div>
+        </div>
+        <!-- Focus View Overlay -->
+        <div id="focus-overlay" class="focus-overlay hidden">
+          <div class="focus-info">
+            <span id="focus-clip-name" class="focus-clip-name"></span>
+            <span id="focus-clip-flags" class="focus-clip-flags"></span>
+          </div>
+        </div>
+        <!-- Chat Overlay (over video, bottom) -->
+        <div id="video-chat-panel" class="video-chat-panel" style="display:none;"></div>
+      </div>
+
+      <!-- Custom Timeline -->
+      <div id="custom-timeline" class="custom-timeline hidden">
+        <div class="timeline-track"></div>
+        <div id="timeline-progress" class="timeline-progress"></div>
+        <div id="timeline-clips" class="timeline-clips"></div>
+        <div id="timeline-playhead" class="timeline-playhead">
+          <div id="playhead-time" class="playhead-time">0:00</div>
+        </div>
+      </div>
+
+      <!-- ═══ CLIP VIEW TOOLBAR (Visible only when a clip is selected) ═══ -->
+      <div id="clip-view-toolbar" class="clip-view-toolbar" style="display:none;">
+
+        <!-- Left: Clip Name and Flags -->
+        <div class="toolbar-section timing-controls" style="flex: 1; justify-content: flex-start;">
+          <span id="toolbar-clip-name"
+            style="font-weight: 600; color: #fff; margin-right: 15px; font-size: 0.95rem;"></span>
+          <span class="ctrl-separator" style="margin-right: 15px;">|</span>
+          <div class="clip-toolbar-flags">
+            <button class="flag-btn-mini" data-action="flag" data-flag="bueno">👍</button>
+            <button class="flag-btn-mini" data-action="flag" data-flag="acorregir">⚠️</button>
+            <button class="flag-btn-mini" data-action="flag" data-flag="duda">❓</button>
+            <button class="flag-btn-mini" data-action="flag" data-flag="importante">⭐</button>
+          </div>
+        </div>
+
+        <!-- Center: Playback Controls -->
+        <div class="toolbar-section" style="flex: 1; justify-content: center; gap: 15px;">
+          <button class="btn btn-outline" style="font-size: 1.2rem; padding: 2px 10px;" id="btn-clip-mark-in"
+            title="Fijar IN en este instante">[</button>
+          <button class="btn btn-ghost clip-icon-btn" id="btn-clip-restart" title="Volver al inicio del clip" aria-label="Volver al inicio del clip">
+            <svg class="clip-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M11 7L6 12L11 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M18 7L13 12L18 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="btn btn-ghost clip-icon-btn clip-icon-btn--play" id="btn-clip-playpause" title="Play/Pausa" aria-label="Play/Pausa">
+            <svg class="clip-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 7.6L17.2 12L9 16.4V7.6Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="btn btn-ghost clip-icon-btn" id="btn-clip-next" title="Siguiente clip" aria-label="Siguiente clip">
+            <svg class="clip-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 7L11 12L6 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M13 7L18 12L13 17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="btn btn-outline" style="font-size: 1.2rem; padding: 2px 10px;" id="btn-clip-mark-out"
+            title="Fijar OUT en este instante">]</button>
+          <button class="btn btn-outline" style="font-size: 0.8rem; padding: 2px 8px; min-width: 40px;" id="btn-clip-speed"
+            title="Velocidad de reproducción">1x</button>
+        </div>
+
+        <!-- Right: Actions -->
+        <div class="toolbar-section" style="flex: 1; justify-content: flex-end; gap: 8px;">
+          <button class="btn btn-sm btn-primary" id="btn-clip-chat" style="gap: 5px;" title="Chat">💬 Chat</button>
+          <button class="btn btn-sm btn-primary" id="btn-clip-draw" style="gap: 5px;" title="Dibujar">🎨
+            Dibujar</button>
+          <span class="ctrl-separator">|</span>
+          <button class="btn btn-sm btn-ghost" style="color: var(--danger);" data-action="delete-clip"
+            title="Eliminar Clip">🗑️</button>
+          <button class="btn btn-sm btn-ghost" id="btn-clip-close" title="Salir de vista de clip"
+            style="font-size: 1.2rem; margin-left:8px;">✕</button>
+        </div>
+      </div>
+
+      <!-- Action area: Tag Buttons -->
+      <div id="tag-bar" class="tag-bar hidden">
+        <div class="tag-bar-header">
+          <div class="tag-rows-wrap">
+            <div class="tag-team-row">
+              <div id="tag-buttons-a" class="tag-buttons-row"></div>
+            </div>
+            <div class="tag-team-row tag-row-rival">
+              <div id="tag-buttons-b" class="tag-buttons-row"></div>
+            </div>
+          </div>
+          <button id="btn-toggle-tag-editor" class="btn btn-xs btn-ghost tag-editor-toggle"
+            title="Editar tags">✏️</button>
+        </div>
+        <div class="clip-edit-group" id="clip-edit-controls"
+          style="display:none; padding: 6px var(--sp-md); background: var(--bg-secondary); border-top: 1px solid var(--border);">
+          <span class="ctrl-label">IN:</span>
+          <button class="btn btn-xs btn-outline" data-action="in-minus">−1s</button>
+          <button class="btn btn-xs btn-outline" data-action="in-plus">+1s</button>
+          <span class="ctrl-separator">|</span>
+          <span class="ctrl-label">OUT:</span>
+          <button class="btn btn-xs btn-outline" data-action="out-minus">−1s</button>
+          <button class="btn btn-xs btn-outline" data-action="out-plus">+1s</button>
+          <span class="ctrl-separator">|</span>
+          <button class="btn btn-xs btn-danger" data-action="delete-clip">🗑️</button>
+        </div>
+        <!-- Inline tag editor (shows for one tag at a time) -->
+        <div id="tag-editor-inline" class="tag-editor-inline" style="display:none;">
+          <div class="tag-editor-inline-row">
+            <label class="editor-lbl">Nombre</label>
+            <input id="edit-tag-label" type="text" class="input-sm" placeholder="Nombre" />
+            <label class="editor-lbl">Pre</label>
+            <input id="edit-tag-pre" type="number" class="input-sm tag-edit-num" min="0" max="30" />
+            <label class="editor-lbl">Post</label>
+            <input id="edit-tag-post" type="number" class="input-sm tag-edit-num" min="0" max="30" />
+            <select id="edit-tag-row" class="input-sm tag-edit-row-select">
+              <option value="top">Propio</option>
+              <option value="bottom">Rival</option>
+            </select>
+            <button id="btn-save-tag" class="btn btn-xs btn-primary">Guardar</button>
+            <button id="btn-delete-tag" class="btn btn-xs btn-danger">🗑️</button>
+            <button id="btn-cancel-tag-edit" class="btn btn-xs btn-ghost">✕</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Side Panel -->
+    <aside id="side-panel" class="side-panel">
+      <button id="btn-collapse-panel" class="btn-collapse" title="Colapsar panel">
+        <span class="collapse-icon">›</span>
+      </button>
+
+      <!-- ═══ ANALYZE MODE PANEL ═══ -->
+      <div id="panel-analyze" class="panel-content">
+        <div class="panel-section flex-grow">
+          <h3 class="section-title">
+            Clips del partido
+            <span id="clip-count" class="badge">0</span>
+            <button id="btn-live-edge" class="btn-live-edge hidden" type="button" title="Volver al vivo">↩ Volver al vivo</button>
+          </h3>
+          <div id="analyze-clip-list" class="clip-list"></div>
+        </div>
+        <div class="panel-section panel-section-fixed"
+          style="border-top: 1px solid var(--border); padding-top: var(--sp-sm);">
+          <h3 class="section-title">Playlists</h3>
+          <div class="playlist-create-row">
+            <input id="new-playlist-name" type="text" placeholder="Nombre de playlist…" class="input-sm" />
+            <button id="btn-create-playlist" class="btn btn-sm btn-primary">+</button>
+          </div>
+          <div id="analyze-playlists" class="playlist-list" style="max-height: 25vh; overflow-y: auto;"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW MODE PANEL ═══ -->
+      <div id="panel-view" class="panel-content hidden">
+        <!-- Source selector: compact, collapsible -->
+        <div class="panel-section panel-section-fixed" id="view-source-selector">
+          <div class="source-selector">
+            <div class="source-group" id="source-group-tags">
+              <button class="source-group-toggle" data-toggle="source-tags-list">
+                <span class="toggle-arrow">▸</span> Tags
+              </button>
+              <div id="source-tags-list" class="source-group-body collapsed">
+                <input type="text" id="view-tag-search" class="source-search-input" placeholder="Buscar tag..." />
+                <div id="source-tags" class="tag-filter-grid"></div>
+              </div>
+            </div>
+            <div class="source-group" id="source-group-flags">
+              <button class="source-group-toggle" data-toggle="source-flags-list">
+                <span class="toggle-arrow">▸</span> Flags
+              </button>
+              <div id="source-flags-list" class="source-group-body collapsed">
+                <div class="flag-filter-bar" id="flag-filter-bar">
+                  <button class="flag-btn" data-flag="bueno" title="Bueno">👍</button>
+                  <button class="flag-btn" data-flag="acorregir" title="A corregir">⚠️</button>
+                  <button class="flag-btn" data-flag="duda" title="Duda">❓</button>
+                  <button class="flag-btn" data-flag="importante" title="Importante">⭐</button>
+                  <button class="flag-btn" data-flag="has_chat" title="Con comentarios">💬</button>
+                </div>
+              </div>
+            </div>
+            <div class="source-group" id="source-group-playlists">
+              <button class="source-group-toggle" data-toggle="source-playlists-list">
+                <span class="toggle-arrow">▸</span> Playlists
+              </button>
+              <div id="source-playlists-list" class="source-group-body collapsed">
+                <div class="playlist-create-row" style="margin-top:6px;">
+                  <input id="view-new-playlist-name" type="text" placeholder="Nueva playlist…" class="input-sm" />
+                  <button id="btn-view-create-playlist" class="btn btn-sm btn-primary">+</button>
+                </div>
+                <div id="source-playlists"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Active filter chips (dynamically populated by JS) -->
+          <div id="active-filter-chip" class="filter-chips-container" style="display:none;"></div>
+          <button id="btn-reset-all-filters" class="btn btn-xs btn-ghost btn-reset-filters" style="display:none;"
+            title="Limpiar todos los filtros">❌ Limpiar filtros</button>
+        </div>
+
+        <!-- Active Playlist Header (shown when a playlist is selected) -->
+        <div id="active-playlist-header" class="panel-section panel-section-fixed" style="display:none;">
+          <div class="active-playlist-bar">
+            <span class="active-playlist-name" id="active-playlist-name"></span>
+            <span class="active-playlist-actions">
+              <button class="btn-playlist-action" id="btn-pl-export" title="Exportar playlist MP4" style="display:none;">📥</button>
+              <button class="btn-playlist-action" id="btn-pl-share" title="Compartir">🔗</button>
+              <button class="btn-playlist-action" id="btn-pl-wa" title="Compartir por WhatsApp" style="color:#25d366;">
+                <svg viewBox="0 0 24 24" fill="#25d366" width="13" height="13"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              </button>
+              <button class="btn-playlist-action" id="btn-pl-rename" title="Renombrar">✏️</button>
+              <button class="btn-playlist-action" id="btn-pl-delete" title="Eliminar">🗑️</button>
+              <button class="btn-playlist-action" id="btn-pl-close" title="Cerrar playlist">✕</button>
+            </span>
+          </div>
+        </div>
+
+        <!-- Clips (scrolls independently) -->
+        <div class="panel-section flex-grow">
+          <h3 class="section-title">
+            Clips
+            <span id="view-clip-count" class="badge">0</span>
+          </h3>
+          <div id="view-clip-list" class="clip-list"></div>
+          <!-- Selection action bar -->
+          <div id="view-selection-bar" class="view-selection-bar" style="display:none;">
+            <span><span id="view-selected-count">0</span> seleccionados</span>
+            <button id="btn-add-selected-to-playlist" class="btn btn-xs btn-primary">📋 Agregar a playlist</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SHARE MODE PANEL ═══ -->
+      <div id="panel-share" class="panel-content hidden">
+        <div class="panel-section">
+          <h3 class="section-title">Compartir Proyecto</h3>
+          <div id="share-no-project" class="share-notice" style="display:none;">
+            <p>Guardá el proyecto primero para poder compartirlo.</p>
+          </div>
+          <div id="share-actions" style="display:none;">
+            <div class="share-action-card" id="share-btn-collab">
+              <div class="share-action-body">
+                <div>
+                  <div class="share-action-title">Link colaborativo</div>
+                  <div class="share-action-desc">Permite editar en tiempo real</div>
+                </div>
+                <div class="share-icon-group">
+                  <span class="share-action-icon" id="share-copy-collab" title="Copiar link">🔗</span>
+                  <span class="share-action-icon share-wa-icon" id="share-wa-collab" title="Compartir por WhatsApp">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="share-action-card" id="share-btn-readonly">
+              <div class="share-action-body">
+                <div>
+                  <div class="share-action-title">Solo lectura</div>
+                  <div class="share-action-desc">El otro puede ver pero no editar</div>
+                </div>
+                <div class="share-icon-group">
+                  <span class="share-action-icon" id="share-copy-readonly" title="Copiar link">🔗</span>
+                  <span class="share-action-icon share-wa-icon" id="share-wa-readonly" title="Compartir por WhatsApp">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="share-section-label">Exportar</div>
+            <div class="share-action-card" id="share-btn-xml">
+              <div class="share-action-body">
+                <div>
+                  <div class="share-action-title">Exportar XML</div>
+                  <div class="share-action-desc">Compatible con SportCode</div>
+                </div>
+                <span class="share-action-icon share-action-icon--down">↓</span>
+              </div>
+            </div>
+            <div class="share-action-card" id="share-btn-json">
+              <div class="share-action-body">
+                <div>
+                  <div class="share-action-title">Exportar JSON</div>
+                  <div class="share-action-desc">Backup completo del proyecto</div>
+                </div>
+                <span class="share-action-icon share-action-icon--down">↓</span>
+              </div>
+            </div>
+            <div class="share-section-label">Playlists</div>
+            <div class="share-playlist-row">
+              <select id="share-panel-playlist-select" class="input-sm" style="flex:1;"></select>
+              <button id="share-btn-playlist" class="btn btn-sm btn-primary">🔗</button>
+              <button id="share-wa-playlist" class="btn btn-sm btn-ghost share-wa-btn" title="Compartir por WhatsApp">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ═══════ NEW PROJECT MODAL ═══════ -->
+  <div id="modal-new-game" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box">
+      <h2>Nuevo Proyecto</h2>
+
+      <!-- Tab Navigation -->
+      <div class="modal-tabs">
+        <button class="tab-btn active" data-tab="yt">
+          <span class="tab-icon">📺</span> YouTube
+        </button>
+        <button class="tab-btn" data-tab="local">
+          <span class="tab-icon">📂</span> Local
+        </button>
+        <button class="tab-btn" data-tab="json">
+          <span class="tab-icon">📥</span> Importar JSON
+        </button>
+      </div>
+
+      <!-- Tab Content: YouTube -->
+      <div id="tab-content-yt" class="tab-content">
+        <label class="form-label">
+          Título del Proyecto
+          <input id="input-game-title-yt" type="text" class="input" placeholder="Ej: vs River Plate — Fecha 12" />
+        </label>
+        <label class="form-label" style="margin-top: 15px;">
+          Enlace de YouTube
+          <input id="input-youtube-id" type="text" class="input" placeholder="Pegá el link de YouTube acá" />
+          <span class="form-hint">Podés pegar el link completo o solo el ID del video</span>
+        </label>
+        <label class="form-label" style="margin-top: 15px;">
+          Ventana de código inicial
+          <select id="select-new-project-buttonboard" class="input hidden">
+            <option value="builtin-default">Default</option>
+          </select>
+          <input id="input-new-project-buttonboard-fixed" class="input" value="Default" disabled />
+          <span id="hint-new-project-buttonboard-pro" class="form-hint hidden">Se copia al proyecto — podés editarla después</span>
+          <span id="hint-new-project-buttonboard-free" class="form-hint">Fija por defecto en Free (podés editarla después)</span>
+        </label>
+      </div>
+
+      <!-- Tab Content: Local Video -->
+      <div id="tab-content-local" class="tab-content hidden">
+        <label class="form-label">
+          Título del Proyecto
+          <input id="input-game-title-local" type="text" class="input" placeholder="Ej: Entrenamiento Táctico" />
+        </label>
+        <label class="form-label" style="margin-top: 15px;">
+          Seleccionar Video Local
+          <input id="input-local-video" type="file" class="input" accept="video/*" />
+        </label>
+      </div>
+
+      <!-- Tab Content: JSON Import -->
+      <div id="tab-content-json" class="tab-content hidden">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+          Cargá un archivo .json exportado previamente para restaurar todos los clips, etiquetas y playlists.
+        </p>
+        <label class="form-label">
+          Archivo del Proyecto (.json)
+          <input id="input-import-json" type="file" class="input" accept=".json" />
+        </label>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 20px;">
+        <button id="btn-cancel-game" class="btn btn-ghost">Cancelar</button>
+        <button id="btn-save-game" class="btn btn-primary">Crear proyecto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ ADD TO PLAYLIST MODAL ═══════ -->
+  <div id="modal-add-to-playlist" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-sm">
+      <h2>Agregar a Playlist</h2>
+      <div class="playlist-create-row" style="margin-bottom: 12px;">
+        <input id="new-playlist-name-modal" type="text" placeholder="Nueva playlist…" class="input-sm" />
+        <button id="btn-create-playlist-modal" class="btn btn-sm btn-primary">+</button>
+      </div>
+      <div id="playlist-select-list" class="playlist-select-list"></div>
+      <div class="modal-actions">
+        <button id="btn-cancel-add-playlist" class="btn btn-ghost">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ SHARE OPTIONS MODAL ═══════ -->
+  <div id="modal-share-options" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-sm" style="text-align: center;">
+      <h3 style="margin-bottom:12px;">🔗 Compartir Link</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
+        Elige qué quieres enviar a tus compañeros:
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button id="btn-share-edit" class="btn"
+          style="width: 100%; border:1px solid var(--border); background:var(--bg-elevated); color:var(--text-primary); justify-content:flex-start; font-size:0.9rem; padding:10px 14px;">
+          ✏️ Proyecto colaborativo
+        </button>
+        <button id="btn-share-view" class="btn"
+          style="width: 100%; border:1px solid var(--border); background:var(--bg-elevated); color:var(--text-primary); justify-content:flex-start; font-size:0.9rem; padding:10px 14px;">
+          👁️ Partido sólo lectura
+        </button>
+        <button id="btn-share-export-xml" class="btn"
+          style="width: 100%; border:1px solid var(--border); background:var(--bg-elevated); color:var(--text-primary); justify-content:flex-start; font-size:0.9rem; padding:10px 14px;">
+          ⬇️ Exportar XML (SportCode)
+        </button>
+        <button id="btn-share-export-json" class="btn"
+          style="width: 100%; border:1px solid var(--border); background:var(--bg-elevated); color:var(--text-primary); justify-content:flex-start; font-size:0.9rem; padding:10px 14px;">
+          📤 Exportar Proyecto Completo (JSON)
+        </button>
+
+        <div
+          style="margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
+          <select id="share-playlist-select" class="input-sm" style="width: 100%; text-align:left;">
+            <option value="">(No hay playlists disponibles)</option>
+          </select>
+          <button id="btn-share-playlist-modal" class="btn btn-share" style="width: 100%;">
+            📋 Compartir Playlist
+          </button>
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top: 15px; justify-content: center;">
+        <button id="btn-cancel-share" class="btn btn-sm btn-ghost">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ PREFERENCES MODAL ═══════ -->
+  <div id="modal-preferences" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-sm">
+      <h2>Preferencias</h2>
+
+      <h4 style="margin: 10px 0 8px; font-size: .86rem; color: var(--text-muted);">Reproducción</h4>
+      <div style="display:grid; grid-template-columns: 1fr 90px; gap:8px; align-items:center;">
+        <label for="pref-seek-step">Salto ←/→ (seg)</label>
+        <input id="pref-seek-step" class="input input-sm" type="number" min="1" max="60" step="1" />
+        <label for="pref-seek-step-shift">Salto Shift+←/→ (seg)</label>
+        <input id="pref-seek-step-shift" class="input input-sm" type="number" min="1" max="60" step="1" />
+      </div>
+      <div style="margin-top: 10px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:.82rem;">
+          <input id="pref-auto-save-enabled" type="checkbox" />
+          Auto-guardar cada 60 segundos
+        </label>
+      </div>
+
+      <h4 style="margin: 14px 0 8px; font-size: .86rem; color: var(--text-muted);">Atajos de teclado</h4>
+      <div style="display:grid; grid-template-columns: 1fr 150px; gap:8px; align-items:center;">
+        <label for="pref-shortcut-play">Play/Pause</label>
+        <input id="pref-shortcut-play" class="input input-sm pref-shortcut-input" type="text" readonly />
+        <label for="pref-shortcut-left">Retroceder</label>
+        <input id="pref-shortcut-left" class="input input-sm pref-shortcut-input" type="text" readonly />
+        <label for="pref-shortcut-right">Avanzar</label>
+        <input id="pref-shortcut-right" class="input input-sm pref-shortcut-input" type="text" readonly />
+        <label for="pref-shortcut-left-fast">Retroceder rápido</label>
+        <input id="pref-shortcut-left-fast" class="input input-sm pref-shortcut-input" type="text" readonly />
+        <label for="pref-shortcut-right-fast">Avanzar rápido</label>
+        <input id="pref-shortcut-right-fast" class="input input-sm pref-shortcut-input" type="text" readonly />
+      </div>
+      <p style="margin-top:8px; font-size:.75rem; color:var(--text-muted);">Tip: hacé foco en un campo y presioná la combinación. Backspace limpia.</p>
+
+      <div class="modal-actions" style="margin-top: 14px;">
+        <button id="btn-pref-reset" class="btn btn-ghost">Restablecer</button>
+        <button id="btn-pref-cancel" class="btn btn-ghost">Cancelar</button>
+        <button id="btn-pref-save" class="btn btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ SESSION CONFLICT MODAL ═══════ -->
+  <div id="modal-session-conflict" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-sm" style="text-align:center;">
+      <h3 style="margin-bottom:10px;">⚠️ Sesión en otro dispositivo</h3>
+      <p style="font-size:.86rem; color:var(--text-muted); margin-bottom:14px;">
+        Esta cuenta se abrió en otro dispositivo o navegador.
+      </p>
+      <p style="font-size:.82rem; color:var(--text-muted); margin-bottom:16px;">
+        Para continuar, iniciá sesión nuevamente.
+      </p>
+      <button id="btn-session-conflict-logout" class="btn btn-primary" style="width:100%;">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <!-- ═══════ COLLAPSED PANEL BUTTON ═══════ -->
+  <button id="btn-expand-panel" class="btn-expand hidden" title="Mostrar panel">‹</button>
+
+  <!-- Navigation arrows overlay -->
+  <div id="nav-arrows" class="nav-arrows hidden">
+    <button id="btn-prev-clip" class="nav-arrow nav-arrow-left" title="Clip anterior (←)">‹</button>
+    <button id="btn-next-clip" class="nav-arrow nav-arrow-right" title="Clip siguiente (→)">›</button>
+  </div>
+
+  <!-- Toast notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Export progress banner -->
+  <div id="export-progress" class="export-progress" style="display:none;">
+    <span class="export-progress-spinner"></span>
+    <span id="export-progress-text" class="export-progress-text"></span>
+  </div>
+
+  <!-- Quick edit menu (last clip) -->
+  <div id="quick-clip-menu" class="quick-clip-menu hidden" aria-hidden="true">
+    <div id="quick-clip-meta" class="quick-clip-menu__meta"></div>
+    <div class="quick-clip-menu__row">
+      <button id="quick-flag-bueno" class="quick-clip-btn" type="button" title="Bueno"><span class="quick-clip-btn__icon">👍</span><small>Q</small></button>
+      <button id="quick-flag-acorregir" class="quick-clip-btn" type="button" title="A corregir"><span class="quick-clip-btn__icon">⚠️</span><small>W</small></button>
+      <button id="quick-flag-duda" class="quick-clip-btn" type="button" title="Duda"><span class="quick-clip-btn__icon">❓</span><small>E</small></button>
+      <button id="quick-flag-importante" class="quick-clip-btn" type="button" title="Importante"><span class="quick-clip-btn__icon">⭐</span><small>R</small></button>
+      <button id="quick-chat" class="quick-clip-btn" type="button" title="Chat"><span class="quick-clip-btn__icon">💬</span><small>T</small></button>
+      <button id="quick-playlist" class="quick-clip-btn" type="button" title="Enviar a playlist"><span class="quick-clip-btn__icon">📋</span><small>Y</small></button>
+      <button id="quick-delete" class="quick-clip-btn quick-clip-btn--danger" type="button" title="Eliminar"><span class="quick-clip-btn__icon">🗑</span><small>U</small></button>
+    </div>
+    <div id="quick-playlist-picker" class="quick-playlist-picker hidden">
+      <div id="quick-playlist-list" class="quick-playlist-list"></div>
+      <div class="quick-playlist-create">
+        <input id="quick-playlist-new-name" class="input input-sm" type="text" placeholder="Nueva playlist…" />
+        <button id="quick-playlist-create-btn" class="btn btn-xs" type="button" title="Crear y enviar">N</button>
+      </div>
+      <div class="quick-playlist-help">1..9 elegir · N crear nueva · Esc cerrar</div>
+    </div>
+  </div>
+
+  <!-- Project list modal -->
+  <div id="modal-projects" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-md">
+      <h3 style="margin-bottom:12px;">📂 Mis Proyectos</h3>
+      <div id="project-folders-summary" style="margin:-4px 0 10px; font-size:.75rem; color:var(--text-muted);"></div>
+      <div id="project-list" class="project-list" style="margin-bottom: 20px;">
+        <p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Cargando...</p>
+      </div>
+
+      <h3 style="margin-bottom:12px; font-size: 0.95rem; color: var(--text-muted);">🔗 Compartidos Conmigo</h3>
+      <div id="shared-project-list" class="project-list">
+        <p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Cargando...</p>
+      </div>
+
+      <div style="margin-top:16px;text-align:right;">
+        <button id="btn-close-projects" class="btn btn-sm btn-ghost">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ BUTTONBOARDS PANEL MODAL (PRO) ═══════ -->
+  <div id="modal-buttonboards" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-md" id="modal-buttonboards-box">
+      <div id="bb-browser" class="bb-browser">
+        <div class="bb-modal-header">
+          <h3>🎛 Ventanas de código</h3>
+          <button id="btn-close-buttonboards" type="button" class="btn btn-ghost btn-sm" style="margin-left:auto;" aria-label="Cerrar">✕</button>
+        </div>
+
+        <!-- Section 1: System templates -->
+        <div class="bb-section">
+          <div class="bb-section-title">Templates del sistema</div>
+          <div id="bb-system-list" class="bb-list">
+            <p class="bb-loading">Cargando...</p>
+          </div>
+        </div>
+
+        <!-- Section 2: My templates (PRO) -->
+        <div class="bb-section">
+          <div class="bb-section-title">Mis templates</div>
+          <div id="bb-user-list" class="bb-list">
+            <p class="bb-loading">Cargando...</p>
+          </div>
+          <button id="btn-bb-new-template" type="button" class="btn btn-sm btn-primary" style="margin-top:10px;">＋ Nuevo template</button>
+        </div>
+
+        <!-- Save current project board as template -->
+        <div class="bb-section bb-save-section">
+          <button id="btn-bb-save-as-template" type="button" class="btn btn-sm btn-outline" style="width:100%;">
+            💾 Guardar ventana de código actual como template
+          </button>
+        </div>
+      </div>
+
+      <!-- Inline editor for name+buttons of a template (full modal when open) -->
+      <div id="bb-editor" class="bb-editor" style="display:none;">
+        <div class="bb-editor-header">
+          <button type="button" id="btn-bb-back-to-list" class="btn btn-ghost btn-sm bb-editor-back">← Volver</button>
+          <strong id="bb-editor-title">Editar template</strong>
+          <button type="button" id="btn-bb-editor-close" class="btn btn-ghost btn-xs" aria-label="Cerrar editor">✕</button>
+        </div>
+        <div class="bb-editor-body">
+          <div id="bb-editor-based-row" class="bb-editor-based-row" hidden>
+            <label class="form-label bb-editor-based-label">
+              Basada en
+              <select id="bb-editor-based-on" class="input"></select>
+            </label>
+          </div>
+          <label class="form-label" style="margin-bottom:10px;">
+            Nombre
+            <input id="bb-editor-name" type="text" class="input" placeholder="Nombre del template" />
+          </label>
+          <div id="bb-editor-buttons-list" class="bb-editor-builder"></div>
+        </div>
+        <div class="bb-editor-actions">
+          <button id="btn-bb-editor-save" class="btn btn-sm btn-primary">Guardar template</button>
+          <button id="btn-bb-editor-cancel" class="btn btn-sm btn-ghost">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- App (Firebase modular v10 + ES modules) -->
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>

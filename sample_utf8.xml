@@ -1,0 +1,2418 @@
+﻿<file>
+<ALL_INSTANCES>
+<instance>
+<ID>1</ID>
+<start>0.0</start>
+<end>28.095245853999614</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>2</ID>
+<start>0.0</start>
+<end>28.095245853999614</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>3</ID>
+<start>0.793567175999975</start>
+<end>0.9935671759999749</end>
+<code>INICIO</code>
+</instance>
+<instance>
+<ID>4</ID>
+<start>9.987665840998254</start>
+<end>28.095245853999614</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>5</ID>
+<start>25.095245853999614</start>
+<end>39.37088994499637</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>6</ID>
+<start>39.510727257002735</start>
+<end>74.59735186599976</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>7</ID>
+<start>79.40012800400044</start>
+<end>92.2189521559977</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>8</ID>
+<start>80.40012800400044</start>
+<end>92.2189521559977</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>9</ID>
+<start>89.2189521559977</start>
+<end>106.74448969599831</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>10</ID>
+<start>105.89848149000079</start>
+<end>124.79964345399588</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>11</ID>
+<start>108.60144769799899</start>
+<end>124.79964345399588</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>12</ID>
+<start>109.60144769799899</start>
+<end>124.79964345399588</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>13</ID>
+<start>121.79964345399588</start>
+<end>128.29831561800032</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>14</ID>
+<start>125.29831561800032</start>
+<end>139.32510053399807</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>15</ID>
+<start>139.9000706320007</start>
+<end>162.1969454780011</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>16</ID>
+<start>140.9000706320007</start>
+<end>162.1969454780011</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>17</ID>
+<start>159.1969454780011</start>
+<end>165.89727766399773</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>18</ID>
+<start>162.89727766399773</start>
+<end>180.99096018799864</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>19</ID>
+<start>177.99096018799864</start>
+<end>201.64627788399886</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>20</ID>
+<start>194.19105666399787</start>
+<end>212.1927513369977</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>21</ID>
+<start>198.64627788399886</start>
+<end>212.1927513369977</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>22</ID>
+<start>218.02213312899488</start>
+<end>225.51805240399617</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>23</ID>
+<start>219.02213312899488</start>
+<end>225.51805240399617</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>24</ID>
+<start>222.51805240399617</start>
+<end>233.09568660399873</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>25</ID>
+<start>229.92762347300228</start>
+<end>241.81388414000097</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>26</ID>
+<start>238.33954249000013</start>
+<end>255.9050192509989</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>27</ID>
+<start>239.33954249000013</start>
+<end>255.9050192509989</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>28</ID>
+<start>252.9050192509989</start>
+<end>261.30400078099905</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>29</ID>
+<start>270.2126111730006</start>
+<end>331.7263093110002</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>30</ID>
+<start>271.2126111730006</start>
+<end>331.7263093110002</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>31</ID>
+<start>344.0994865369957</start>
+<end>356.09994411499974</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>32</ID>
+<start>345.0994865369957</start>
+<end>356.09994411499974</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>33</ID>
+<start>353.09994411499974</start>
+<end>365.60237364199827</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>34</ID>
+<start>359.54690026099934</start>
+<end>378.7999838399963</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>35</ID>
+<start>362.60237364199827</start>
+<end>378.7999838399963</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>36</ID>
+<start>380.00830197200236</start>
+<end>413.6295755830005</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>37</ID>
+<start>381.00830197200236</start>
+<end>434.7666966189999</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>38</ID>
+<start>424.33175487399984</start>
+<end>443.11056947200063</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>39</ID>
+<start>433.3265341049984</start>
+<end>443.11056947200063</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>40</ID>
+<start>434.3265341049984</start>
+<end>443.11056947200063</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>41</ID>
+<start>436.91399931899747</start>
+<end>459.5130562979983</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>42</ID>
+<start>441.21784392800276</start>
+<end>459.5130562979983</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>43</ID>
+<start>442.21784392800276</start>
+<end>459.5130562979983</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>44</ID>
+<start>459.26657066399866</start>
+<end>492.9936195149961</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>45</ID>
+<start>460.26657066399866</start>
+<end>492.9936195149961</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>46</ID>
+<start>475.99351649299905</start>
+<end>492.9936195149961</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>47</ID>
+<start>643.2001574400028</start>
+<end>656.5964129559973</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>48</ID>
+<start>644.2001574400028</start>
+<end>656.5964129559973</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>49</ID>
+<start>645.6928771739994</start>
+<end>645.8928771739994</end>
+<code>INICIO</code>
+</instance>
+<instance>
+<ID>50</ID>
+<start>659.8147590490019</start>
+<end>668.1962592889992</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>51</ID>
+<start>674.9130434740015</start>
+<end>685.6972195539988</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>52</ID>
+<start>685.4001403260011</start>
+<end>702.6931451829981</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>53</ID>
+<start>685.9895331989975</start>
+<end>702.6931451829981</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>54</ID>
+<start>686.4001403260011</start>
+<end>702.6931451829981</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>55</ID>
+<start>701.1933752190002</start>
+<end>719.6689370619956</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>56</ID>
+<start>703.992803011999</start>
+<end>719.6689370619956</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>57</ID>
+<start>704.992803011999</start>
+<end>719.6689370619956</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>58</ID>
+<start>716.6689370619956</start>
+<end>725.7972003629967</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>59</ID>
+<start>726.5300022209985</start>
+<end>747.6966036529988</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>60</ID>
+<start>727.5300022209985</start>
+<end>747.6966036529988</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>61</ID>
+<start>745.4000337550013</start>
+<end>785.7846341890012</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>62</ID>
+<start>746.4000337550013</start>
+<end>785.7846341890012</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>63</ID>
+<start>766.8929222169946</start>
+<end>785.7846341890012</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>64</ID>
+<start>769.7846341890012</start>
+<end>787.7846341890012</end>
+<code>LEUV GOAL</code>
+</instance>
+<instance>
+<ID>65</ID>
+<start>799.9438036720032</start>
+<end>809.4386302989998</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>66</ID>
+<start>800.1390444709982</start>
+<end>819.7395073669974</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>67</ID>
+<start>800.9438036720032</start>
+<end>809.4386302989998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>68</ID>
+<start>806.4386302989998</start>
+<end>819.7395073669974</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>69</ID>
+<start>823.5434879530015</start>
+<end>840.2896064070002</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>70</ID>
+<start>824.5434879530015</start>
+<end>840.2896064070002</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>71</ID>
+<start>837.2896064070002</start>
+<end>843.7947542850001</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>72</ID>
+<start>840.7947542850001</start>
+<end>849.1965318549962</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>73</ID>
+<start>846.0437914919992</start>
+<end>855.938508445996</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>74</ID>
+<start>847.0437914919992</start>
+<end>855.938508445996</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>75</ID>
+<start>859.5435277890027</start>
+<end>876.6049091169959</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>76</ID>
+<start>873.6049091169959</start>
+<end>885.8999794280003</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>77</ID>
+<start>882.8999794280003</start>
+<end>916.0893020009972</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>78</ID>
+<start>913.0893020009972</start>
+<end>923.2033360149983</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>79</ID>
+<start>921.7099495570008</start>
+<end>927.9024266779986</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>80</ID>
+<start>925.6072817390017</start>
+<end>954.704804939996</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>81</ID>
+<start>926.6072817390017</start>
+<end>954.704804939996</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>82</ID>
+<start>933.3056865949989</start>
+<end>954.704804939996</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>83</ID>
+<start>938.704804939996</start>
+<end>956.704804939996</end>
+<code>DARI GOAL</code>
+</instance>
+<instance>
+<ID>84</ID>
+<start>970.301478434997</start>
+<end>1005.2050141719991</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>85</ID>
+<start>971.301478434997</start>
+<end>1015.001828325998</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>86</ID>
+<start>986.7920033590001</start>
+<end>1005.2050141719991</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>87</ID>
+<start>1011.6841597450001</start>
+<end>1018.9152094819962</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>88</ID>
+<start>1012.6841597450001</start>
+<end>1018.9152094819962</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>89</ID>
+<start>1017.9002671750026</start>
+<end>1046.7953096069987</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>90</ID>
+<start>1031.4148673469965</start>
+<end>1046.7953096069987</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>91</ID>
+<start>1038.5941661620006</start>
+<end>1054.993219782999</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>92</ID>
+<start>1043.7953096069987</start>
+<end>1050.7977831279986</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>93</ID>
+<start>1047.7977831279986</start>
+<end>1054.993219782999</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>94</ID>
+<start>1051.993219782999</start>
+<end>1065.7939522080005</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>95</ID>
+<start>1081.110614095</start>
+<end>1108.4949775719986</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>96</ID>
+<start>1082.110614095</start>
+<end>1136.498123463996</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>97</ID>
+<start>1091.2950988609966</start>
+<end>1108.4949775719986</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>98</ID>
+<start>1133.5987638049958</start>
+<end>1152.6938686599983</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>99</ID>
+<start>1142.7663849789997</start>
+<end>1152.6938686599983</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>100</ID>
+<start>1149.6938686599983</start>
+<end>1159.2883490059987</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>101</ID>
+<start>1159.9829549759993</start>
+<end>1206.8767270110006</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>102</ID>
+<start>1160.9829549759993</start>
+<end>1206.8767270110006</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>103</ID>
+<start>1210.5833110959986</start>
+<end>1224.6955012779963</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>104</ID>
+<start>1211.5833110959986</start>
+<end>1224.6955012779963</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>105</ID>
+<start>1222.9070277999986</start>
+<end>1232.7983490069987</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>106</ID>
+<start>1232.3237585170014</start>
+<end>1262.3983852279987</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>107</ID>
+<start>1233.3237585170014</start>
+<end>1262.3983852279987</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>108</ID>
+<start>1259.3983852279987</start>
+<end>1268.795619185999</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>109</ID>
+<start>1270.9842095960032</start>
+<end>1281.3979196909993</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>110</ID>
+<start>1271.9842095960032</start>
+<end>1281.3979196909993</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>111</ID>
+<start>1276.9449071929964</start>
+<end>1298.905472771997</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>112</ID>
+<start>1280.5831314869995</start>
+<end>1298.905472771997</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>113</ID>
+<start>1281.5831314869995</start>
+<end>1298.905472771997</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>114</ID>
+<start>1286.6989910909988</start>
+<end>1446.6989910909988</end>
+<code>DARI G</code>
+</instance>
+<instance>
+<ID>115</ID>
+<start>1295.905472771997</start>
+<end>1301.7998202640001</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>116</ID>
+<start>1297.3039734510016</start>
+<end>1304.6953600539966</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>117</ID>
+<start>1298.3039734510016</start>
+<end>1304.6953600539966</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>118</ID>
+<start>1306.402471811999</start>
+<end>1316.9977032929978</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>119</ID>
+<start>1307.402471811999</start>
+<end>1316.9977032929978</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>120</ID>
+<start>1312.4983777350005</start>
+<end>1335.8973930339969</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>121</ID>
+<start>1318.1232597689989</start>
+<end>1335.8973930339969</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>122</ID>
+<start>1357.8043266510017</start>
+<end>1373.8817085529995</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>123</ID>
+<start>1358.8043266510017</start>
+<end>1373.8817085529995</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>124</ID>
+<start>1372.0032625329982</start>
+<end>1426.400050785997</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>125</ID>
+<start>1373.0032625329982</start>
+<end>1426.400050785997</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>126</ID>
+<start>1414.5586820449987</start>
+<end>1433.0427996379974</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>127</ID>
+<start>1421.0008812760007</start>
+<end>1433.0427996379974</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>128</ID>
+<start>1422.0008812760007</start>
+<end>1433.0427996379974</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>129</ID>
+<start>1430.0427996379974</start>
+<end>1434.8459055279982</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>130</ID>
+<start>1441.9001725710004</start>
+<end>1453.6921271909962</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>131</ID>
+<start>1442.9001725710004</start>
+<end>1453.6921271909962</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>132</ID>
+<start>1443.4667543289997</start>
+<end>1461.7925990759986</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>133</ID>
+<start>1450.6921271909962</start>
+<end>1461.7925990759986</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>134</ID>
+<start>1466.2086468080013</start>
+<end>1477.3662773749988</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>135</ID>
+<start>1467.2086468080013</start>
+<end>1477.3662773749988</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>136</ID>
+<start>1474.3662773749988</start>
+<end>1483.397613972998</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>137</ID>
+<start>1480.397613972998</start>
+<end>1492.494111628</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>138</ID>
+<start>1489.494111628</start>
+<end>1520.4938514519954</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>139</ID>
+<start>1507.50390426</start>
+<end>1520.4938514519954</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>140</ID>
+<start>1545.2456970519993</start>
+<end>1557.1420721759985</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>141</ID>
+<start>1546.2456970519993</start>
+<end>1557.1420721759985</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>142</ID>
+<start>1556.5455128950027</start>
+<end>1565.979416145999</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>143</ID>
+<start>1557.5455128950027</start>
+<end>1565.979416145999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>144</ID>
+<start>1565.6000745440008</start>
+<end>1614.1395960339978</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>145</ID>
+<start>1566.6000745440008</start>
+<end>1614.1395960339978</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>146</ID>
+<start>1597.2912652010004</start>
+<end>1614.1395960339978</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>147</ID>
+<start>1671.5913951789996</start>
+<end>1685.896349842997</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>148</ID>
+<start>1671.5913951789996</start>
+<end>1686.5913951789996</end>
+<code>DARI PC</code>
+</instance>
+<instance>
+<ID>149</ID>
+<start>1742.3515803129978</start>
+<end>1816.2383800979992</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>150</ID>
+<start>1743.3515803129978</start>
+<end>1816.2383800979992</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>151</ID>
+<start>1798.1947724219974</start>
+<end>1816.2383800979992</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>152</ID>
+<start>1867.796146697997</start>
+<end>1885.796146697997</end>
+<code>LEUV GOAL</code>
+</instance>
+<instance>
+<ID>153</ID>
+<start>1876.3040275279975</start>
+<end>1883.796146697997</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>154</ID>
+<start>1876.3040275279975</start>
+<end>1891.3040275279975</end>
+<code>LEUV PC</code>
+</instance>
+<instance>
+<ID>155</ID>
+<start>1901.4415809229993</start>
+<end>1912.5536356909995</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>156</ID>
+<start>1902.4415809229993</start>
+<end>1912.5536356909995</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>157</ID>
+<start>1914.2431474959985</start>
+<end>1941.6354339969992</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>158</ID>
+<start>1915.2431474959985</start>
+<end>1941.6354339969992</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>159</ID>
+<start>1917.297189070999</start>
+<end>1917.497189070999</end>
+<code>INICIO</code>
+</instance>
+<instance>
+<ID>160</ID>
+<start>1938.6354339969992</start>
+<end>1973.3954715029965</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>161</ID>
+<start>1967.8339881279965</start>
+<end>1994.5940318949981</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>162</ID>
+<start>1968.8339881279965</start>
+<end>1994.5940318949981</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>163</ID>
+<start>1977.5976586759984</start>
+<end>1994.5940318949981</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>164</ID>
+<start>2037.725875143998</start>
+<end>2049.598623951996</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>165</ID>
+<start>2037.725875143998</start>
+<end>2052.725875143998</end>
+<code>LEUV PC</code>
+</instance>
+<instance>
+<ID>166</ID>
+<start>2103.5975774859953</start>
+<end>2118.5975774859953</end>
+<code>LEUV PC</code>
+</instance>
+<instance>
+<ID>167</ID>
+<start>2103.5975774859953</start>
+<end>2129.794641955</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>168</ID>
+<start>2112.171390035997</start>
+<end>2129.794641955</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>169</ID>
+<start>2126.794641955</start>
+<end>2136.7968163759983</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>170</ID>
+<start>2130.395568490998</start>
+<end>2149.9968151539974</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>171</ID>
+<start>2135.310150809998</start>
+<end>2149.9968151539974</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>172</ID>
+<start>2152.194853440997</start>
+<end>2164.087855423999</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>173</ID>
+<start>2153.194853440997</start>
+<end>2164.087855423999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>174</ID>
+<start>2163.5973485450004</start>
+<end>2181.20114801</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>175</ID>
+<start>2166.5044139189986</start>
+<end>2181.20114801</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>176</ID>
+<start>2167.5044139189986</start>
+<end>2181.20114801</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>177</ID>
+<start>2178.20114801</start>
+<end>2207.192328464998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>178</ID>
+<start>2206.7115697619997</start>
+<end>2215.9056794339967</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>179</ID>
+<start>2207.7115697619997</start>
+<end>2215.9056794339967</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>180</ID>
+<start>2219.4116511480015</start>
+<end>2244.0079342890003</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>181</ID>
+<start>2241.0079342890003</start>
+<end>2258.9064421169996</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>182</ID>
+<start>2259.1155196730006</start>
+<end>2286.9051942739966</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>183</ID>
+<start>2260.1155196730006</start>
+<end>2286.9051942739966</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>184</ID>
+<start>2284.9104897389993</start>
+<end>2298.0029777269974</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>185</ID>
+<start>2285.9104897389993</start>
+<end>2298.0029777269974</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>186</ID>
+<start>2295.0029777269974</start>
+<end>2304.6248353549954</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>187</ID>
+<start>2303.6307350730012</start>
+<end>2340.507999339995</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>188</ID>
+<start>2304.6307350730012</start>
+<end>2340.507999339995</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>189</ID>
+<start>2337.507999339995</start>
+<end>2342.8133265579977</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>190</ID>
+<start>2339.8133265579977</start>
+<end>2349.7166057029954</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>191</ID>
+<start>2348.118973633001</start>
+<end>2355.388337163997</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>192</ID>
+<start>2350.8112155240015</start>
+<end>2366.614433763996</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>193</ID>
+<start>2359.4006942630017</start>
+<end>2366.614433763996</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>194</ID>
+<start>2360.4006942630017</start>
+<end>2366.614433763996</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>195</ID>
+<start>2363.614433763996</start>
+<end>2400.864764586999</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>196</ID>
+<start>2378.015870732995</start>
+<end>2400.864764586999</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>197</ID>
+<start>2397.4186011760003</start>
+<end>2557.4186011760003</end>
+<code>LEUV G</code>
+</instance>
+<instance>
+<ID>198</ID>
+<start>2397.864764586999</start>
+<end>2414.7891273209975</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>199</ID>
+<start>2420.8202113809994</start>
+<end>2464.697692467998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>200</ID>
+<start>2446.9565827869997</start>
+<end>2464.697692467998</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>201</ID>
+<start>2456.495832203998</start>
+<end>2472.951164080996</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>202</ID>
+<start>2462.8029229279996</start>
+<end>2472.951164080996</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>203</ID>
+<start>2463.8029229279996</start>
+<end>2472.951164080996</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>204</ID>
+<start>2469.951164080996</start>
+<end>2518.691871851998</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>205</ID>
+<start>2499.1939006479984</start>
+<end>2518.691871851998</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>206</ID>
+<start>2557.3129466109995</start>
+<end>2575.3129466109995</end>
+<code>LEUV GOAL</code>
+</instance>
+<instance>
+<ID>207</ID>
+<start>2565.687205342998</start>
+<end>2573.3129466109995</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>208</ID>
+<start>2565.687205342998</start>
+<end>2580.687205342998</end>
+<code>LEUV PC</code>
+</instance>
+<instance>
+<ID>209</ID>
+<start>2588.621895029002</start>
+<end>2612.076120254998</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>210</ID>
+<start>2589.621895029002</start>
+<end>2612.076120254998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>211</ID>
+<start>2602.793400369998</start>
+<end>2620.5968104459967</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>212</ID>
+<start>2610.0006414640006</start>
+<end>2620.5968104459967</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>213</ID>
+<start>2622.8322231840007</start>
+<end>2640.998286107997</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>214</ID>
+<start>2623.8322231840007</start>
+<end>2640.998286107997</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>215</ID>
+<start>2644.400616003998</start>
+<end>2658.976621348999</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>216</ID>
+<start>2645.400616003998</start>
+<end>2658.976621348999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>217</ID>
+<start>2655.976621348999</start>
+<end>2662.497303624998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>218</ID>
+<start>2662.650307989998</start>
+<end>2699.4357364489956</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>219</ID>
+<start>2702.8968715159954</start>
+<end>2717.998491833998</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>220</ID>
+<start>2703.8968715159954</start>
+<end>2717.998491833998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>221</ID>
+<start>2725.9577137310002</start>
+<end>2741.219609909998</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>222</ID>
+<start>2726.9577137310002</start>
+<end>2741.219609909998</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>223</ID>
+<start>2747.0412977560013</start>
+<end>2760.698011604999</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>224</ID>
+<start>2748.0412977560013</start>
+<end>2760.698011604999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>225</ID>
+<start>2762.3257049300005</start>
+<end>2784.6165626089974</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>226</ID>
+<start>2783.2008852279982</start>
+<end>2810.492301993002</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>227</ID>
+<start>2793.577003427004</start>
+<end>2810.492301993002</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>228</ID>
+<start>2807.492301993002</start>
+<end>2815.1958384839977</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>229</ID>
+<start>2812.1958384839977</start>
+<end>2819.470264141999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>230</ID>
+<start>2816.470264141999</start>
+<end>2839.967046373997</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>231</ID>
+<start>2820.796868338998</start>
+<end>2839.967046373997</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>232</ID>
+<start>2836.967046373997</start>
+<end>2847.5934732999967</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>233</ID>
+<start>2854.6251580009935</start>
+<end>2876.1246987869927</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>234</ID>
+<start>2861.3001144419945</start>
+<end>2876.1246987869927</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>235</ID>
+<start>2862.3001144419945</start>
+<end>2876.1246987869927</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>236</ID>
+<start>2873.3732619190037</start>
+<end>2883.4972482859985</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>237</ID>
+<start>2874.3732619190037</start>
+<end>2883.4972482859985</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>238</ID>
+<start>2880.4972482859985</start>
+<end>2895.592508229993</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>239</ID>
+<start>2897.2013281690006</start>
+<end>2913.1978858500024</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>240</ID>
+<start>2906.711598374999</start>
+<end>3066.711598374999</end>
+<code>DARI G</code>
+</instance>
+<instance>
+<ID>241</ID>
+<start>2910.1978858500024</start>
+<end>2921.4118910539983</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>242</ID>
+<start>2935.792651436998</start>
+<end>2952.2534103300013</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>243</ID>
+<start>2943.9002768869964</start>
+<end>2952.2534103300013</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>244</ID>
+<start>2949.2534103300013</start>
+<end>2960.4966076979995</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>245</ID>
+<start>2961.300593742996</start>
+<end>2971.524090688998</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>246</ID>
+<start>2962.300593742996</start>
+<end>2971.524090688998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>247</ID>
+<start>2968.524090688998</start>
+<end>2991.2530212449933</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>248</ID>
+<start>2988.2530212449933</start>
+<end>3002.5518722510014</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>249</ID>
+<start>3012.9582738499976</start>
+<end>3040.991042700997</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>250</ID>
+<start>3013.9582738499976</start>
+<end>3040.991042700997</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>251</ID>
+<start>3037.991042700997</start>
+<end>3047.992752931002</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>252</ID>
+<start>3048.501307345994</start>
+<end>3065.493409123997</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>253</ID>
+<start>3049.501307345994</start>
+<end>3065.493409123997</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>254</ID>
+<start>3062.493409123997</start>
+<end>3083.400349519003</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>255</ID>
+<start>3064.6981325979996</start>
+<end>3083.400349519003</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>256</ID>
+<start>3080.400349519003</start>
+<end>3090.2976796059984</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>257</ID>
+<start>3233.0080623180033</start>
+<end>3251.0937263149963</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>258</ID>
+<start>3234.0080623180033</start>
+<end>3251.0937263149963</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>259</ID>
+<start>3235.997950531999</start>
+<end>3236.1979505319987</end>
+<code>INICIO</code>
+</instance>
+<instance>
+<ID>260</ID>
+<start>3254.4238859699994</start>
+<end>3267.493598814996</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>261</ID>
+<start>3255.4238859699994</start>
+<end>3267.493598814996</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>262</ID>
+<start>3264.493598814996</start>
+<end>3298.495740711999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>263</ID>
+<start>3301.882259535997</start>
+<end>3311.778255197992</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>264</ID>
+<start>3302.882259535997</start>
+<end>3311.778255197992</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>265</ID>
+<start>3308.778255197992</start>
+<end>3322.433804369992</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>266</ID>
+<start>3322.300721101002</start>
+<end>3332.2921935529976</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>267</ID>
+<start>3323.300721101002</start>
+<end>3332.2921935529976</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>268</ID>
+<start>3330.001697042</start>
+<end>3347.6006101990006</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>269</ID>
+<start>3331.001697042</start>
+<end>3347.6006101990006</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>270</ID>
+<start>3343.419938165</start>
+<end>3360.913050997998</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>271</ID>
+<start>3344.6006101990006</start>
+<end>3351.752906504005</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>272</ID>
+<start>3348.752906504005</start>
+<end>3353.2159000669994</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>273</ID>
+<start>3351.000236503003</start>
+<end>3360.913050997998</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>274</ID>
+<start>3352.000236503003</start>
+<end>3360.913050997998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>275</ID>
+<start>3403.7864993839976</start>
+<end>3418.7864993839976</end>
+<code>DARI PC</code>
+</instance>
+<instance>
+<ID>276</ID>
+<start>3403.7864993839976</start>
+<end>3431.5364510040026</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>277</ID>
+<start>3427.5364510040026</start>
+<end>3439.4970458389967</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>278</ID>
+<start>3428.5364510040026</start>
+<end>3439.4970458389967</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>279</ID>
+<start>3436.4970458389967</start>
+<end>3457.096772478999</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>280</ID>
+<start>3437.392854227003</start>
+<end>3457.096772478999</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>281</ID>
+<start>3458.3821837650003</start>
+<end>3487.8392513720023</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>282</ID>
+<start>3459.3821837650003</start>
+<end>3487.8392513720023</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>283</ID>
+<start>3483.8392513720023</start>
+<end>3493.7932086850014</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>284</ID>
+<start>3484.8392513720023</start>
+<end>3493.7932086850014</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>285</ID>
+<start>3490.7932086850014</start>
+<end>3512.889240786</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>286</ID>
+<start>3510.0001190760026</start>
+<end>3524.776060710998</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>287</ID>
+<start>3511.0001190760026</start>
+<end>3524.776060710998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>288</ID>
+<start>3523.703917737002</start>
+<end>3534.734003123</end>
+<code>DARI BS2</code>
+</instance>
+<instance>
+<ID>289</ID>
+<start>3524.703917737002</start>
+<end>3534.734003123</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>290</ID>
+<start>3535.4805964189977</start>
+<end>3544.8759714869943</end>
+<code>LEUV BS2</code>
+</instance>
+<instance>
+<ID>291</ID>
+<start>3536.4805964189977</start>
+<end>3544.8759714869943</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>292</ID>
+<start>3548.6810724850034</start>
+<end>3594.293117857002</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>293</ID>
+<start>3592.6172944580026</start>
+<end>3634.408627106997</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>294</ID>
+<start>3628.594461815999</start>
+<end>3644.494694887999</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>295</ID>
+<start>3633.616540145001</start>
+<end>3644.494694887999</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>296</ID>
+<start>3634.616540145001</start>
+<end>3644.494694887999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>297</ID>
+<start>3650.0719096960015</start>
+<end>3659.6964972220026</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>298</ID>
+<start>3651.0719096960015</start>
+<end>3659.6964972220026</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>299</ID>
+<start>3661.398200978993</start>
+<end>3681.3714547940003</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>300</ID>
+<start>3661.4002300020006</start>
+<end>3681.3714547940003</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>301</ID>
+<start>3662.4002300020006</start>
+<end>3681.3714547940003</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>302</ID>
+<start>3681.396316734997</start>
+<end>3697.5972186350004</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>303</ID>
+<start>3687.734116306</start>
+<end>3697.5972186350004</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>304</ID>
+<start>3688.734116306</start>
+<end>3697.5972186350004</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>305</ID>
+<start>3696.2918465439957</start>
+<end>3713.7149784920025</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>306</ID>
+<start>3700.6907797210024</start>
+<end>3713.7149784920025</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>307</ID>
+<start>3701.6907797210024</start>
+<end>3713.7149784920025</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>308</ID>
+<start>3710.7149784920025</start>
+<end>3715.998610906999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>309</ID>
+<start>3712.998610906999</start>
+<end>3726.5969969820017</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>310</ID>
+<start>3721.9869178600015</start>
+<end>3738.7143990240015</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>311</ID>
+<start>3723.5969969820017</start>
+<end>3735.1961515369985</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>312</ID>
+<start>3732.1961515369985</start>
+<end>3738.7143990240015</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>313</ID>
+<start>3746.2025892310016</start>
+<end>3775.8982607569983</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>314</ID>
+<start>3747.2025892310016</start>
+<end>3775.8982607569983</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>315</ID>
+<start>3756.0974634760037</start>
+<end>3775.8982607569983</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>316</ID>
+<start>3774.1000537240006</start>
+<end>3800.093949654995</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>317</ID>
+<start>3775.1000537240006</start>
+<end>3800.093949654995</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>318</ID>
+<start>3801.8933969669974</start>
+<end>3819.669638327998</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>319</ID>
+<start>3809.2733285829977</start>
+<end>3819.669638327998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>320</ID>
+<start>3816.669638327998</start>
+<end>3828.893893678997</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>321</ID>
+<start>3829.019418631002</start>
+<end>3855.204421702996</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>322</ID>
+<start>3830.019418631002</start>
+<end>3855.204421702996</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>323</ID>
+<start>3837.094650957994</start>
+<end>3855.204421702996</end>
+<code>LEUV CP</code>
+</instance>
+<instance>
+<ID>324</ID>
+<start>3859.0030114559986</start>
+<end>3875.3026460660026</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>325</ID>
+<start>3859.407120561995</start>
+<end>3875.3026460660026</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>326</ID>
+<start>3860.407120561995</start>
+<end>3875.3026460660026</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>327</ID>
+<start>3877.9129902699983</start>
+<end>3888.998217325002</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>328</ID>
+<start>3878.9129902699983</start>
+<end>3888.998217325002</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>329</ID>
+<start>3885.998217325002</start>
+<end>3893.904743660001</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>330</ID>
+<start>3887.5004987679954</start>
+<end>3907.679408126995</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>331</ID>
+<start>3893.7041956279977</start>
+<end>3907.679408126995</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>332</ID>
+<start>3894.7041956279977</start>
+<end>3907.679408126995</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>333</ID>
+<start>3907.1921176239994</start>
+<end>3923.791327817997</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>334</ID>
+<start>3908.4914261540007</start>
+<end>3923.791327817997</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>335</ID>
+<start>3909.4914261540007</start>
+<end>3923.791327817997</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>336</ID>
+<start>3920.791327817997</start>
+<end>3936.791220462</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>337</ID>
+<start>3929.294914690002</start>
+<end>3946.2871044380013</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>338</ID>
+<start>3933.791220462</start>
+<end>3937.6417152079944</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>339</ID>
+<start>3937.600106882998</start>
+<end>3946.2871044380013</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>340</ID>
+<start>3982.7939842119977</start>
+<end>3992.995014401999</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>341</ID>
+<start>3982.7939842119977</start>
+<end>3997.7939842119977</end>
+<code>DARI PC</code>
+</instance>
+<instance>
+<ID>342</ID>
+<start>4016.3969915739945</start>
+<end>4031.3969915739945</end>
+<code>DARI PC</code>
+</instance>
+<instance>
+<ID>343</ID>
+<start>4016.3969915739945</start>
+<end>4035.055464242998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>344</ID>
+<start>4018.381694810991</start>
+<end>4035.055464242998</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>345</ID>
+<start>4038.501409788999</start>
+<end>4055.8974591320048</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>346</ID>
+<start>4039.476061593999</start>
+<end>4055.8974591320048</end>
+<code>DARI BS4</code>
+</instance>
+<instance>
+<ID>347</ID>
+<start>4040.476061593999</start>
+<end>4055.8974591320048</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>348</ID>
+<start>4161.872939132</start>
+<end>4172.262490382994</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>349</ID>
+<start>4162.872939132</start>
+<end>4172.262490382994</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>350</ID>
+<start>4171.407221012997</start>
+<end>4192.698036512999</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>351</ID>
+<start>4172.407221012997</start>
+<end>4192.698036512999</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>352</ID>
+<start>4175.395706263999</start>
+<end>4192.698036512999</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>353</ID>
+<start>4189.698036512999</start>
+<end>4194.578778578994</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>354</ID>
+<start>4199.153681820996</start>
+<end>4216.398259993002</end>
+<code>LEUV BS1</code>
+</instance>
+<instance>
+<ID>355</ID>
+<start>4200.153681820996</start>
+<end>4216.398259993002</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>356</ID>
+<start>4219.153845087995</start>
+<end>4233.497133364996</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>357</ID>
+<start>4220.153845087995</start>
+<end>4233.497133364996</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>358</ID>
+<start>4232.659118158996</start>
+<end>4242.897293473997</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>359</ID>
+<start>4233.659118158996</start>
+<end>4242.897293473997</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>360</ID>
+<start>4239.897293473997</start>
+<end>4260.624137004992</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>361</ID>
+<start>4257.624137004992</start>
+<end>4264.412170572001</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>362</ID>
+<start>4260.986970866995</start>
+<end>4276.8151377199965</end>
+<code>DARI CP</code>
+</instance>
+<instance>
+<ID>363</ID>
+<start>4261.800336255002</start>
+<end>4276.8151377199965</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>364</ID>
+<start>4262.800336255002</start>
+<end>4276.8151377199965</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>365</ID>
+<start>4273.8151377199965</start>
+<end>4290.119370732998</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>366</ID>
+<start>4287.119370732998</start>
+<end>4293.335389208998</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>367</ID>
+<start>4291.464812152996</start>
+<end>4302.043902587998</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>368</ID>
+<start>4292.464812152996</start>
+<end>4302.043902587998</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>369</ID>
+<start>4299.043902587998</start>
+<end>4316.391166374999</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>370</ID>
+<start>4314.648663176003</start>
+<end>4327.794886972003</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>371</ID>
+<start>4327.800912761003</start>
+<end>4339.439451986</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>372</ID>
+<start>4328.800912761003</start>
+<end>4339.439451986</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>373</ID>
+<start>4339.555327779</start>
+<end>4348.192874674996</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>374</ID>
+<start>4340.555327779</start>
+<end>4348.192874674996</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>375</ID>
+<start>4345.192874674996</start>
+<end>4361.847236454005</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>376</ID>
+<start>4365.448656016001</start>
+<end>4375.777903618999</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>377</ID>
+<start>4379.501466533997</start>
+<end>4389.198039749997</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>378</ID>
+<start>4380.501466533997</start>
+<end>4389.198039749997</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>379</ID>
+<start>4388.759888400006</start>
+<end>4398.034025841995</end>
+<code>LEUV BS4</code>
+</instance>
+<instance>
+<ID>380</ID>
+<start>4389.759888400006</start>
+<end>4398.034025841995</end>
+<code>LEUV POS</code>
+</instance>
+<instance>
+<ID>381</ID>
+<start>4394.093943876</start>
+<end>4554.093943876</end>
+<code>LEUV G</code>
+</instance>
+<instance>
+<ID>382</ID>
+<start>4396.500485628994</start>
+<end>4407.76397387</end>
+<code>DARI BS1</code>
+</instance>
+<instance>
+<ID>383</ID>
+<start>4397.500485628994</start>
+<end>4407.76397387</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>384</ID>
+<start>4413.199956640995</start>
+<end>4425.598470154995</end>
+<code>DARI POS</code>
+</instance>
+<instance>
+<ID>385</ID>
+<start>4422.598470154995</start>
+<end>4429.0</end>
+<code>LEUV POS</code>
+</instance>
+</ALL_INSTANCES>
+<ROWS>
+<row>
+<code>INICIO</code>
+<R>65535</R>
+<G>65535</G>
+<B>65535</B>
+</row>
+<row>
+<code>DARI BS1</code>
+<R>64764</R>
+<G>22102</G>
+<B>14649</B>
+</row>
+<row>
+<code>DARI BS2</code>
+<R>64764</R>
+<G>22102</G>
+<B>14649</B>
+</row>
+<row>
+<code>DARI BS4</code>
+<R>64764</R>
+<G>22102</G>
+<B>14649</B>
+</row>
+<row>
+<code>DARI CP</code>
+<R>64764</R>
+<G>22102</G>
+<B>14649</B>
+</row>
+<row>
+<code>DARI GOAL</code>
+<R>64764</R>
+<G>22102</G>
+<B>14649</B>
+</row>
+<row>
+<code>DARI PC</code>
+<R>64764</R>
+<G>22102</G>
+<B>14649</B>
+</row>
+<row>
+<code>LEUV BS1</code>
+<R>28527</R>
+<G>36751</G>
+<B>65535</B>
+</row>
+<row>
+<code>LEUV BS2</code>
+<R>28527</R>
+<G>36751</G>
+<B>65535</B>
+</row>
+<row>
+<code>LEUV BS4</code>
+<R>28527</R>
+<G>36751</G>
+<B>65535</B>
+</row>
+<row>
+<code>LEUV CP</code>
+<R>28527</R>
+<G>36751</G>
+<B>65535</B>
+</row>
+<row>
+<code>LEUV GOAL</code>
+<R>28527</R>
+<G>36751</G>
+<B>65535</B>
+</row>
+<row>
+<code>LEUV PC</code>
+<R>28527</R>
+<G>36751</G>
+<B>65535</B>
+</row>
+<row>
+<code>DARI G</code>
+<R>15163</R>
+<G>48573</G>
+<B>1028</B>
+</row>
+<row>
+<code>LEUV G</code>
+<R>15163</R>
+<G>48573</G>
+<B>1028</B>
+</row>
+<row>
+<code>DARI POS</code>
+<R>65535</R>
+<G>65535</G>
+<B>65535</B>
+</row>
+<row>
+<code>LEUV POS</code>
+<R>65535</R>
+<G>65535</G>
+<B>65535</B>
+</row>
+</ROWS>
+</file>
