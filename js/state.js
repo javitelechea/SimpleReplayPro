@@ -89,7 +89,9 @@ export const AppState = (() => {
   }
 
   function getTagType(id) {
-    return getActiveTagTypes().find(t => t.id === id);
+    const activeTag = getActiveTagTypes().find(t => t.id === id);
+    if (activeTag) return activeTag;
+    return state.tagTypes.find(t => t.id === id);
   }
 
   function getFilteredClips() {
