@@ -929,14 +929,29 @@ export const AppState = (() => {
     state.playlistItems = playlistItemsToImport;
     state.clipFlags = clipFlagsToImport;
     state.playlistComments = playlistCommentsToImport;
-    
-    if (data.tagTypes && data.tagTypes.length > 0) {
-      state.tagTypes = data.tagTypes;
-    }
-    if (data.activeButtonboards) {
+
+    // Same rules as loadFromCloud: if activeButtonboards exist, tagTypes come from the first board's buttons.
+    // Otherwise legacy tagTypes only, or empty — never leave stale state.tagTypes from a previous session.
+    if (data.activeButtonboards && data.activeButtonboards.length > 0) {
       state.activeButtonboards = data.activeButtonboards;
+      state.tagTypes = [...(state.activeButtonboards[0].buttons || [])];
+    } else if (data.tagTypes && data.tagTypes.length > 0) {
+      state.activeButtonboards = [{
+        id: 'migrated-' + Date.now().toString(36),
+        name: 'Ventana de código del proyecto',
+        buttons: [...data.tagTypes],
+      }];
+      state.tagTypes = [...data.tagTypes];
+    } else {
+      state.activeButtonboards = [];
+      state.tagTypes = [];
     }
 
+    if (state.tagTypes.length > 0) {
+      DemoData.restoreTagTypes(state.tagTypes);
+    }
+
+    emit('tagTypesUpdated', getActiveTagTypes());
     emit('gameChanged', gameToImport);
     return gameToImport;
   }
