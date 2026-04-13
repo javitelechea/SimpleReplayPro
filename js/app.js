@@ -1072,6 +1072,11 @@ import { createSessionGuard } from './sessionGuard.js';
 
     // ── New Project Modal: Tab Logic ──
     let activeProjectTab = 'yt';
+    /** Ventana de código: visible en YouTube y Local; oculta en Importar JSON (el .json trae la suya). */
+    function updateNewProjectButtonboardRowVisibility() {
+        const row = $('#new-project-buttonboard-row');
+        if (row) row.classList.toggle('hidden', activeProjectTab === 'json');
+    }
     function syncNewProjectModalByPlan() {
         const hasLocalVideo = AppState.hasFeature(FEATURES.LOCAL_VIDEO);
         const hasImportData = AppState.hasFeature(FEATURES.IMPORT_DATA);
@@ -1088,6 +1093,7 @@ import { createSessionGuard } from './sessionGuard.js';
                 c.classList.toggle('hidden', c.id !== 'tab-content-yt');
             });
         }
+        updateNewProjectButtonboardRowVisibility();
     }
 
     // New project modal
@@ -1126,6 +1132,7 @@ import { createSessionGuard } from './sessionGuard.js';
         } else {
             _newProjectTemplates = [ButtonboardTemplates.BUILTIN_DEFAULT];
         }
+        updateNewProjectButtonboardRowVisibility();
     });
 
     $('#btn-cancel-game').addEventListener('click', () => {
@@ -1151,6 +1158,7 @@ import { createSessionGuard } from './sessionGuard.js';
             document.querySelectorAll('#modal-new-game .tab-content').forEach(c => {
                 c.classList.toggle('hidden', c.id !== `tab-content-${activeProjectTab}`);
             });
+            updateNewProjectButtonboardRowVisibility();
         });
     });
 

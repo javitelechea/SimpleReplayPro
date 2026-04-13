@@ -94,6 +94,17 @@ export const AppState = (() => {
     return state.tagTypes.find(t => t.id === id);
   }
 
+  /** Botonera activa + tags solo en state.tagTypes (p. ej. import XML). Para filtros en modo Ver sin llenar la botonera. */
+  function getTagTypesForFilter() {
+    const active = getActiveTagTypes();
+    const byId = new Map();
+    active.forEach(t => byId.set(t.id, t));
+    state.tagTypes.forEach(t => {
+      if (!byId.has(t.id)) byId.set(t.id, t);
+    });
+    return Array.from(byId.values());
+  }
+
   function getFilteredClips() {
     let clips = [...state.clips];
 
@@ -958,7 +969,7 @@ export const AppState = (() => {
 
   return {
     on, off, get, set: (k, v) => { state[k] = v; },
-    getCurrentGame, getCurrentClip, getTagType, getFilteredClips, getClipUserFlags,
+    getCurrentGame, getCurrentClip, getTagType, getTagTypesForFilter, getFilteredClips, getClipUserFlags,
     setMode, setCurrentGame, setCurrentClip,
     addGame, addClip, updateClipBounds, updateClipAbsoluteBounds, deleteClip,
     addPlaylist, addClipToPlaylist, removeClipFromPlaylist, renamePlaylist, deletePlaylist, reorderPlaylist,

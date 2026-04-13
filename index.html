@@ -479,15 +479,6 @@
           <input id="input-youtube-id" type="text" class="input" placeholder="Pegá el link de YouTube acá" />
           <span class="form-hint">Podés pegar el link completo o solo el ID del video</span>
         </label>
-        <label class="form-label" style="margin-top: 15px;">
-          Ventana de código inicial
-          <select id="select-new-project-buttonboard" class="input hidden">
-            <option value="builtin-default">Default</option>
-          </select>
-          <input id="input-new-project-buttonboard-fixed" class="input" value="Default" disabled />
-          <span id="hint-new-project-buttonboard-pro" class="form-hint hidden">Se copia al proyecto — podés editarla después</span>
-          <span id="hint-new-project-buttonboard-free" class="form-hint">Fija por defecto en Free (podés editarla después)</span>
-        </label>
       </div>
 
       <!-- Tab Content: Local Video -->
@@ -511,6 +502,17 @@
           Archivo del Proyecto (.json)
           <input id="input-import-json" type="file" class="input" accept=".json" />
         </label>
+      </div>
+
+      <!-- YouTube + Local: misma elección de botonera (no aplica a importar JSON) -->
+      <div id="new-project-buttonboard-row" class="form-label" style="margin-top: 15px;">
+        Ventana de código inicial
+        <select id="select-new-project-buttonboard" class="input hidden">
+          <option value="builtin-default">Default</option>
+        </select>
+        <input id="input-new-project-buttonboard-fixed" class="input" value="Default" disabled />
+        <span id="hint-new-project-buttonboard-pro" class="form-hint hidden">Se copia al proyecto — podés editarla después</span>
+        <span id="hint-new-project-buttonboard-free" class="form-hint">Fija por defecto en Free (podés editarla después)</span>
       </div>
 
       <div class="modal-actions" style="margin-top: 20px;">

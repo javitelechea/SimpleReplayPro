@@ -1135,7 +1135,7 @@ export const UI = (() => {
     function renderViewSources() {
         const tagsContainer = $('#source-tags');
         const playlistsContainer = $('#source-playlists');
-        const tags = AppState.get('tagTypes');
+        const tags = AppState.getTagTypesForFilter();
         const playlists = AppState.get('playlists');
         const activeTagIds = AppState.get('activeTagFilters');
         const activePlaylistId = AppState.get('activePlaylistId');
