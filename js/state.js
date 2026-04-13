@@ -628,7 +628,8 @@ export const AppState = (() => {
     const data = {
       title: game ? game.title : 'Sin título',
       youtubeVideoId: game ? game.youtube_video_id : '',
-      tagTypes: getActiveTagTypes(),             // legacy field kept for compatibility
+      // Catálogo completo (botonera + tags solo por import XML, etc.). No usar solo getActiveTagTypes().
+      tagTypes: [...state.tagTypes],
       activeButtonboards: state.activeButtonboards,
       games: state.games,
       clips: state.clips,
@@ -658,7 +659,6 @@ export const AppState = (() => {
     if (!data) return false;
 
     state.currentProjectId = projectId;
-    state.tagTypes = data.tagTypes || [];
     state.games = data.games || [];
     state.clips = data.clips || [];
     state.playlists = data.playlists || [];
@@ -670,10 +670,13 @@ export const AppState = (() => {
 
     // ── Restore / migrate activeButtonboards ──
     if (data.activeButtonboards && data.activeButtonboards.length > 0) {
-      // Modern project: use saved activeButtonboards
       state.activeButtonboards = data.activeButtonboards;
-      // Sync tagTypes to the first active board so DemoData mutations stay consistent
-      state.tagTypes = [...(state.activeButtonboards[0].buttons || [])];
+      // tagTypes en Firestore = catálogo completo; la botonera es solo la parte visible.
+      if (data.tagTypes && data.tagTypes.length > 0) {
+        state.tagTypes = [...data.tagTypes];
+      } else {
+        state.tagTypes = [...(state.activeButtonboards[0].buttons || [])];
+      }
     } else if (data.tagTypes && data.tagTypes.length > 0) {
       // Legacy project: wrap existing tagTypes as the first (and only) active board
       state.activeButtonboards = [{
@@ -684,6 +687,7 @@ export const AppState = (() => {
       state.tagTypes = [...data.tagTypes];
     } else {
       state.activeButtonboards = [];
+      state.tagTypes = [];
     }
 
     // Sync DemoData so local mutations work with cloud data
