@@ -2420,9 +2420,24 @@ import { createSessionGuard } from './sessionGuard.js';
             }
         }
 
-        // Arrow keys: navigate clips (View mode)
+        // Arrow keys: navigate clips (View mode). Flechas solas = clip anterior/siguiente;
+        // Shift+flecha (u otros atajos de seekLeftFast/seekRightFast) = salto de tiempo como en Análisis.
         if (mode === 'view') {
-            if (e.key === 'ArrowLeft') {
+            if (matchesShortcut(e, 'seekLeftFast')) {
+                e.preventDefault();
+                const t = YTPlayer.getCurrentTime();
+                const step = getSeekStep(true);
+                YTPlayer.seekTo(Math.max(0, t - step));
+                return;
+            }
+            if (matchesShortcut(e, 'seekRightFast')) {
+                e.preventDefault();
+                const t = YTPlayer.getCurrentTime();
+                const step = getSeekStep(true);
+                YTPlayer.seekTo(t + step);
+                return;
+            }
+            if (e.key === 'ArrowLeft' && !e.shiftKey) {
                 e.preventDefault();
                 AppState.navigateClip('prev');
                 const clip = AppState.getCurrentClip();
@@ -2433,7 +2448,7 @@ import { createSessionGuard } from './sessionGuard.js';
                 }
                 return;
             }
-            if (e.key === 'ArrowRight') {
+            if (e.key === 'ArrowRight' && !e.shiftKey) {
                 e.preventDefault();
                 AppState.navigateClip('next');
                 const clip = AppState.getCurrentClip();
