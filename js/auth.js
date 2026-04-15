@@ -67,6 +67,14 @@ export async function getUserDoc(uid) {
     return snap.exists() ? snap.data() : null;
 }
 
+export async function setLastProjectForUser(uid, projectId) {
+    if (!uid || !projectId) return;
+    await setDoc(doc(db, 'users', uid), {
+        lastProjectId: projectId,
+        lastProjectOpenedAt: serverTimestamp(),
+    }, { merge: true });
+}
+
 export function waitForAuthReady() {
     return auth.authStateReady();
 }

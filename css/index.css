@@ -2889,8 +2889,11 @@ body.read-only-mode #btn-pl-wa,
 body.read-only-mode .pl-wa-btn,
 body.read-only-mode .pl-share-btn,
 body.read-only-mode .share-wa-btn,
-body.read-only-mode .header-nav-wrap,
 body.read-only-mode #btn-save-project {
+  display: none !important;
+}
+
+body.read-only-mode:not(.read-only-pro) .header-nav-wrap {
   display: none !important;
 }
 
@@ -3537,6 +3540,10 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   /* Solo ocultamos acciones; la marca (logo + nombre) sí se ve */
   body.read-only-mode #app-header .header-right {
     display: none !important;
+  }
+
+  body.read-only-mode.read-only-pro #app-header .header-right {
+    display: flex !important;
   }
 
   body.read-only-mode #app-header .header-left {

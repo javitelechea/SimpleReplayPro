@@ -11,7 +11,7 @@ import { YTPlayer } from './youtubePlayer.js';
 import { Timeline } from './timeline.js';
 import { DrawingTool } from './drawing.js';
 import { ExportManager } from './export.js';
-import { onAuthChange, loginWithGoogle, logout, waitForAuthReady, getCurrentUser, getUserDoc } from './auth.js';
+import { onAuthChange, loginWithGoogle, logout, waitForAuthReady, getCurrentUser, getUserDoc, setLastProjectForUser } from './auth.js';
 import { FEATURES, resolveEffectivePlan, resolveFeaturesForUser } from './features.js';
 import { toMillis } from './access.js';
 import { ButtonboardTemplates } from './buttonboardTemplates.js';
@@ -841,12 +841,28 @@ import { createSessionGuard } from './sessionGuard.js';
         latestUserDoc = user ? await getUserDoc(user.uid) : null;
         updateAuthHeader(user);
         AppState.setFeatureFlags(resolveFeaturesForUser(latestUserDoc));
+        syncReadOnlyCapabilitiesClass();
         // Show/hide Ventanas de código menu item based on plan
         const btnBB = $('#btn-open-buttonboards');
         if (btnBB) {
             btnBB.style.display = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES) ? '' : 'none';
         }
     });
+
+    async function rememberLastProject(projectId) {
+        const user = getCurrentUser();
+        if (!user?.uid || !projectId) return;
+        try {
+            await setLastProjectForUser(user.uid, projectId);
+        } catch (e) {
+            console.warn('No se pudo guardar lastProjectId:', e);
+        }
+    }
+
+    function syncReadOnlyCapabilitiesClass() {
+        const canUseProNav = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES);
+        document.body.classList.toggle('read-only-pro', !!canUseProNav);
+    }
 
     // Extract YouTube video ID from any input (full URL or raw ID)
     function extractYouTubeId(input) {
@@ -2042,7 +2058,10 @@ import { createSessionGuard } from './sessionGuard.js';
                     UI.toast('Cargando proyecto...', '');
                     const loaded = await AppState.loadFromCloud(p.id);
                     if (loaded) {
-                        FirebaseData.markProjectOpened(p.id);
+                        await Promise.all([
+                            FirebaseData.markProjectOpened(p.id),
+                            rememberLastProject(p.id),
+                        ]);
                         FirebaseData.addProjectLocally(p.id, false);
                         UI.toast('Proyecto cargado ✅', 'success');
                         UI.refreshAll();
@@ -3067,9 +3086,28 @@ import { createSessionGuard } from './sessionGuard.js';
         const gameIdFromUrl = FirebaseData.getGameIdFromUrl();
         const params = new URLSearchParams(window.location.search);
         const modeFromUrl = params.get('mode');
+        document.body.classList.remove('read-only-pro');
+        let projectIdToLoad = projectIdFromUrl;
 
-        if (projectIdFromUrl) {
-            // No cargamos los clips demo si venimos de un link
+        if (!projectIdToLoad) {
+            const currentUser = getCurrentUser();
+            if (currentUser?.uid) {
+                try {
+                    const userDoc = await getUserDoc(currentUser.uid);
+                    const lastProjectId = typeof userDoc?.lastProjectId === 'string'
+                        ? userDoc.lastProjectId.trim()
+                        : '';
+                    if (lastProjectId) {
+                        projectIdToLoad = lastProjectId;
+                    }
+                } catch (e) {
+                    console.warn('No se pudo leer lastProjectId del usuario:', e);
+                }
+            }
+        }
+
+        if (projectIdToLoad) {
+            // No cargamos los clips demo si vamos a intentar abrir un proyecto cloud.
             DemoData.clear();
         }
 
@@ -3093,19 +3131,24 @@ import { createSessionGuard } from './sessionGuard.js';
             DrawingTool.init();
         }
 
-        if (projectIdFromUrl) {
-            UI.toast('Cargando proyecto...', '');
-            const loaded = await AppState.loadFromCloud(projectIdFromUrl);
+        if (projectIdToLoad) {
+            UI.toast(projectIdFromUrl ? 'Cargando proyecto...' : 'Cargando último proyecto...', '');
+            const loaded = await AppState.loadFromCloud(projectIdToLoad);
 
             if (loaded) {
-                // Determine if this project was already in our local 'owned' list
-                const localProjects = JSON.parse(localStorage.getItem('sr_my_projects') || '[]');
-                const isOwned = localProjects.some(p => {
-                    if (typeof p === 'string') return p === projectIdFromUrl;
-                    return p.id === projectIdFromUrl && p.shared === false;
-                });
-
-                FirebaseData.addProjectLocally(projectIdFromUrl, !isOwned); // Save as shared if we don't own it
+                if (projectIdFromUrl) {
+                    // Determine if this project was already in our local 'owned' list
+                    const localProjects = JSON.parse(localStorage.getItem('sr_my_projects') || '[]');
+                    const isOwned = localProjects.some(p => {
+                        if (typeof p === 'string') return p === projectIdToLoad;
+                        return p.id === projectIdToLoad && p.shared === false;
+                    });
+                    FirebaseData.addProjectLocally(projectIdToLoad, !isOwned); // Save as shared if we don't own it
+                }
+                await Promise.all([
+                    FirebaseData.markProjectOpened(projectIdToLoad),
+                    rememberLastProject(projectIdToLoad),
+                ]);
                 UI.toast('Proyecto cargado ✅', 'success');
 
                 if (gameIdFromUrl) {
@@ -3152,6 +3195,7 @@ import { createSessionGuard } from './sessionGuard.js';
 
                 if (isReadOnlyAccess) {
                     document.body.classList.add('read-only-mode');
+                    syncReadOnlyCapabilitiesClass();
                     AppState.setMode('view');
                     if (isCollaborativeButLoggedOut) {
                         UI.toast('Este link colaborativo requiere iniciar sesión para editar. Estás en solo lectura.', 'error');
@@ -3164,11 +3208,23 @@ import { createSessionGuard } from './sessionGuard.js';
                             if (plToggle) plToggle.classList.add('open');
                         }, 50);
                     }
+                } else {
+                    document.body.classList.remove('read-only-pro');
                 }
             } else {
-                UI.toast('No se pudo cargar el proyecto', 'error');
+                document.body.classList.remove('read-only-pro');
+                if (!projectIdFromUrl) {
+                    UI.toast('No se pudo cargar tu último proyecto. Se abrió el demo.', 'info');
+                    const games = AppState.get('games');
+                    if (games.length > 0) {
+                        AppState.setCurrentGame(games[0].id);
+                    }
+                } else {
+                    UI.toast('No se pudo cargar el proyecto', 'error');
+                }
             }
         } else {
+            document.body.classList.remove('read-only-pro');
             // Auto-select first game for demo
             const games = AppState.get('games');
             if (games.length > 0) {
