@@ -6,61 +6,111 @@
   <title>SimpleReplay — Admin</title>
   <style>
     * { box-sizing: border-box; }
+    :root {
+      --bg-top: #f6f8ff;
+      --bg-bottom: #eef2ff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3f4;
+      --line-soft: #e8edf8;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --surface: rgba(255, 255, 255, 0.84);
+      --surface-strong: #ffffff;
+    }
     body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       margin: 0;
-      padding: 24px;
-      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-      color: #0f172a;
+      padding: 32px 20px;
+      background:
+        radial-gradient(1200px 420px at -8% -10%, rgba(37, 99, 235, 0.14) 0%, transparent 55%),
+        radial-gradient(900px 300px at 110% -8%, rgba(99, 102, 241, 0.12) 0%, transparent 52%),
+        linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+      color: var(--ink);
       line-height: 1.45;
     }
-    h1 { font-size: 1.35rem; margin: 0 0 8px; }
-    .sub { color: #64748b; font-size: 0.9rem; margin: 0 0 20px; }
+    h1 {
+      font-size: clamp(1.45rem, 2.2vw, 1.9rem);
+      letter-spacing: -0.015em;
+      margin: 0 0 6px;
+    }
+    .sub { color: var(--muted); font-size: 0.92rem; margin: 0 0 20px; }
     .card {
-      background: #fff;
-      border: 1px solid #dbe3f4;
-      border-radius: 12px;
-      padding: 20px;
-      max-width: 1100px;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px;
+      max-width: 1180px;
+      margin: 0 auto;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
     }
     button {
       cursor: pointer;
-      padding: 8px 14px;
-      border-radius: 6px;
+      padding: 9px 14px;
+      border-radius: 10px;
       border: 1px solid #cbd5e1;
-      background: #fff;
+      background: var(--surface-strong);
       font-size: 0.9rem;
-      transition: all .15s ease;
+      font-weight: 500;
+      transition: all .16s ease;
     }
-    button:hover { border-color: #94a3b8; }
+    button:hover {
+      border-color: #94a3b8;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    }
     button.primary {
-      background: #2563eb;
+      background: linear-gradient(180deg, #3b82f6 0%, var(--primary) 100%);
       color: #fff;
-      border-color: #2563eb;
+      border-color: var(--primary);
     }
-    button.primary:hover { background: #1d4ed8; }
+    button.primary:hover { background: linear-gradient(180deg, #2563eb 0%, var(--primary-dark) 100%); }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+    }
+    .table-shell {
+      overflow: hidden;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.85rem;
+      font-size: 0.86rem;
       background: #fff;
-      border-radius: 10px;
-      overflow: hidden;
     }
     th, td {
       text-align: left;
-      padding: 8px 10px;
-      border-bottom: 1px solid #e2e8f0;
+      padding: 10px 12px;
+      border-bottom: 1px solid #edf1f8;
       vertical-align: middle;
     }
     th {
-      color: #475569;
+      color: #334155;
       font-weight: 600;
-      background: #f8fafc;
+      background: #f8fbff;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    tbody tr:hover td {
+      background: #f8fbff;
     }
     .mono { font-family: ui-monospace, monospace; font-size: 0.75rem; word-break: break-all; }
-    select { padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; max-width: 140px; }
+    select {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      max-width: 160px;
+      background: #fff;
+    }
     .pill {
       display: inline-block;
       padding: 2px 8px;
@@ -80,15 +130,19 @@
     .grant-cell.grant-ok { color: #15803d; }
     .grant-cell.grant-muted { color: #94a3b8; }
     .grant-cell .subline { color: #94a3b8; font-size: 0.72rem; display: block; margin-top: 2px; }
-    #status-msg { margin: 0 0 16px; font-size: 0.85rem; min-height: 1.2em; }
+    #status-msg { margin: 0 auto 16px; font-size: 0.85rem; min-height: 1.2em; max-width: 1180px; }
     .row-actions { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     a { color: #2563eb; }
     .filters {
-      margin: 0 0 12px;
+      margin: 0 0 14px;
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
       align-items: end;
+      padding: 10px;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: #fbfdff;
     }
     .filter-group.search-grow {
       flex: 1 1 220px;
@@ -97,7 +151,7 @@
     .filter-group.search-grow input[type="search"] {
       width: 100%;
       padding: 8px 10px;
-      border-radius: 6px;
+      border-radius: 10px;
       border: 1px solid #cbd5e1;
       font-size: 0.9rem;
     }
@@ -105,7 +159,7 @@
     button.th-sort {
       width: 100%;
       text-align: left;
-      padding: 8px 10px;
+      padding: 10px 12px;
       border: none;
       background: transparent;
       font: inherit;
@@ -117,7 +171,7 @@
       justify-content: space-between;
       gap: 6px;
     }
-    button.th-sort:hover { background: #eef2f7; }
+    button.th-sort:hover { background: #eff6ff; }
     button.th-sort .sort-ind { font-size: 0.65rem; opacity: 0.35; flex-shrink: 0; }
     button.th-sort.is-active { background: #e8eef5; }
     button.th-sort.is-active .sort-ind { opacity: 1; }
@@ -134,13 +188,13 @@
       align-items: center;
       justify-content: center;
       padding: 0;
-      border-radius: 8px;
+      border-radius: 9px;
       font-size: 14px;
     }
     .dialog-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.45);
+      background: rgba(15, 23, 42, 0.5);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -152,7 +206,7 @@
       max-width: 380px;
       background: #fff;
       border: 1px solid #dbe3f4;
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 18px;
       box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
     }
@@ -160,7 +214,21 @@
     .field { margin-bottom: 12px; }
     .field label { display: block; font-size: 0.82rem; color: #475569; margin-bottom: 6px; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-    .admin-nav { margin: 0 0 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .admin-nav {
+      margin: 0 0 14px;
+      display: inline-flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 6px;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: #f8fbff;
+    }
+    .admin-nav .nav-btn {
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
+    }
     .admin-nav .nav-btn.active {
       background: #0f172a;
       border-color: #0f172a;
@@ -177,15 +245,53 @@
     .db-controls input,
     .db-controls select {
       padding: 8px 10px;
-      border-radius: 6px;
+      border-radius: 10px;
       border: 1px solid #cbd5e1;
       font-size: 0.9rem;
       min-width: 130px;
     }
     .db-results { margin-top: 12px; }
     .db-meta { color: #475569; font-size: 0.85rem; margin-bottom: 8px; }
-    .db-table-wrap { overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .db-table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+    }
     .db-note { color: #64748b; font-size: 0.82rem; margin-top: 8px; }
+    .stats-grid {
+      margin: 0 0 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+    }
+    .stat-card {
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      padding: 12px;
+      box-shadow: 0 6px 15px rgba(15, 23, 42, 0.05);
+    }
+    .stat-label {
+      display: block;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.1;
+    }
+    @media (max-width: 740px) {
+      body { padding: 20px 12px; }
+      .card { padding: 14px; border-radius: 14px; }
+      th, td { padding: 9px 8px; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .filter-group.search-grow { flex: 1 1 100%; }
+    }
   </style>
 </head>
 <body>
@@ -217,6 +323,24 @@
     </div>
 
     <section id="section-users" class="admin-section">
+      <div class="stats-grid" id="user-stats">
+        <div class="stat-card">
+          <span class="stat-label">Registrados</span>
+          <span class="stat-value" id="stat-total-users">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Plan Pro</span>
+          <span class="stat-value" id="stat-pro-users">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Pagando (paid)</span>
+          <span class="stat-value" id="stat-paid-users">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Grant (granted)</span>
+          <span class="stat-value" id="stat-granted-users">0</span>
+        </div>
+      </div>
       <div class="filters">
       <div class="filter-group search-grow">
         <label for="user-search">Buscar</label>
@@ -241,20 +365,22 @@
       </div>
       <button type="button" id="btn-clear-filters">Limpiar filtros</button>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="uid">UID<span class="sort-ind" aria-hidden="true"></span></button></th>
-          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="email">Email<span class="sort-ind" aria-hidden="true"></span></button></th>
-          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="name">Nombre<span class="sort-ind" aria-hidden="true"></span></button></th>
-          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="plan">plan<span class="sort-ind" aria-hidden="true"></span></button></th>
-          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="accessType">accessType<span class="sort-ind" aria-hidden="true"></span></button></th>
-          <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="grant">Grant (restante)<span class="sort-ind" aria-hidden="true"></span></button></th>
-          <th>Editar</th>
-        </tr>
-      </thead>
-      <tbody id="users-tbody"></tbody>
-    </table>
+    <div class="table-shell">
+      <table>
+        <thead>
+          <tr>
+            <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="uid">UID<span class="sort-ind" aria-hidden="true"></span></button></th>
+            <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="email">Email<span class="sort-ind" aria-hidden="true"></span></button></th>
+            <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="name">Nombre<span class="sort-ind" aria-hidden="true"></span></button></th>
+            <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="plan">plan<span class="sort-ind" aria-hidden="true"></span></button></th>
+            <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="accessType">accessType<span class="sort-ind" aria-hidden="true"></span></button></th>
+            <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="grant">Grant (restante)<span class="sort-ind" aria-hidden="true"></span></button></th>
+            <th>Editar</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+    </div>
     </section>
 
     <section id="section-db" class="admin-section" hidden>

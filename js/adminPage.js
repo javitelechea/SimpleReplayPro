@@ -66,6 +66,22 @@ function userMatchesSearch(u, q) {
     return hay.includes(q);
 }
 
+function countBy(list, predicate) {
+    return list.reduce((acc, item) => (predicate(item) ? acc + 1 : acc), 0);
+}
+
+function setStatValue(id, value) {
+    const el = $(id);
+    if (el) el.textContent = String(value);
+}
+
+function renderStats() {
+    setStatValue('stat-total-users', allUsers.length);
+    setStatValue('stat-pro-users', countBy(allUsers, (u) => u.plan === 'pro'));
+    setStatValue('stat-paid-users', countBy(allUsers, (u) => u.accessType === 'paid'));
+    setStatValue('stat-granted-users', countBy(allUsers, (u) => u.accessType === 'granted'));
+}
+
 async function loadUsers() {
     const tbody = $('users-tbody');
     if (!tbody) return;
@@ -76,6 +92,8 @@ async function loadUsers() {
         const snap = await getDocs(collection(db, 'users'));
         if (snap.empty) {
             tbody.innerHTML = '<tr><td colspan="7">No hay usuarios.</td></tr>';
+            allUsers = [];
+            renderStats();
             return;
         }
 
@@ -96,6 +114,7 @@ async function loadUsers() {
 
         rows.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
         allUsers = rows;
+        renderStats();
         renderUsers();
     } catch (e) {
         console.error(e);
