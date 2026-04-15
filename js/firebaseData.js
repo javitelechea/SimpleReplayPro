@@ -2,6 +2,8 @@ import {
     doc,
     getDoc,
     setDoc,
+    updateDoc,
+    deleteDoc,
     collection,
     addDoc,
     serverTimestamp,
@@ -66,6 +68,24 @@ export const FirebaseData = (() => {
             console.error('Error loading project:', err);
             return null;
         }
+    }
+
+    async function markProjectOpened(projectId) {
+        if (!projectId) return;
+        try {
+            await updateDoc(doc(db, 'projects', projectId), {
+                lastOpenedAt: serverTimestamp(),
+            });
+        } catch (err) {
+            // Don't block UX if this metadata update fails.
+            console.warn('Could not update lastOpenedAt:', err);
+        }
+    }
+
+    async function deleteProjectCloud(projectId) {
+        if (!projectId) throw new Error('Proyecto inválido');
+        await deleteDoc(doc(db, 'projects', projectId));
+        removeProjectLocally(projectId);
     }
 
     function getShareUrl(projectId, gameId = null, playlistId = null, editKey = null) {
@@ -137,6 +157,8 @@ export const FirebaseData = (() => {
                     id: res.data.id,
                     title: res.data.title || 'Sin título',
                     updatedAt: res.data.updatedAt?.toDate?.() || null,
+                    lastOpenedAt: res.data.lastOpenedAt?.toDate?.() || null,
+                    ownerUid: res.data.ownerUid || '',
                     youtubeVideoId: res.data.youtubeVideoId || '',
                     isShared: res.shared,
                 }))
@@ -191,6 +213,8 @@ export const FirebaseData = (() => {
     return {
         saveProject,
         loadProject,
+        markProjectOpened,
+        deleteProjectCloud,
         listProjects,
         getShareUrl,
         getProjectIdFromUrl,

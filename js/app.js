@@ -2042,6 +2042,7 @@ import { createSessionGuard } from './sessionGuard.js';
                     UI.toast('Cargando proyecto...', '');
                     const loaded = await AppState.loadFromCloud(p.id);
                     if (loaded) {
+                        FirebaseData.markProjectOpened(p.id);
                         FirebaseData.addProjectLocally(p.id, false);
                         UI.toast('Proyecto cargado ✅', 'success');
                         UI.refreshAll();
@@ -2066,11 +2067,49 @@ import { createSessionGuard } from './sessionGuard.js';
                 const delBtn = document.createElement('button');
                 delBtn.className = 'btn btn-xs btn-danger project-delete-btn';
                 delBtn.innerHTML = '🗑️';
-                delBtn.title = p.isShared ? 'Remover de la lista' : 'Eliminar localmente';
-                delBtn.addEventListener('click', () => {
-                    if (confirm(`⚠️ ¿Quitar "${p.title}" de tu lista local?\n\nEsta acción no se puede deshacer.`)) {
+                delBtn.title = p.isShared ? 'Remover de la lista' : 'Quitar local o borrar de nube';
+                delBtn.addEventListener('click', async () => {
+                    if (p.isShared) {
+                        if (confirm(`¿Quitar "${p.title}" de tu lista local?`)) {
+                            FirebaseData.removeProjectLocally(p.id);
+                            el.remove();
+                        }
+                        return;
+                    }
+
+                    const choice = prompt(
+                        `¿Qué querés hacer con "${p.title}"?\n\n` +
+                        `1 = Quitar solo de mi lista local\n` +
+                        `2 = Eliminar definitivamente de la nube\n\n` +
+                        `Escribí 1 o 2`
+                    );
+                    if (!choice) return;
+
+                    if (choice.trim() === '1') {
                         FirebaseData.removeProjectLocally(p.id);
                         el.remove();
+                        UI.toast('Proyecto quitado de tu lista local.', 'success');
+                        return;
+                    }
+                    if (choice.trim() !== '2') {
+                        UI.toast('Opción inválida. Escribí 1 o 2.', 'error');
+                        return;
+                    }
+
+                    const confirmCloudDelete = confirm(
+                        `⚠️ Vas a eliminar "${p.title}" de la nube.\n\n` +
+                        `Esto borra el proyecto de Firestore y no se puede deshacer.\n\n` +
+                        `¿Confirmar eliminación definitiva?`
+                    );
+                    if (!confirmCloudDelete) return;
+
+                    try {
+                        await FirebaseData.deleteProjectCloud(p.id);
+                        el.remove();
+                        UI.toast('Proyecto eliminado definitivamente de la nube.', 'success');
+                    } catch (err) {
+                        console.error('deleteProjectCloud error:', err);
+                        UI.toast(`No se pudo eliminar de la nube: ${err.message || err}`, 'error');
                     }
                 });
 
