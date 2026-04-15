@@ -28,6 +28,8 @@ export const FirebaseData = (() => {
         };
 
         if (data.editKey) payload.editKey = data.editKey;
+        if (data.lastEditedByUid) payload.lastEditedByUid = data.lastEditedByUid;
+        if (!projectId && data.ownerUid) payload.ownerUid = data.ownerUid;
 
         const timeout = (ms) =>
             new Promise((_, reject) =>

@@ -328,6 +328,25 @@
       padding: 2px 8px;
       background: rgba(37, 99, 235, 0.2);
     }
+    .open-project-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #bfdbfe;
+      text-decoration: none;
+      transition: all .16s ease;
+    }
+    .open-project-link:hover {
+      border-color: #60a5fa;
+      background: #13203a;
+      color: #dbeafe;
+      transform: translateY(-1px);
+    }
     .stat-label {
       display: block;
       font-size: 0.78rem;
@@ -415,7 +434,7 @@
       <p class="stats-help">Actividad basada en <code>lastSeenAt</code> (se actualiza cuando el usuario usa la app).</p>
       <div class="activity-card">
         <h3>Top usuarios activos (7d)</h3>
-        <p class="activity-note">Basado en proyectos actualizados (campo <code>updatedAt</code>).</p>
+        <p class="activity-note" id="top-active-users-note">Basado en proyectos actualizados (campo <code>updatedAt</code>).</p>
         <ul id="top-active-users-7d" class="activity-list">
           <li>Cargando...</li>
         </ul>
@@ -490,6 +509,7 @@
                 <th>Playlists</th>
                 <th>Creado</th>
                 <th>Actualizado</th>
+                <th>Abrir</th>
               </tr>
             </thead>
             <tbody id="db-tbody">

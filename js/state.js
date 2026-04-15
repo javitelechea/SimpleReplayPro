@@ -616,6 +616,18 @@ export const AppState = (() => {
     return state.activityLog;
   }
 
+  function getActorUidForOwnership() {
+    if (state.authUser?.uid) return state.authUser.uid;
+    if (state.userId && state.userId !== ANONYMOUS_USER_ID) return state.userId;
+    return null;
+  }
+
+  function withCreatedBy(items, actorUid) {
+    if (!Array.isArray(items)) return [];
+    if (!actorUid) return [...items];
+    return items.map((item) => ({ ...item, created_by: actorUid }));
+  }
+
   // ── Cloud save/load ──
   async function saveToCloud() {
     // Generate an editKey on first save
@@ -625,20 +637,23 @@ export const AppState = (() => {
     }
 
     const game = getCurrentGame();
+    const actorUid = getActorUidForOwnership();
     const data = {
       title: game ? game.title : 'Sin título',
       youtubeVideoId: game ? game.youtube_video_id : '',
       // Catálogo completo (botonera + tags solo por import XML, etc.). No usar solo getActiveTagTypes().
       tagTypes: [...state.tagTypes],
       activeButtonboards: state.activeButtonboards,
-      games: state.games,
-      clips: state.clips,
-      playlists: state.playlists,
+      games: withCreatedBy(state.games, actorUid),
+      clips: withCreatedBy(state.clips, actorUid),
+      playlists: withCreatedBy(state.playlists, actorUid),
       playlistItems: state.playlistItems,
       clipFlags: state.clipFlags,
       playlistComments: state.playlistComments,
       activityLog: state.activityLog,
       editKey: state.editKey,
+      ownerUid: actorUid,
+      lastEditedByUid: actorUid,
     };
     const projectId = await FirebaseData.saveProject(state.currentProjectId, data);
     state.currentProjectId = projectId;
@@ -855,6 +870,7 @@ export const AppState = (() => {
     let playlistItemsToImport = { ...(data.playlistItems || {}) };
     let clipFlagsToImport = { ...(data.clipFlags || {}) };
     let playlistCommentsToImport = { ...(data.playlistComments || {}) };
+    const actorUid = getActorUidForOwnership();
 
     // Collision check: if project already exists, create a copy with new IDs
     const exists = state.games.some(g => g.id === gameToImport.id);
@@ -909,6 +925,14 @@ export const AppState = (() => {
         }
       });
       playlistCommentsToImport = newPlaylistComments;
+    }
+
+    // Imported JSONs from older versions may carry demo ownership metadata.
+    // Normalize ownership so saved projects are attributed to the authenticated user.
+    if (actorUid) {
+      gameToImport.created_by = actorUid;
+      clipsToImport = clipsToImport.map((c) => ({ ...c, created_by: actorUid }));
+      playlistsToImport = playlistsToImport.map((p) => ({ ...p, created_by: actorUid }));
     }
 
     // Clear current state first

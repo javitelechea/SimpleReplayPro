@@ -25,6 +25,7 @@ let sortDir = 'asc';
 let activeSection = 'users';
 const DAY_MS = 86_400_000;
 const TOP_ACTIVE_USERS_LIMIT = 8;
+const DEMO_OWNER_UIDS = new Set(['demo-user-001']);
 
 function normEmail(s) {
     return (s || '').trim().toLowerCase();
@@ -120,8 +121,35 @@ function renderTopActiveUsers7d(items, errMsg = '') {
     `).join('');
 }
 
+function setTopActiveNote(text) {
+    const note = $('top-active-users-note');
+    if (!note) return;
+    note.textContent = text;
+}
+
+function isLikelyDemoProject(projectData) {
+    if (!projectData || typeof projectData !== 'object') return false;
+    const ownerUid = getProjectOwnerUid(projectData);
+    if (ownerUid && DEMO_OWNER_UIDS.has(ownerUid)) return true;
+
+    if (Array.isArray(projectData.games) && projectData.games.some((g) =>
+        g?.id === 'game-demo-1'
+    )) {
+        return true;
+    }
+
+    if (Array.isArray(projectData.playlists) && projectData.playlists.some((p) =>
+        p?.id === 'pl-demo-1'
+    )) {
+        return true;
+    }
+
+    return false;
+}
+
 async function loadTopActiveUsers7d() {
     renderTopActiveUsers7d([], 'Cargando...');
+    setTopActiveNote('Basado en proyectos actualizados (campo updatedAt).');
     try {
         const fromDate = new Date(Date.now() - (7 * DAY_MS));
         const projectsSnap = await getDocs(query(
@@ -130,10 +158,15 @@ async function loadTopActiveUsers7d() {
             limitDocs(500)
         ));
         const countByUid = new Map();
+        let skippedDemoProjects = 0;
         projectsSnap.forEach((d) => {
             const data = d.data() || {};
+            if (isLikelyDemoProject(data)) {
+                skippedDemoProjects += 1;
+                return;
+            }
             const ownerUid = getProjectOwnerUid(data);
-            if (!ownerUid) return;
+            if (!ownerUid || DEMO_OWNER_UIDS.has(ownerUid)) return;
             countByUid.set(ownerUid, (countByUid.get(ownerUid) || 0) + 1);
         });
 
@@ -152,9 +185,16 @@ async function loadTopActiveUsers7d() {
             .slice(0, TOP_ACTIVE_USERS_LIMIT);
 
         renderTopActiveUsers7d(top);
+        const baseNote = 'Basado en proyectos actualizados (campo updatedAt).';
+        if (skippedDemoProjects > 0) {
+            setTopActiveNote(`${baseNote} Se excluyeron ${skippedDemoProjects} proyecto(s) demo.`);
+        } else {
+            setTopActiveNote(baseNote);
+        }
     } catch (e) {
         console.error(e);
         renderTopActiveUsers7d([], `No se pudo cargar actividad 7d: ${e.message || String(e)}`);
+        setTopActiveNote('No se pudo calcular el ranking de actividad.');
     }
 }
 
@@ -300,6 +340,11 @@ function getProjectOwnerUid(projectData) {
     return '';
 }
 
+function getProjectViewUrl(projectId) {
+    if (!projectId) return 'index.html';
+    return `index.html?project=${encodeURIComponent(projectId)}&mode=view`;
+}
+
 function renderDbRows(items) {
     const tbody = $('db-tbody');
     if (!tbody) return;
@@ -316,6 +361,7 @@ function renderDbRows(items) {
             <td>${it.playlistsCount}</td>
             <td>${escapeHtml(it.createdAtText)}</td>
             <td>${escapeHtml(it.updatedAtText)}</td>
+            <td><a class="open-project-link" href="${escapeAttr(getProjectViewUrl(it.id))}" target="_blank" rel="noopener noreferrer" title="Abrir proyecto">↗</a></td>
         </tr>
     `).join('');
 }
