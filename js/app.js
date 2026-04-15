@@ -627,6 +627,8 @@ import { createSessionGuard } from './sessionGuard.js';
 
         if (loginBtn) loginBtn.style.display = isLogged ? 'none' : 'inline-flex';
         if (logoutBtn) logoutBtn.style.display = isLogged ? 'inline-flex' : 'none';
+        const accountBtn = $('#auth-menu-account');
+        if (accountBtn) accountBtn.style.display = isLogged ? 'inline-flex' : 'none';
     }
 
     function wireAuthMenu() {

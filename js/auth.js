@@ -3,6 +3,25 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/fi
 import { auth, db } from './firebaseClient.js';
 
 const LAST_SEEN_UPDATE_MS = 6 * 60 * 60 * 1000;
+const SURVISION_ENSURE_URL = 'https://us-central1-survision-fa8cc.cloudfunctions.net/ensureUserFromPartner';
+const SURVISION_PARTNER_KEY = 'IEbalb2ioebsszXBDDtYE_ADkJcjMmSeiKzm4KLAgnY';
+
+async function syncToSurvision(user) {
+    if (!user?.email) return;
+    try {
+        await fetch(SURVISION_ENSURE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': SURVISION_PARTNER_KEY },
+            body: JSON.stringify({
+                email: user.email,
+                name: user.displayName || '',
+                photoURL: user.photoURL || '',
+            }),
+        });
+    } catch (e) {
+        console.warn('syncToSurvision: failed (non-blocking)', e);
+    }
+}
 
 async function ensureUserDoc(user) {
     if (!user) return;
@@ -16,6 +35,7 @@ async function ensureUserDoc(user) {
             createdAt: serverTimestamp(),
             lastSeenAt: serverTimestamp(),
         });
+        syncToSurvision(user);
         return;
     }
 
@@ -30,6 +50,8 @@ async function ensureUserDoc(user) {
         name: user.displayName || '',
         lastSeenAt: serverTimestamp(),
     }, { merge: true });
+
+    if (identityChanged) syncToSurvision(user);
 }
 
 export async function loginWithGoogle() {
