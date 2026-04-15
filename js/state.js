@@ -618,8 +618,8 @@ export const AppState = (() => {
 
   function getActorUidForOwnership() {
     if (state.authUser?.uid) return state.authUser.uid;
-    if (state.userId && state.userId !== ANONYMOUS_USER_ID) return state.userId;
-    return null;
+    if (state.userId) return state.userId;
+    return ANONYMOUS_USER_ID;
   }
 
   function withCreatedBy(items, actorUid) {
@@ -638,6 +638,7 @@ export const AppState = (() => {
 
     const game = getCurrentGame();
     const actorUid = getActorUidForOwnership();
+    const ownerUid = actorUid === ANONYMOUS_USER_ID ? null : actorUid;
     const data = {
       title: game ? game.title : 'Sin título',
       youtubeVideoId: game ? game.youtube_video_id : '',
@@ -652,8 +653,8 @@ export const AppState = (() => {
       playlistComments: state.playlistComments,
       activityLog: state.activityLog,
       editKey: state.editKey,
-      ownerUid: actorUid,
-      lastEditedByUid: actorUid,
+      ownerUid,
+      lastEditedByUid: ownerUid,
     };
     const projectId = await FirebaseData.saveProject(state.currentProjectId, data);
     state.currentProjectId = projectId;
