@@ -2,17 +2,34 @@ import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from
 import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { auth, db } from './firebaseClient.js';
 
+const LAST_SEEN_UPDATE_MS = 6 * 60 * 60 * 1000;
+
 async function ensureUserDoc(user) {
     if (!user) return;
     const ref = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
-    if (snap.exists()) return;
+    if (!snap.exists()) {
+        await setDoc(ref, {
+            email: user.email || '',
+            name: user.displayName || '',
+            plan: 'free',
+            createdAt: serverTimestamp(),
+            lastSeenAt: serverTimestamp(),
+        });
+        return;
+    }
+
+    const data = snap.data() || {};
+    const lastSeenMs = data.lastSeenAt?.toMillis?.() || 0;
+    const shouldUpdateLastSeen = !lastSeenMs || (Date.now() - lastSeenMs) >= LAST_SEEN_UPDATE_MS;
+    const identityChanged = (data.email || '') !== (user.email || '') || (data.name || '') !== (user.displayName || '');
+    if (!shouldUpdateLastSeen && !identityChanged) return;
+
     await setDoc(ref, {
         email: user.email || '',
         name: user.displayName || '',
-        plan: 'free',
-        createdAt: serverTimestamp(),
-    });
+        lastSeenAt: serverTimestamp(),
+    }, { merge: true });
 }
 
 export async function loginWithGoogle() {

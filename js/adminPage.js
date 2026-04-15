@@ -2,6 +2,7 @@ import {
     collection,
     getDocs,
     query,
+    where,
     limit as limitDocs,
     doc,
     updateDoc,
@@ -18,10 +19,12 @@ const FAR_FUTURE_DATE_ISO = '9999-12-31T23:59:59.999Z';
 const $ = (id) => document.getElementById(id);
 let editingUid = null;
 let allUsers = [];
-/** Columna activa: uid | email | name | plan | accessType | grant */
+/** Columna activa: uid | email | name | plan | accessType | grant | lastSeen */
 let sortKey = 'email';
 let sortDir = 'asc';
 let activeSection = 'users';
+const DAY_MS = 86_400_000;
+const TOP_ACTIVE_USERS_LIMIT = 8;
 
 function normEmail(s) {
     return (s || '').trim().toLowerCase();
@@ -76,22 +79,95 @@ function setStatValue(id, value) {
 }
 
 function renderStats() {
+    const now = Date.now();
     setStatValue('stat-total-users', allUsers.length);
     setStatValue('stat-pro-users', countBy(allUsers, (u) => u.plan === 'pro'));
     setStatValue('stat-paid-users', countBy(allUsers, (u) => u.accessType === 'paid'));
     setStatValue('stat-granted-users', countBy(allUsers, (u) => u.accessType === 'granted'));
+    setStatValue('stat-active-7d', countBy(allUsers, (u) => u.lastSeenMs && (now - u.lastSeenMs) <= (7 * DAY_MS)));
+    setStatValue('stat-active-30d', countBy(allUsers, (u) => u.lastSeenMs && (now - u.lastSeenMs) <= (30 * DAY_MS)));
+}
+
+function formatLastSeenCell(lastSeenMs) {
+    if (!lastSeenMs) return 'Sin actividad';
+    const diff = Date.now() - lastSeenMs;
+    if (diff <= DAY_MS) return 'Hoy';
+    const days = Math.floor(diff / DAY_MS);
+    if (days < 30) return `Hace ${days} ${days === 1 ? 'día' : 'días'}`;
+    return new Date(lastSeenMs).toLocaleDateString('es-AR');
+}
+
+function renderTopActiveUsers7d(items, errMsg = '') {
+    const listEl = $('top-active-users-7d');
+    if (!listEl) return;
+
+    if (errMsg) {
+        listEl.innerHTML = `<li>${escapeHtml(errMsg)}</li>`;
+        return;
+    }
+    if (!items.length) {
+        listEl.innerHTML = '<li>Sin actividad registrada en los ultimos 7 dias.</li>';
+        return;
+    }
+    listEl.innerHTML = items.map((item) => `
+        <li>
+            <div class="activity-user">
+                <strong>${escapeHtml(item.name)}</strong>
+                <span class="subline">${escapeHtml(item.email)}</span>
+            </div>
+            <span class="activity-count">${item.count} proyecto(s)</span>
+        </li>
+    `).join('');
+}
+
+async function loadTopActiveUsers7d() {
+    renderTopActiveUsers7d([], 'Cargando...');
+    try {
+        const fromDate = new Date(Date.now() - (7 * DAY_MS));
+        const projectsSnap = await getDocs(query(
+            collection(db, 'projects'),
+            where('updatedAt', '>=', Timestamp.fromDate(fromDate)),
+            limitDocs(500)
+        ));
+        const countByUid = new Map();
+        projectsSnap.forEach((d) => {
+            const data = d.data() || {};
+            const ownerUid = getProjectOwnerUid(data);
+            if (!ownerUid) return;
+            countByUid.set(ownerUid, (countByUid.get(ownerUid) || 0) + 1);
+        });
+
+        const byUid = new Map(allUsers.map((u) => [u.uid, u]));
+        const top = Array.from(countByUid.entries())
+            .map(([uid, count]) => {
+                const u = byUid.get(uid);
+                return {
+                    uid,
+                    count,
+                    name: u?.name || u?.email || uid,
+                    email: u?.email || uid,
+                };
+            })
+            .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
+            .slice(0, TOP_ACTIVE_USERS_LIMIT);
+
+        renderTopActiveUsers7d(top);
+    } catch (e) {
+        console.error(e);
+        renderTopActiveUsers7d([], `No se pudo cargar actividad 7d: ${e.message || String(e)}`);
+    }
 }
 
 async function loadUsers() {
     const tbody = $('users-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7">Cargando…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9">Cargando…</td></tr>';
     setStatus('');
 
     try {
         const snap = await getDocs(collection(db, 'users'));
         if (snap.empty) {
-            tbody.innerHTML = '<tr><td colspan="7">No hay usuarios.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9">No hay usuarios.</td></tr>';
             allUsers = [];
             renderStats();
             return;
@@ -108,17 +184,19 @@ async function loadUsers() {
                 ? data.accessType
                 : 'free';
             const grantExpiresMs = toMillis(data.grantExpiresAt);
+            const lastSeenMs = toMillis(data.lastSeenAt);
 
-            rows.push({ uid, email, name, plan, accessType, grantExpiresMs });
+            rows.push({ uid, email, name, plan, accessType, grantExpiresMs, lastSeenMs });
         });
 
         rows.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
         allUsers = rows;
         renderStats();
         renderUsers();
+        loadTopActiveUsers7d();
     } catch (e) {
         console.error(e);
-        tbody.innerHTML = '<tr><td colspan="7">Error al cargar usuarios.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9">Error al cargar usuarios.</td></tr>';
         setStatus(e.message || String(e), true);
     }
 }
@@ -141,10 +219,11 @@ function getFilteredUsers() {
 function renderUsers() {
     const tbody = $('users-tbody');
     if (!tbody) return;
+    renderStats();
 
     const users = getFilteredUsers();
     if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7">No hay usuarios para ese filtro.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9">No hay usuarios para ese filtro.</td></tr>';
         return;
     }
 
@@ -162,6 +241,7 @@ function renderUsers() {
         <td><span class="pill">${escapeHtml(u.plan)}</span></td>
         <td><span class="pill access">${escapeHtml(u.accessType)}</span></td>
         <td class="${grantCell.className}">${grantCell.html}</td>
+        <td>${escapeHtml(formatLastSeenCell(u.lastSeenMs))}</td>
         <td><button type="button" class="btn-icon btn-edit" data-uid="${escapeAttr(u.uid)}" title="Editar">✏️</button></td>
       `;
         tbody.appendChild(tr);
@@ -175,7 +255,7 @@ function renderUsers() {
 }
 
 function setSort(key) {
-    const allowed = ['uid', 'email', 'name', 'plan', 'accessType', 'grant'];
+    const allowed = ['uid', 'email', 'name', 'plan', 'accessType', 'grant', 'lastSeen'];
     if (!allowed.includes(key)) return;
     if (sortKey === key) {
         sortDir = sortDir === 'asc' ? 'desc' : 'asc';
@@ -327,6 +407,10 @@ function compareUsersForSort(a, b, key, dir) {
         const na = grantSortNumber(a);
         const nb = grantSortNumber(b);
         if (na !== nb) return na < nb ? -mult : mult;
+    } else if (key === 'lastSeen') {
+        const na = a.lastSeenMs || 0;
+        const nb = b.lastSeenMs || 0;
+        if (na !== nb) return na < nb ? -mult : mult;
     } else {
         const sa = String(a[key] ?? '');
         const sb = String(b[key] ?? '');
@@ -442,6 +526,7 @@ async function saveEditModal() {
                 ? toMillis(updates.grantExpiresAt)
                 : null;
         }
+        renderStats();
         renderUsers();
         setStatus('Guardado.');
         closeEditModal();

@@ -7,24 +7,24 @@
   <style>
     * { box-sizing: border-box; }
     :root {
-      --bg-top: #f6f8ff;
-      --bg-bottom: #eef2ff;
-      --ink: #0f172a;
-      --muted: #64748b;
-      --line: #dbe3f4;
-      --line-soft: #e8edf8;
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --surface: rgba(255, 255, 255, 0.84);
-      --surface-strong: #ffffff;
+      --bg-top: #070b16;
+      --bg-bottom: #0a1020;
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --line: #24304a;
+      --line-soft: #1b2438;
+      --primary: #3b82f6;
+      --primary-dark: #2563eb;
+      --surface: rgba(15, 23, 42, 0.84);
+      --surface-strong: #0f172a;
     }
     body {
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       margin: 0;
       padding: 32px 20px;
       background:
-        radial-gradient(1200px 420px at -8% -10%, rgba(37, 99, 235, 0.14) 0%, transparent 55%),
-        radial-gradient(900px 300px at 110% -8%, rgba(99, 102, 241, 0.12) 0%, transparent 52%),
+        radial-gradient(1200px 420px at -8% -10%, rgba(59, 130, 246, 0.22) 0%, transparent 55%),
+        radial-gradient(900px 300px at 110% -8%, rgba(99, 102, 241, 0.2) 0%, transparent 52%),
         linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
       color: var(--ink);
       line-height: 1.45;
@@ -51,6 +51,7 @@
       border-radius: 10px;
       border: 1px solid #cbd5e1;
       background: var(--surface-strong);
+      color: var(--ink);
       font-size: 0.9rem;
       font-weight: 500;
       transition: all .16s ease;
@@ -77,31 +78,31 @@
       overflow: hidden;
       border: 1px solid var(--line-soft);
       border-radius: 12px;
-      background: #fff;
+      background: #0b1325;
       box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
     }
     table {
       width: 100%;
       border-collapse: collapse;
       font-size: 0.86rem;
-      background: #fff;
+      background: #0b1325;
     }
     th, td {
       text-align: left;
       padding: 10px 12px;
-      border-bottom: 1px solid #edf1f8;
+      border-bottom: 1px solid #1d2940;
       vertical-align: middle;
     }
     th {
-      color: #334155;
+      color: #cbd5e1;
       font-weight: 600;
-      background: #f8fbff;
+      background: #121a2f;
       position: sticky;
       top: 0;
       z-index: 1;
     }
     tbody tr:hover td {
-      background: #f8fbff;
+      background: #111a30;
     }
     .mono { font-family: ui-monospace, monospace; font-size: 0.75rem; word-break: break-all; }
     select {
@@ -109,21 +110,22 @@
       border-radius: 10px;
       border: 1px solid #cbd5e1;
       max-width: 160px;
-      background: #fff;
+      color: var(--ink);
+      background: #0f172a;
     }
     .pill {
       display: inline-block;
       padding: 2px 8px;
       border-radius: 999px;
       font-size: 0.75rem;
-      border: 1px solid #dbeafe;
-      background: #eff6ff;
-      color: #1e3a8a;
+      border: 1px solid #1e3a8a;
+      background: rgba(37, 99, 235, 0.2);
+      color: #bfdbfe;
     }
     .pill.access {
-      background: #f8fafc;
-      border-color: #e2e8f0;
-      color: #334155;
+      background: #0f172a;
+      border-color: #334155;
+      color: #cbd5e1;
     }
     .grant-cell { font-size: 0.78rem; color: #475569; }
     .grant-cell.grant-expired { color: #b91c1c; font-weight: 500; }
@@ -142,7 +144,7 @@
       padding: 10px;
       border: 1px solid var(--line-soft);
       border-radius: 12px;
-      background: #fbfdff;
+      background: #0d1528;
     }
     .filter-group.search-grow {
       flex: 1 1 220px;
@@ -171,7 +173,7 @@
       justify-content: space-between;
       gap: 6px;
     }
-    button.th-sort:hover { background: #eff6ff; }
+    button.th-sort:hover { background: #1b2a45; }
     button.th-sort .sort-ind { font-size: 0.65rem; opacity: 0.35; flex-shrink: 0; }
     button.th-sort.is-active { background: #e8eef5; }
     button.th-sort.is-active .sort-ind { opacity: 1; }
@@ -204,15 +206,15 @@
     .dialog {
       width: 100%;
       max-width: 380px;
-      background: #fff;
-      border: 1px solid #dbe3f4;
+      background: #0f172a;
+      border: 1px solid var(--line);
       border-radius: 14px;
       padding: 18px;
       box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
     }
     .dialog h3 { margin: 0 0 12px; font-size: 1rem; }
     .field { margin-bottom: 12px; }
-    .field label { display: block; font-size: 0.82rem; color: #475569; margin-bottom: 6px; }
+    .field label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
     .admin-nav {
       margin: 0 0 14px;
@@ -222,7 +224,7 @@
       padding: 6px;
       border: 1px solid var(--line-soft);
       border-radius: 12px;
-      background: #f8fbff;
+      background: #0d1528;
     }
     .admin-nav .nav-btn {
       border-color: transparent;
@@ -246,20 +248,22 @@
     .db-controls select {
       padding: 8px 10px;
       border-radius: 10px;
-      border: 1px solid #cbd5e1;
+      border: 1px solid #334155;
       font-size: 0.9rem;
       min-width: 130px;
+      background: #0f172a;
+      color: var(--ink);
     }
     .db-results { margin-top: 12px; }
-    .db-meta { color: #475569; font-size: 0.85rem; margin-bottom: 8px; }
+    .db-meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
     .db-table-wrap {
       overflow: auto;
       border: 1px solid var(--line-soft);
       border-radius: 12px;
-      background: #fff;
+      background: #0b1325;
       box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
     }
-    .db-note { color: #64748b; font-size: 0.82rem; margin-top: 8px; }
+    .db-note { color: var(--muted); font-size: 0.82rem; margin-top: 8px; }
     .stats-grid {
       margin: 0 0 14px;
       display: grid;
@@ -269,9 +273,60 @@
     .stat-card {
       border: 1px solid var(--line-soft);
       border-radius: 12px;
-      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      background: linear-gradient(180deg, #131d33 0%, #0f172a 100%);
       padding: 12px;
       box-shadow: 0 6px 15px rgba(15, 23, 42, 0.05);
+    }
+    .stats-help {
+      margin: 2px 0 12px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .activity-card {
+      margin: 0 0 14px;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: #0d1528;
+      padding: 12px;
+    }
+    .activity-card h3 {
+      margin: 0 0 6px;
+      font-size: 0.92rem;
+      color: #e2e8f0;
+    }
+    .activity-note {
+      margin: 0 0 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .activity-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 6px;
+    }
+    .activity-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #1d2940;
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: #0b1325;
+    }
+    .activity-user { min-width: 0; }
+    .activity-user strong { display: block; font-size: 0.84rem; color: #e2e8f0; }
+    .activity-user .subline { display: block; margin-top: 2px; font-size: 0.74rem; color: var(--muted); }
+    .activity-count {
+      flex-shrink: 0;
+      font-size: 0.76rem;
+      color: #bfdbfe;
+      border: 1px solid #1e3a8a;
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: rgba(37, 99, 235, 0.2);
     }
     .stat-label {
       display: block;
@@ -282,9 +337,17 @@
     .stat-value {
       font-size: 1.25rem;
       font-weight: 700;
-      color: #0f172a;
+      color: #f8fafc;
       line-height: 1.1;
     }
+    input[type="search"],
+    input[type="number"] {
+      background: #0f172a;
+      color: var(--ink);
+      border-color: #334155;
+    }
+    .mono { color: #cbd5e1; }
+    code { color: #93c5fd; }
     @media (max-width: 740px) {
       body { padding: 20px 12px; }
       .card { padding: 14px; border-radius: 14px; }
@@ -340,6 +403,22 @@
           <span class="stat-label">Grant (granted)</span>
           <span class="stat-value" id="stat-granted-users">0</span>
         </div>
+        <div class="stat-card">
+          <span class="stat-label">Activos 7d</span>
+          <span class="stat-value" id="stat-active-7d">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Activos 30d</span>
+          <span class="stat-value" id="stat-active-30d">0</span>
+        </div>
+      </div>
+      <p class="stats-help">Actividad basada en <code>lastSeenAt</code> (se actualiza cuando el usuario usa la app).</p>
+      <div class="activity-card">
+        <h3>Top usuarios activos (7d)</h3>
+        <p class="activity-note">Basado en proyectos actualizados (campo <code>updatedAt</code>).</p>
+        <ul id="top-active-users-7d" class="activity-list">
+          <li>Cargando...</li>
+        </ul>
       </div>
       <div class="filters">
       <div class="filter-group search-grow">
@@ -375,6 +454,7 @@
             <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="plan">plan<span class="sort-ind" aria-hidden="true"></span></button></th>
             <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="accessType">accessType<span class="sort-ind" aria-hidden="true"></span></button></th>
             <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="grant">Grant (restante)<span class="sort-ind" aria-hidden="true"></span></button></th>
+            <th class="th-sort-wrap"><button type="button" class="th-sort" data-sort="lastSeen">Ult. actividad<span class="sort-ind" aria-hidden="true"></span></button></th>
             <th>Editar</th>
           </tr>
         </thead>
