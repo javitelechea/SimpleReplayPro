@@ -2878,6 +2878,10 @@ body.playlist-only-mode #app-header .header-right .header-nav-wrap {
 /* ═══════════════════════════════════════════
    READ ONLY MODE (View Only Link)
    ═══════════════════════════════════════════ */
+body.initial-playlist-lock-loading #view-clip-list {
+  visibility: hidden;
+}
+
 body.read-only-mode #btn-mode-analyze,
 body.read-only-mode #btn-mode-share,
 body.read-only-mode #btn-mode-view,

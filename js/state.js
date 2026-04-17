@@ -670,7 +670,10 @@ export const AppState = (() => {
     return projectId;
   }
 
-  async function loadFromCloud(projectId) {
+  async function loadFromCloud(projectId, options = {}) {
+    const initialPlaylistId = typeof options.initialPlaylistId === 'string'
+      ? options.initialPlaylistId.trim()
+      : '';
     const data = await FirebaseData.loadProject(projectId);
     if (!data) return false;
 
@@ -720,7 +723,7 @@ export const AppState = (() => {
     }
 
     state.activeTagFilters = [];
-    state.activePlaylistId = null;
+    state.activePlaylistId = initialPlaylistId || null;
     state.filterFlags = [];
     state.currentClipId = null;
     state.currentClipIndex = -1;

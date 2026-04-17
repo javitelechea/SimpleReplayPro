@@ -3088,6 +3088,11 @@ import { createSessionGuard } from './sessionGuard.js';
         const gameIdFromUrl = FirebaseData.getGameIdFromUrl();
         const params = new URLSearchParams(window.location.search);
         const modeFromUrl = params.get('mode');
+        const deferSharedPlaylistRender = modeFromUrl === 'view' && !!playlistIdFromUrl;
+        if (deferSharedPlaylistRender) {
+            // Prevent initial full-list flash while shared-playlist filter locks in.
+            document.body.classList.add('initial-playlist-lock-loading');
+        }
         // Reset read-only UI state before deciding access for the current project.
         document.body.classList.remove('read-only-mode', 'read-only-pro');
         let projectIdToLoad = projectIdFromUrl;
@@ -3136,7 +3141,9 @@ import { createSessionGuard } from './sessionGuard.js';
 
         if (projectIdToLoad) {
             UI.toast(projectIdFromUrl ? 'Cargando proyecto...' : 'Cargando último proyecto...', '');
-            const loaded = await AppState.loadFromCloud(projectIdToLoad);
+            const loaded = await AppState.loadFromCloud(projectIdToLoad, {
+                initialPlaylistId: playlistIdFromUrl || '',
+            });
 
             if (loaded) {
                 if (projectIdFromUrl) {
@@ -3247,6 +3254,7 @@ import { createSessionGuard } from './sessionGuard.js';
 
         // Render initial UI
         UI.refreshAll();
+        document.body.classList.remove('initial-playlist-lock-loading');
         updateLiveEdgeButton();
         wireAutoSaveLoop();
         setInterval(updateLiveEdgeButton, 1000);
