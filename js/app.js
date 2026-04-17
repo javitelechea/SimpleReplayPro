@@ -3088,7 +3088,8 @@ import { createSessionGuard } from './sessionGuard.js';
         const gameIdFromUrl = FirebaseData.getGameIdFromUrl();
         const params = new URLSearchParams(window.location.search);
         const modeFromUrl = params.get('mode');
-        document.body.classList.remove('read-only-pro');
+        // Reset read-only UI state before deciding access for the current project.
+        document.body.classList.remove('read-only-mode', 'read-only-pro');
         let projectIdToLoad = projectIdFromUrl;
 
         if (!projectIdToLoad) {
@@ -3191,9 +3192,12 @@ import { createSessionGuard } from './sessionGuard.js';
                 const editKeyFromUrl = FirebaseData.getEditKeyFromUrl();
                 const currentUser = getCurrentUser();
                 const isCollaborativeButLoggedOut = !!editKeyFromUrl && !currentUser;
+                const hasEditKeyInUrl = !!editKeyFromUrl;
+                const hasStoredEditKey = !!storedEditKey;
+                const isEditKeyMismatch = hasEditKeyInUrl && hasStoredEditKey && editKeyFromUrl !== storedEditKey;
                 const isReadOnlyAccess = modeFromUrl === 'view' ||
                     isCollaborativeButLoggedOut ||
-                    (storedEditKey && editKeyFromUrl !== storedEditKey);
+                    isEditKeyMismatch;
 
                 if (isReadOnlyAccess) {
                     document.body.classList.add('read-only-mode');
@@ -3211,10 +3215,10 @@ import { createSessionGuard } from './sessionGuard.js';
                         }, 50);
                     }
                 } else {
-                    document.body.classList.remove('read-only-pro');
+                    document.body.classList.remove('read-only-mode', 'read-only-pro');
                 }
             } else {
-                document.body.classList.remove('read-only-pro');
+                document.body.classList.remove('read-only-mode', 'read-only-pro');
                 if (!projectIdFromUrl) {
                     UI.toast('No se pudo cargar tu último proyecto. Se abrió el demo.', 'info');
                     const games = AppState.get('games');
@@ -3226,7 +3230,7 @@ import { createSessionGuard } from './sessionGuard.js';
                 }
             }
         } else {
-            document.body.classList.remove('read-only-pro');
+            document.body.classList.remove('read-only-mode', 'read-only-pro');
             // Auto-select first game for demo
             const games = AppState.get('games');
             if (games.length > 0) {
