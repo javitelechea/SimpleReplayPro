@@ -519,6 +519,34 @@
         </div>
         <p class="db-note">Tip: esta vista está pensada para monitoreo rápido, no para editar documentos.</p>
       </div>
+
+      <div class="db-results" style="margin-top:28px;">
+        <h3 style="margin:0 0 8px;">Migración: rellenar <code>ownerUid</code></h3>
+        <p class="db-note" style="margin-top:0;">
+          Busca proyectos sin el campo <code>ownerUid</code> e infiere el dueño desde <code>games[0].created_by</code>.
+          Primero se hace un preview; luego se puede aplicar.
+        </p>
+        <div class="db-controls">
+          <button type="button" id="btn-migration-scan" class="primary">Buscar proyectos sin ownerUid</button>
+          <button type="button" id="btn-migration-apply" disabled>Aplicar migración</button>
+        </div>
+        <div id="migration-meta" class="db-meta">Tocá “Buscar” para ver qué se migrará.</div>
+        <div class="db-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Proyecto</th>
+                <th>Dueño inferido (UID)</th>
+                <th>Email dueño</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="migration-tbody">
+              <tr><td colspan="4">Sin datos.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
   </div>
 

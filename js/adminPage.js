@@ -366,6 +366,159 @@ function renderDbRows(items) {
     `).join('');
 }
 
+// ── Migración: rellenar ownerUid en proyectos legacy ──
+// migrationAllRows: TODAS las filas del último scan (para mostrar en la tabla incluso tras aplicar).
+// migrationPreview: solo las migrables pendientes (las que aún no se aplicaron con éxito).
+let migrationAllRows = [];
+let migrationPreview = [];
+
+async function scanProjectsMissingOwner() {
+    const meta = $('migration-meta');
+    const tbody = $('migration-tbody');
+    const applyBtn = $('btn-migration-apply');
+    if (applyBtn) applyBtn.disabled = true;
+    migrationPreview = [];
+    migrationAllRows = [];
+
+    if (meta) meta.textContent = 'Buscando proyectos sin ownerUid...';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="4">Cargando…</td></tr>';
+
+    try {
+        const [usersSnap, projectsSnap] = await Promise.all([
+            getDocs(collection(db, 'users')),
+            getDocs(collection(db, 'projects')),
+        ]);
+
+        const emailByUid = new Map();
+        usersSnap.forEach((d) => {
+            const data = d.data() || {};
+            emailByUid.set(d.id, data.email || '');
+        });
+
+        const rows = [];
+        let scanned = 0;
+        let withOwner = 0;
+        let missingOwnerButInferable = 0;
+        let missingOwnerAndUnknown = 0;
+
+        projectsSnap.forEach((d) => {
+            scanned += 1;
+            const data = d.data() || {};
+            if (data.ownerUid) {
+                withOwner += 1;
+                return;
+            }
+
+            // Inferencia: misma regla que getProjectOwnerUid, pero solo cuando FALTA ownerUid
+            let inferred = '';
+            if (Array.isArray(data.games) && data.games.length > 0) {
+                const first = data.games[0];
+                if (first?.created_by) inferred = String(first.created_by);
+            }
+
+            if (!inferred) {
+                missingOwnerAndUnknown += 1;
+                rows.push({
+                    id: d.id,
+                    title: data.title || '',
+                    ownerUid: '',
+                    ownerEmail: '',
+                    inferable: false,
+                    status: 'Sin datos para inferir',
+                });
+                return;
+            }
+
+            missingOwnerButInferable += 1;
+            rows.push({
+                id: d.id,
+                title: data.title || '',
+                ownerUid: inferred,
+                ownerEmail: emailByUid.get(inferred) || '',
+                inferable: true,
+                status: 'Listo para migrar',
+            });
+        });
+
+        migrationAllRows = rows;
+        migrationPreview = rows.filter((r) => r.inferable);
+        renderMigrationRows(rows);
+        if (meta) {
+            meta.textContent =
+                `Escaneados ${scanned} · con ownerUid ${withOwner} · a migrar ${missingOwnerButInferable}` +
+                (missingOwnerAndUnknown ? ` · sin inferencia posible ${missingOwnerAndUnknown}` : '');
+        }
+        if (applyBtn) applyBtn.disabled = migrationPreview.length === 0;
+    } catch (e) {
+        console.error(e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(e.message || String(e))}</td></tr>`;
+        if (meta) meta.textContent = 'Error al escanear.';
+    }
+}
+
+function renderMigrationRows(items) {
+    const tbody = $('migration-tbody');
+    if (!tbody) return;
+    if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="4">Todos los proyectos ya tienen ownerUid.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = items.map((it) => `
+        <tr>
+            <td>${escapeHtml(it.title || 'Sin título')}<div class="mono">${escapeHtml(it.id)}</div></td>
+            <td class="mono">${escapeHtml(it.ownerUid || '—')}</td>
+            <td>${escapeHtml(it.ownerEmail || '—')}</td>
+            <td>${escapeHtml(it.status)}</td>
+        </tr>
+    `).join('');
+}
+
+async function applyOwnerUidMigration() {
+    const meta = $('migration-meta');
+    const applyBtn = $('btn-migration-apply');
+    const scanBtn = $('btn-migration-scan');
+    if (!migrationPreview.length) {
+        if (meta) meta.textContent = 'Nada para aplicar. Ejecutá “Buscar” primero.';
+        return;
+    }
+    const total = migrationPreview.length;
+    if (!confirm(`Se van a actualizar ${total} proyecto(s) con el ownerUid inferido. ¿Continuar?`)) {
+        return;
+    }
+
+    if (applyBtn) applyBtn.disabled = true;
+    if (scanBtn) scanBtn.disabled = true;
+
+    let done = 0;
+    let failed = 0;
+    const errors = [];
+    for (const row of migrationPreview) {
+        if (meta) meta.textContent = `Aplicando ${done + 1}/${total}...`;
+        try {
+            await updateDoc(doc(db, 'projects', row.id), { ownerUid: row.ownerUid });
+            done += 1;
+            row.status = 'Migrado';
+        } catch (e) {
+            failed += 1;
+            row.status = `Error: ${e.message || String(e)}`;
+            errors.push({ id: row.id, error: e.message || String(e) });
+        }
+    }
+
+    // Los exitosos ya no necesitan aplicarse; preview queda con los que fallaron (si alguno).
+    migrationPreview = migrationPreview.filter((r) => r.status !== 'Migrado');
+    renderMigrationRows(migrationAllRows);
+    if (meta) {
+        const parts = [`Migración terminada: ${done} ok`];
+        if (failed) parts.push(`${failed} con error`);
+        meta.textContent = parts.join(' · ');
+    }
+    if (errors.length) console.error('Errores de migración ownerUid:', errors);
+
+    if (applyBtn) applyBtn.disabled = migrationPreview.length === 0;
+    if (scanBtn) scanBtn.disabled = false;
+}
+
 async function loadDbCollection() {
     const collectionName = $('db-collection')?.value || 'projects';
     const lim = parseDbLimit();
@@ -656,6 +809,8 @@ function wireUi() {
             loadDbCollection();
         }
     });
+    $('btn-migration-scan')?.addEventListener('click', scanProjectsMissingOwner);
+    $('btn-migration-apply')?.addEventListener('click', applyOwnerUidMigration);
     setActiveSection('users');
 }
 
