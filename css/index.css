@@ -3667,8 +3667,10 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
 /* ═══════════════════════════════════════════
    Teléfono en horizontal: solo video grande (sin chrome de la app)
    max-height evita activarlo en escritorio con ventana ancha pero alta
+   max-width: viewports anchos (netbooks ~1024+) no entran — suelen ser laptop/tablet
+   con poca altura útil; el modo "solo video" iba pensado para móvil.
    ═══════════════════════════════════════════ */
-@media (orientation: landscape) and (max-height: 520px) {
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 932px) {
   html,
   body {
     height: 100%;
