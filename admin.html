@@ -528,13 +528,14 @@
         </p>
         <div class="db-controls">
           <button type="button" id="btn-migration-scan" class="primary">Buscar proyectos sin ownerUid</button>
-          <button type="button" id="btn-migration-apply" disabled>Aplicar migración</button>
+          <button type="button" id="btn-migration-apply" disabled>Aplicar a seleccionados</button>
         </div>
         <div id="migration-meta" class="db-meta">Tocá “Buscar” para ver qué se migrará.</div>
         <div class="db-table-wrap">
           <table>
             <thead>
               <tr>
+                <th style="width:38px;"><input type="checkbox" id="migration-check-all" title="Seleccionar todos los migrables" /></th>
                 <th>Proyecto</th>
                 <th>Dueño inferido (UID)</th>
                 <th>Email dueño</th>
@@ -542,7 +543,7 @@
               </tr>
             </thead>
             <tbody id="migration-tbody">
-              <tr><td colspan="4">Sin datos.</td></tr>
+              <tr><td colspan="5">Sin datos.</td></tr>
             </tbody>
           </table>
         </div>

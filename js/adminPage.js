@@ -367,21 +367,22 @@ function renderDbRows(items) {
 }
 
 // ── Migración: rellenar ownerUid en proyectos legacy ──
-// migrationAllRows: TODAS las filas del último scan (para mostrar en la tabla incluso tras aplicar).
-// migrationPreview: solo las migrables pendientes (las que aún no se aplicaron con éxito).
+// migrationAllRows: TODAS las filas del último scan.
+//   Cada row: { id, title, ownerUid, ownerEmail, inferable, status, selected }
+//   - inferable=true cuando se puede inferir dueño desde games[0].created_by
+//   - selected solo se usa si inferable=true
 let migrationAllRows = [];
-let migrationPreview = [];
 
 async function scanProjectsMissingOwner() {
     const meta = $('migration-meta');
     const tbody = $('migration-tbody');
     const applyBtn = $('btn-migration-apply');
     if (applyBtn) applyBtn.disabled = true;
-    migrationPreview = [];
     migrationAllRows = [];
+    syncMigrationCheckAllState();
 
     if (meta) meta.textContent = 'Buscando proyectos sin ownerUid...';
-    if (tbody) tbody.innerHTML = '<tr><td colspan="4">Cargando…</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5">Cargando…</td></tr>';
 
     try {
         const [usersSnap, projectsSnap] = await Promise.all([
@@ -424,6 +425,7 @@ async function scanProjectsMissingOwner() {
                     ownerUid: '',
                     ownerEmail: '',
                     inferable: false,
+                    selected: false,
                     status: 'Sin datos para inferir',
                 });
                 return;
@@ -436,22 +438,24 @@ async function scanProjectsMissingOwner() {
                 ownerUid: inferred,
                 ownerEmail: emailByUid.get(inferred) || '',
                 inferable: true,
+                selected: false, // por defecto no seleccionados: el admin elige
                 status: 'Listo para migrar',
             });
         });
 
         migrationAllRows = rows;
-        migrationPreview = rows.filter((r) => r.inferable);
         renderMigrationRows(rows);
         if (meta) {
             meta.textContent =
                 `Escaneados ${scanned} · con ownerUid ${withOwner} · a migrar ${missingOwnerButInferable}` +
-                (missingOwnerAndUnknown ? ` · sin inferencia posible ${missingOwnerAndUnknown}` : '');
+                (missingOwnerAndUnknown ? ` · sin inferencia posible ${missingOwnerAndUnknown}` : '') +
+                ' · seleccioná las filas y tocá “Aplicar a seleccionados”.';
         }
-        if (applyBtn) applyBtn.disabled = migrationPreview.length === 0;
+        refreshMigrationApplyButton();
+        syncMigrationCheckAllState();
     } catch (e) {
         console.error(e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(e.message || String(e))}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(e.message || String(e))}</td></tr>`;
         if (meta) meta.textContent = 'Error al escanear.';
     }
 }
@@ -460,28 +464,94 @@ function renderMigrationRows(items) {
     const tbody = $('migration-tbody');
     if (!tbody) return;
     if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="4">Todos los proyectos ya tienen ownerUid.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5">Todos los proyectos ya tienen ownerUid.</td></tr>';
         return;
     }
-    tbody.innerHTML = items.map((it) => `
-        <tr>
+    tbody.innerHTML = items.map((it) => {
+        // Ya migrado o no inferible: checkbox deshabilitado.
+        const canSelect = it.inferable && it.status !== 'Migrado';
+        const checked = canSelect && it.selected ? 'checked' : '';
+        const disabled = canSelect ? '' : 'disabled';
+        return `
+        <tr data-project-id="${escapeAttr(it.id)}">
+            <td><input type="checkbox" class="migration-row-check" ${checked} ${disabled} /></td>
             <td>${escapeHtml(it.title || 'Sin título')}<div class="mono">${escapeHtml(it.id)}</div></td>
             <td class="mono">${escapeHtml(it.ownerUid || '—')}</td>
             <td>${escapeHtml(it.ownerEmail || '—')}</td>
             <td>${escapeHtml(it.status)}</td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('.migration-row-check').forEach((cb) => {
+        cb.addEventListener('change', () => {
+            const tr = cb.closest('tr');
+            const id = tr?.dataset.projectId;
+            const row = migrationAllRows.find((r) => r.id === id);
+            if (row) row.selected = cb.checked;
+            refreshMigrationApplyButton();
+            syncMigrationCheckAllState();
+        });
+    });
+}
+
+function getSelectableRows() {
+    return migrationAllRows.filter((r) => r.inferable && r.status !== 'Migrado');
+}
+
+function getSelectedRows() {
+    return getSelectableRows().filter((r) => r.selected);
+}
+
+function refreshMigrationApplyButton() {
+    const applyBtn = $('btn-migration-apply');
+    if (!applyBtn) return;
+    const n = getSelectedRows().length;
+    applyBtn.disabled = n === 0;
+    applyBtn.textContent = n > 0 ? `Aplicar a seleccionados (${n})` : 'Aplicar a seleccionados';
+}
+
+function syncMigrationCheckAllState() {
+    const master = $('migration-check-all');
+    if (!master) return;
+    const selectable = getSelectableRows();
+    const selected = selectable.filter((r) => r.selected).length;
+    if (selectable.length === 0) {
+        master.checked = false;
+        master.indeterminate = false;
+        master.disabled = true;
+        return;
+    }
+    master.disabled = false;
+    if (selected === 0) {
+        master.checked = false;
+        master.indeterminate = false;
+    } else if (selected === selectable.length) {
+        master.checked = true;
+        master.indeterminate = false;
+    } else {
+        master.checked = false;
+        master.indeterminate = true;
+    }
+}
+
+function handleMigrationCheckAll(ev) {
+    const checked = !!ev.target.checked;
+    getSelectableRows().forEach((r) => { r.selected = checked; });
+    renderMigrationRows(migrationAllRows);
+    refreshMigrationApplyButton();
+    syncMigrationCheckAllState();
 }
 
 async function applyOwnerUidMigration() {
     const meta = $('migration-meta');
     const applyBtn = $('btn-migration-apply');
     const scanBtn = $('btn-migration-scan');
-    if (!migrationPreview.length) {
-        if (meta) meta.textContent = 'Nada para aplicar. Ejecutá “Buscar” primero.';
+    const selected = getSelectedRows();
+    if (!selected.length) {
+        if (meta) meta.textContent = 'No hay filas seleccionadas.';
         return;
     }
-    const total = migrationPreview.length;
+    const total = selected.length;
     if (!confirm(`Se van a actualizar ${total} proyecto(s) con el ownerUid inferido. ¿Continuar?`)) {
         return;
     }
@@ -492,12 +562,13 @@ async function applyOwnerUidMigration() {
     let done = 0;
     let failed = 0;
     const errors = [];
-    for (const row of migrationPreview) {
+    for (const row of selected) {
         if (meta) meta.textContent = `Aplicando ${done + 1}/${total}...`;
         try {
             await updateDoc(doc(db, 'projects', row.id), { ownerUid: row.ownerUid });
             done += 1;
             row.status = 'Migrado';
+            row.selected = false;
         } catch (e) {
             failed += 1;
             row.status = `Error: ${e.message || String(e)}`;
@@ -505,8 +576,6 @@ async function applyOwnerUidMigration() {
         }
     }
 
-    // Los exitosos ya no necesitan aplicarse; preview queda con los que fallaron (si alguno).
-    migrationPreview = migrationPreview.filter((r) => r.status !== 'Migrado');
     renderMigrationRows(migrationAllRows);
     if (meta) {
         const parts = [`Migración terminada: ${done} ok`];
@@ -515,7 +584,8 @@ async function applyOwnerUidMigration() {
     }
     if (errors.length) console.error('Errores de migración ownerUid:', errors);
 
-    if (applyBtn) applyBtn.disabled = migrationPreview.length === 0;
+    refreshMigrationApplyButton();
+    syncMigrationCheckAllState();
     if (scanBtn) scanBtn.disabled = false;
 }
 
@@ -811,6 +881,7 @@ function wireUi() {
     });
     $('btn-migration-scan')?.addEventListener('click', scanProjectsMissingOwner);
     $('btn-migration-apply')?.addEventListener('click', applyOwnerUidMigration);
+    $('migration-check-all')?.addEventListener('change', handleMigrationCheckAll);
     setActiveSection('users');
 }
 
