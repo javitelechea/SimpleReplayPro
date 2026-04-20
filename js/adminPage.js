@@ -368,10 +368,18 @@ function renderDbRows(items) {
 
 // ── Migración: rellenar ownerUid en proyectos legacy ──
 // migrationAllRows: TODAS las filas del último scan.
-//   Cada row: { id, title, ownerUid, ownerEmail, inferable, status, selected }
-//   - inferable=true cuando se puede inferir dueño desde games[0].created_by
-//   - selected solo se usa si inferable=true
+//   Cada row: {
+//     id, title,
+//     originalInferredUid, originalInferredEmail, // lo que salió del scan (solo informativo)
+//     ownerUid, ownerEmail,                        // lo que se va a aplicar (puede venir de reasignación manual)
+//     manualEmailInput,                            // último valor del input manual (string, lo que escribió el admin)
+//     inferable,  // true => el checkbox se puede tildar
+//     selected,
+//     status,
+//   }
 let migrationAllRows = [];
+let migrationEmailByUid = new Map();
+let migrationUidByEmail = new Map();
 
 async function scanProjectsMissingOwner() {
     const meta = $('migration-meta');
@@ -391,10 +399,16 @@ async function scanProjectsMissingOwner() {
         ]);
 
         const emailByUid = new Map();
+        const uidByEmail = new Map();
         usersSnap.forEach((d) => {
             const data = d.data() || {};
-            emailByUid.set(d.id, data.email || '');
+            const email = (data.email || '').trim();
+            emailByUid.set(d.id, email);
+            if (email) uidByEmail.set(email.toLowerCase(), d.id);
         });
+        migrationEmailByUid = emailByUid;
+        migrationUidByEmail = uidByEmail;
+        updateMigrationEmailDatalist();
 
         const rows = [];
         let scanned = 0;
@@ -422,24 +436,38 @@ async function scanProjectsMissingOwner() {
                 rows.push({
                     id: d.id,
                     title: data.title || '',
+                    originalInferredUid: '',
+                    originalInferredEmail: '',
                     ownerUid: '',
                     ownerEmail: '',
+                    manualEmailInput: '',
                     inferable: false,
                     selected: false,
-                    status: 'Sin datos para inferir',
+                    status: 'Sin datos para inferir — reasigná manualmente si sabés el dueño',
                 });
                 return;
             }
 
-            missingOwnerButInferable += 1;
+            const resolvedEmail = emailByUid.get(inferred) || '';
+            const hasKnownUser = !!resolvedEmail;
+            if (hasKnownUser) {
+                missingOwnerButInferable += 1;
+            } else {
+                missingOwnerAndUnknown += 1;
+            }
             rows.push({
                 id: d.id,
                 title: data.title || '',
-                ownerUid: inferred,
-                ownerEmail: emailByUid.get(inferred) || '',
-                inferable: true,
-                selected: false, // por defecto no seleccionados: el admin elige
-                status: 'Listo para migrar',
+                originalInferredUid: inferred,
+                originalInferredEmail: resolvedEmail,
+                ownerUid: hasKnownUser ? inferred : '',
+                ownerEmail: hasKnownUser ? resolvedEmail : '',
+                manualEmailInput: '',
+                inferable: hasKnownUser,
+                selected: false,
+                status: hasKnownUser
+                    ? 'Listo para migrar'
+                    : 'UID sin usuario en /users — reasigná manualmente si sabés el dueño',
             });
         });
 
@@ -447,8 +475,8 @@ async function scanProjectsMissingOwner() {
         renderMigrationRows(rows);
         if (meta) {
             meta.textContent =
-                `Escaneados ${scanned} · con ownerUid ${withOwner} · a migrar ${missingOwnerButInferable}` +
-                (missingOwnerAndUnknown ? ` · sin inferencia posible ${missingOwnerAndUnknown}` : '') +
+                `Escaneados ${scanned} · con ownerUid ${withOwner} · migrables ${missingOwnerButInferable}` +
+                (missingOwnerAndUnknown ? ` · requieren reasignación manual ${missingOwnerAndUnknown}` : '') +
                 ' · seleccioná las filas y tocá “Aplicar a seleccionados”.';
         }
         refreshMigrationApplyButton();
@@ -464,20 +492,40 @@ function renderMigrationRows(items) {
     const tbody = $('migration-tbody');
     if (!tbody) return;
     if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="5">Todos los proyectos ya tienen ownerUid.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6">Todos los proyectos ya tienen ownerUid.</td></tr>';
         return;
     }
     tbody.innerHTML = items.map((it) => {
-        // Ya migrado o no inferible: checkbox deshabilitado.
-        const canSelect = it.inferable && it.status !== 'Migrado';
+        const alreadyMigrated = it.status === 'Migrado';
+        const canSelect = it.inferable && !alreadyMigrated;
         const checked = canSelect && it.selected ? 'checked' : '';
-        const disabled = canSelect ? '' : 'disabled';
+        const disabledCheck = canSelect ? '' : 'disabled';
+
+        // Info de dueño "inferido" que sale del scan (solo informativo).
+        const originalUid = it.originalInferredUid || '—';
+        const originalEmail = it.originalInferredEmail || '—';
+
+        // Input manual: deshabilitado si ya se migró. Siempre visible para permitir reasignar.
+        const manualVal = it.manualEmailInput || '';
+        const disabledInput = alreadyMigrated ? 'disabled' : '';
+
         return `
         <tr data-project-id="${escapeAttr(it.id)}">
-            <td><input type="checkbox" class="migration-row-check" ${checked} ${disabled} /></td>
+            <td><input type="checkbox" class="migration-row-check" ${checked} ${disabledCheck} /></td>
             <td>${escapeHtml(it.title || 'Sin título')}<div class="mono">${escapeHtml(it.id)}</div></td>
-            <td class="mono">${escapeHtml(it.ownerUid || '—')}</td>
-            <td>${escapeHtml(it.ownerEmail || '—')}</td>
+            <td class="mono">${escapeHtml(originalUid)}</td>
+            <td>${escapeHtml(originalEmail)}</td>
+            <td>
+                <input type="email" class="migration-manual-email"
+                       list="migration-emails-datalist"
+                       placeholder="email del dueño"
+                       value="${escapeAttr(manualVal)}"
+                       ${disabledInput}
+                       style="min-width:180px;" />
+                ${it.ownerEmail && it.ownerEmail !== originalEmail
+                    ? `<div class="mono" style="font-size:0.75rem;">→ ${escapeHtml(it.ownerUid)}</div>`
+                    : ''}
+            </td>
             <td>${escapeHtml(it.status)}</td>
         </tr>`;
     }).join('');
@@ -492,6 +540,75 @@ function renderMigrationRows(items) {
             syncMigrationCheckAllState();
         });
     });
+
+    tbody.querySelectorAll('.migration-manual-email').forEach((input) => {
+        const handler = () => {
+            const tr = input.closest('tr');
+            const id = tr?.dataset.projectId;
+            const row = migrationAllRows.find((r) => r.id === id);
+            if (!row) return;
+            applyManualEmailToRow(row, input.value);
+            renderMigrationRows(migrationAllRows);
+            refreshMigrationApplyButton();
+            syncMigrationCheckAllState();
+        };
+        input.addEventListener('change', handler);
+        input.addEventListener('blur', handler);
+    });
+}
+
+/**
+ * Aplica el email manual a la fila. Si está vacío, vuelve al estado original del scan.
+ * Si es un email conocido de la colección users, lo usa como nuevo dueño.
+ * Si no existe en users, marca la fila como no migrable con error.
+ */
+function applyManualEmailToRow(row, rawValue) {
+    const value = (rawValue || '').trim();
+    row.manualEmailInput = value;
+
+    if (!value) {
+        // Volver al estado inferido automáticamente
+        if (row.originalInferredEmail) {
+            row.ownerUid = row.originalInferredUid;
+            row.ownerEmail = row.originalInferredEmail;
+            row.inferable = true;
+            row.status = 'Listo para migrar';
+        } else {
+            row.ownerUid = '';
+            row.ownerEmail = '';
+            row.inferable = false;
+            row.status = row.originalInferredUid
+                ? 'UID sin usuario en /users — reasigná manualmente si sabés el dueño'
+                : 'Sin datos para inferir — reasigná manualmente si sabés el dueño';
+        }
+        row.selected = false;
+        return;
+    }
+
+    const uid = migrationUidByEmail.get(value.toLowerCase());
+    if (!uid) {
+        row.ownerUid = '';
+        row.ownerEmail = '';
+        row.inferable = false;
+        row.selected = false;
+        row.status = 'Email no encontrado en /users';
+        return;
+    }
+
+    row.ownerUid = uid;
+    row.ownerEmail = migrationEmailByUid.get(uid) || value;
+    row.inferable = true;
+    row.selected = true; // como el admin lo asignó a propósito, lo seleccionamos por defecto
+    row.status = 'Reasignado manualmente — listo para migrar';
+}
+
+function updateMigrationEmailDatalist() {
+    const dl = $('migration-emails-datalist');
+    if (!dl) return;
+    const emails = Array.from(migrationEmailByUid.values())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    dl.innerHTML = emails.map((e) => `<option value="${escapeAttr(e)}"></option>`).join('');
 }
 
 function getSelectableRows() {
@@ -552,7 +669,11 @@ async function applyOwnerUidMigration() {
         return;
     }
     const total = selected.length;
-    if (!confirm(`Se van a actualizar ${total} proyecto(s) con el ownerUid inferido. ¿Continuar?`)) {
+    const manualCount = selected.filter((r) => !!r.manualEmailInput).length;
+    const msg = manualCount > 0
+        ? `Se van a actualizar ${total} proyecto(s) (${manualCount} con dueño reasignado manualmente). ¿Continuar?`
+        : `Se van a actualizar ${total} proyecto(s) con el ownerUid inferido. ¿Continuar?`;
+    if (!confirm(msg)) {
         return;
     }
 

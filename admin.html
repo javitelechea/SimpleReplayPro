@@ -531,6 +531,7 @@
           <button type="button" id="btn-migration-apply" disabled>Aplicar a seleccionados</button>
         </div>
         <div id="migration-meta" class="db-meta">Tocá “Buscar” para ver qué se migrará.</div>
+        <datalist id="migration-emails-datalist"></datalist>
         <div class="db-table-wrap">
           <table>
             <thead>
@@ -539,11 +540,12 @@
                 <th>Proyecto</th>
                 <th>Dueño inferido (UID)</th>
                 <th>Email dueño</th>
+                <th>Reasignar a (email)</th>
                 <th>Estado</th>
               </tr>
             </thead>
             <tbody id="migration-tbody">
-              <tr><td colspan="5">Sin datos.</td></tr>
+              <tr><td colspan="6">Sin datos.</td></tr>
             </tbody>
           </table>
         </div>
