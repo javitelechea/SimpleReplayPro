@@ -2014,7 +2014,7 @@ import { createSessionGuard } from './sessionGuard.js';
                         UI.toast('Proyecto duplicado ✅', 'success');
                         // Re-open projects modal to show new copy
                         listOwned.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">Cargando...</p>';
-                        const projects2 = await FirebaseData.listProjects();
+                        const projects2 = await FirebaseData.listProjects(currentUser?.uid);
                         ownedProjectsCache = sortAlpha(projects2.filter(x => !x.isShared), 'title');
                         renderOwnedWithFolders();
                         renderList(listShared, projects2.filter(x => x.isShared));
@@ -2312,7 +2312,7 @@ import { createSessionGuard } from './sessionGuard.js';
 
         try {
             ensureProjectsSearchUI();
-            const projects = await FirebaseData.listProjects();
+            const projects = await FirebaseData.listProjects(currentUser?.uid);
             if (canUseFolders) {
                 folderState = await FirebaseData.loadUserProjectFolders(currentUser.uid);
             } else {
@@ -3154,6 +3154,14 @@ import { createSessionGuard } from './sessionGuard.js';
                         return p.id === projectIdToLoad && p.shared === false;
                     });
                     FirebaseData.addProjectLocally(projectIdToLoad, !isOwned); // Save as shared if we don't own it
+                } else {
+                    const u = getCurrentUser();
+                    if (u?.uid) {
+                        const owner = loaded.ownerUid || '';
+                        if (!owner || owner === u.uid) {
+                            FirebaseData.addProjectLocally(projectIdToLoad, false);
+                        }
+                    }
                 }
                 await Promise.all([
                     FirebaseData.markProjectOpened(projectIdToLoad),

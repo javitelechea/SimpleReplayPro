@@ -6,6 +6,9 @@ import {
     deleteDoc,
     collection,
     addDoc,
+    query,
+    where,
+    getDocs,
     serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { db } from './firebaseClient.js';
@@ -142,18 +145,67 @@ export const FirebaseData = (() => {
         localStorage.setItem('sr_my_projects', JSON.stringify(ids));
     }
 
-    async function listProjects() {
+    function mapDocToListRow(docSnap, isShared) {
+        const data = docSnap.data() || {};
+        return {
+            id: docSnap.id,
+            title: data.title || 'Sin título',
+            updatedAt: data.updatedAt?.toDate?.() || null,
+            lastOpenedAt: data.lastOpenedAt?.toDate?.() || null,
+            ownerUid: data.ownerUid || '',
+            youtubeVideoId: data.youtubeVideoId || '',
+            isShared,
+        };
+    }
+
+    /**
+     * Lista proyectos: propios desde Firestore (ownerUid) + índice local (sr_my_projects).
+     * Así los proyectos aparecen en un navegador nuevo sin depender solo de localStorage.
+     * authUid: Firebase uid del usuario logueado; si es null, solo se usa la lista local.
+     */
+    async function listProjects(authUid = null) {
         try {
             const stored = getLocalProjects();
-            if (stored.length === 0) return [];
+            const normalized = stored.map((p) =>
+                typeof p === 'string' ? { id: p, shared: false } : { id: p.id, shared: !!p.shared }
+            );
 
-            const projectIds = stored.map((p) => (typeof p === 'string' ? { id: p, shared: false } : p));
+            const sharedRefs = normalized.filter((p) => p.shared);
+            const localOwnedIds = new Set(normalized.filter((p) => !p.shared).map((p) => p.id));
 
-            const promises = projectIds.map((p) => loadProject(p.id).then((data) => ({ data, shared: p.shared })));
-            const results = await Promise.all(promises);
-            return results
-                .filter((res) => res.data !== null)
-                .map((res) => ({
+            const rows = [];
+            const seenIds = new Set();
+            let cloudOwnedIds = new Set();
+
+            if (authUid) {
+                try {
+                    const q = query(collection(db, 'projects'), where('ownerUid', '==', authUid));
+                    const snap = await getDocs(q);
+                    cloudOwnedIds = new Set(snap.docs.map((d) => d.id));
+                    snap.docs.forEach((d) => {
+                        const row = mapDocToListRow(d, false);
+                        rows.push(row);
+                        seenIds.add(row.id);
+                    });
+                } catch (err) {
+                    console.error('Error listando proyectos propios en Firestore:', err);
+                }
+            }
+
+            // Propios solo locales (p. ej. legacy sin ownerUid en documento): sigue haciendo falta getDoc
+            const legacyOwnedLoads = [...localOwnedIds].filter((id) => !seenIds.has(id)).map((id) =>
+                loadProject(id).then((data) => ({ data, shared: false }))
+            );
+
+            // Compartidos: solo en localStorage; no entran en la query por ownerUid
+            const sharedLoads = sharedRefs
+                .filter((p) => !seenIds.has(p.id))
+                .map((p) => loadProject(p.id).then((data) => ({ data, shared: true })));
+
+            const extra = await Promise.all([...legacyOwnedLoads, ...sharedLoads]);
+            extra.forEach((res) => {
+                if (!res.data) return;
+                rows.push({
                     id: res.data.id,
                     title: res.data.title || 'Sin título',
                     updatedAt: res.data.updatedAt?.toDate?.() || null,
@@ -161,8 +213,15 @@ export const FirebaseData = (() => {
                     ownerUid: res.data.ownerUid || '',
                     youtubeVideoId: res.data.youtubeVideoId || '',
                     isShared: res.shared,
-                }))
-                .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+                });
+            });
+
+            // Mantener el índice local alineado con la nube (sin borrar entradas "compartidas")
+            if (authUid && cloudOwnedIds.size > 0) {
+                cloudOwnedIds.forEach((id) => addProjectLocally(id, false));
+            }
+
+            return rows.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
         } catch (err) {
             console.error('Error listing projects:', err);
             return [];

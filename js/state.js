@@ -730,7 +730,7 @@ export const AppState = (() => {
 
     emit('projectLoaded', data);
     emit('gameChanged', getCurrentGame());
-    return true;
+    return data;
   }
 
   // ── XML Import / Export ──
