@@ -323,6 +323,59 @@ select {
   transform: scale(1.04);
 }
 
+.popout-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 8px;
+  margin: 0 6px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #c5f5d4;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.popout-status-pill[hidden] {
+  display: none !important;
+}
+
+.popout-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+  animation: popout-pulse 1.6s ease-out infinite;
+}
+
+@keyframes popout-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
+  70%  { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.popout-status-close {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 6px;
+  opacity: 0.75;
+}
+
+.popout-status-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 1;
+}
+
 .header-action-sep {
   height: 1px;
   margin: 6px 6px;
@@ -967,6 +1020,107 @@ select {
 #youtube-player iframe {
   width: 100% !important;
   height: 100% !important;
+}
+
+/* YouTube en la app principal: sin clics en el iframe (controles = timeline, teclas, ventana externa) */
+#youtube-player.youtube-embed--app-controlled iframe {
+  pointer-events: none;
+}
+
+/* Barra de controles propia (play/pausa, saltos, volumen) — debajo del video, sobre el iframe */
+.player-chrome {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  display: flex;
+  justify-content: center;
+  padding: 10px 12px 14px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(8px);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.16) 55%, transparent 100%);
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+.player-chrome.hidden {
+  display: none !important;
+}
+
+#player-container:hover .player-chrome:not(.hidden),
+#player-container:focus-within .player-chrome:not(.hidden) {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.player-chrome__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--r-xl, 12px);
+  background: rgba(22, 25, 34, 0.52);
+  border: 1px solid color-mix(in srgb, var(--border) 48%, transparent);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(7px);
+  pointer-events: auto;
+}
+
+.player-chrome__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text, #e8eaf0);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease, border-color .15s ease;
+}
+
+.player-chrome__btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.player-chrome__btn:active {
+  transform: scale(0.96);
+}
+
+.player-chrome__btn--primary {
+  min-width: 48px;
+  background: rgba(124, 92, 252, 0.14);
+  border-color: rgba(124, 92, 252, 0.32);
+}
+
+.player-chrome__btn--primary:hover {
+  background: rgba(124, 92, 252, 0.24);
+}
+
+.player-chrome__vol {
+  display: flex;
+  align-items: center;
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.player-chrome__btn--mute {
+  min-width: 40px;
+}
+
+.player-chrome__icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.92;
+  display: block;
 }
 
 .player-overlay {
@@ -2999,12 +3153,18 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
 }
 
 .draw-tool-btn {
-  font-size: 1.1rem;
   padding: 4px;
   border-radius: var(--r-sm);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.draw-tool-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  opacity: 0.92;
 }
 
 .draw-tool-btn.active {

@@ -13,6 +13,21 @@ export const YTPlayer = (() => {
     let _pollTimer = null;
     let _onReadyCb = null;
     let _clipAutoPaused = false;
+    let _lastMedia = null;
+    let _commandListener = null;
+
+    function _emit(type, payload) {
+        if (!_commandListener) return;
+        try { _commandListener(type, payload); } catch (_) { /* noop */ }
+    }
+
+    function setCommandListener(fn) {
+        _commandListener = typeof fn === 'function' ? fn : null;
+    }
+
+    function getLastMedia() {
+        return _lastMedia ? { ..._lastMedia } : null;
+    }
 
     function init() {
         console.log('YTPlayer wrapper: init() called');
@@ -35,7 +50,14 @@ export const YTPlayer = (() => {
             return;
         }
 
-        _videoPlayer = new VideoPlayer('youtube-player');
+        // Sin UI nativa de YouTube en la app: así no se usa el iframe por error y todo pasa por timeline/atajos/popup.
+        _videoPlayer = new VideoPlayer('youtube-player', { youtubeShowControls: false });
+        _videoPlayer.setPlaybackActivityCallback((ev) => {
+            if (!ev || !ev.action) return;
+            if (ev.action === 'play') _emit('play');
+            else if (ev.action === 'pause') _emit('pause');
+            else if (ev.action === 'seek' && typeof ev.time === 'number') _emit('seek', { seconds: ev.time });
+        });
         _ready = true;
         console.log('YTPlayer wrapper: player instance created, ready');
 
@@ -55,22 +77,27 @@ export const YTPlayer = (() => {
 
         if (videoId) {
             _videoPlayer.loadVideo({ type: 'youtube', id: videoId });
+            _lastMedia = { kind: 'youtube', id: videoId };
+            _emit('mediaLoaded', _lastMedia);
         }
     }
 
-    function loadLocalVideo(url) {
+    function loadLocalVideo(url, file) {
         if (!_ready || !_videoPlayer) return;
         _clipEndSec = null;
         _stopPoll();
 
         if (url) {
             _videoPlayer.loadVideo({ type: 'local', url: url });
+            _lastMedia = { kind: 'local', url, file: file || null };
+            _emit('mediaLoaded', _lastMedia);
         }
     }
 
     function seekTo(seconds) {
         if (!_ready || !_videoPlayer) return;
         _videoPlayer.seekTo(seconds);
+        _emit('seek', { seconds });
     }
 
     function play() {
@@ -111,6 +138,7 @@ export const YTPlayer = (() => {
         _clipEndSec = endSec;
         _videoPlayer.seekTo(startSec);
         _videoPlayer.play();
+        _emit('seek', { seconds: startSec });
         _startPoll();
     }
 
@@ -145,6 +173,43 @@ export const YTPlayer = (() => {
     function setSpeed(rate) {
         if (!_ready || !_videoPlayer) return;
         _videoPlayer.setPlaybackRate(rate);
+        _emit('speed', { rate });
+    }
+
+    function getVolume() {
+        if (!_ready || !_videoPlayer) return 100;
+        return _videoPlayer.getVolume();
+    }
+
+    function setVolume(percent) {
+        if (!_ready || !_videoPlayer) return;
+        _videoPlayer.setVolume(percent);
+        if (percent > 0 && _videoPlayer.isMuted()) _videoPlayer.unMute();
+        _emit('volume', { volume: _videoPlayer.getVolume(), muted: _videoPlayer.isMuted() });
+    }
+
+    function isMuted() {
+        if (!_ready || !_videoPlayer) return false;
+        return _videoPlayer.isMuted();
+    }
+
+    function mute() {
+        if (!_ready || !_videoPlayer) return;
+        _videoPlayer.mute();
+        _emit('volume', { volume: _videoPlayer.getVolume(), muted: true });
+    }
+
+    function unMute() {
+        if (!_ready || !_videoPlayer) return;
+        _videoPlayer.unMute();
+        _emit('volume', { volume: _videoPlayer.getVolume(), muted: _videoPlayer.isMuted() });
+    }
+
+    function toggleMute() {
+        if (!_ready || !_videoPlayer) return;
+        if (_videoPlayer.isMuted()) _videoPlayer.unMute();
+        else _videoPlayer.mute();
+        _emit('volume', { volume: _videoPlayer.getVolume(), muted: _videoPlayer.isMuted() });
     }
 
     function getSourceType() {
@@ -157,7 +222,9 @@ export const YTPlayer = (() => {
         const d = getDuration();
         if (!d || !Number.isFinite(d)) return;
         clearClipEnd();
-        _videoPlayer.seekTo(Math.max(0, d - 1));
+        const target = Math.max(0, d - 1);
+        _videoPlayer.seekTo(target);
+        _emit('seek', { seconds: target });
     }
 
     function isLiveStream() {
@@ -168,6 +235,26 @@ export const YTPlayer = (() => {
     // Dummy for compatibility
     function getPlayerState() { return -1; }
     function isReady() { return _ready; }
+    function isPlaying() { return !!(_videoPlayer && _videoPlayer.isPlaying); }
 
-    return { init, loadVideo, loadLocalVideo, seekTo, play, pause, togglePlay, getCurrentTime, getDuration, playClip, clearClipEnd, clearAutoPause, isReady, getPlayerState, setSpeed, getSourceType, jumpToLiveEdge, isLiveStream };
+    /** Apply play/pause/seek from the popout window (bypasses duplicate _emit). */
+    function mirrorRemotePlayback(payload) {
+        if (!_ready || !_videoPlayer || !payload || !payload.action) return;
+        if (payload.action === 'seek' && typeof payload.time === 'number') {
+            _videoPlayer.seekTo(payload.time);
+        } else if (payload.action === 'play') {
+            _videoPlayer.play();
+        } else if (payload.action === 'pause') {
+            _videoPlayer.pause();
+        } else if (payload.action === 'volume') {
+            if (payload.muted === true) _videoPlayer.mute();
+            else if (payload.muted === false) _videoPlayer.unMute();
+            if (typeof payload.volume === 'number') {
+                _videoPlayer.setVolume(payload.volume);
+                if (payload.volume > 0 && _videoPlayer.isMuted()) _videoPlayer.unMute();
+            }
+        }
+    }
+
+    return { init, loadVideo, loadLocalVideo, seekTo, play, pause, togglePlay, getCurrentTime, getDuration, playClip, clearClipEnd, clearAutoPause, isReady, isPlaying, getPlayerState, setSpeed, getSourceType, jumpToLiveEdge, isLiveStream, setCommandListener, getLastMedia, mirrorRemotePlayback, getVolume, setVolume, isMuted, mute, unMute, toggleMute };
 })();

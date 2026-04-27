@@ -1690,6 +1690,8 @@ export const UI = (() => {
         const overlay = $('#no-game-overlay');
         const hasGame = !!AppState.get('currentGameId');
         overlay.classList.toggle('hidden', hasGame);
+        const chrome = $('#player-chrome');
+        if (chrome) chrome.classList.toggle('hidden', !hasGame);
     }
 
     // ═══ ADD TO PLAYLIST MODAL ═══

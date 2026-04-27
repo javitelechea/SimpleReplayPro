@@ -453,7 +453,7 @@ export const DrawingTool = (() => {
                     _watchShownIds.add(d.id);
                     // Seek back slightly before pausing to prevent YouTube showing
                     // its "more videos" overlay (which it triggers at natural pause points)
-                    YTPlayer.seekTo(Math.max(0, d.videoTimeSec - 1));
+                    YTPlayer.seekTo(Math.max(0, d.videoTimeSec - 0.2));
                     YTPlayer.pause();
                     _showAutoOverlay(d);
                 }

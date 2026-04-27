@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SimpleReplay — Player externo</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: #000;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #e8eaf0;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      min-height: 100vh;
+      min-height: 100dvh;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    #popout-stage {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+      width: 100%;
+    }
+
+    #popout-player {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    #popout-status {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.55);
+      border-radius: 8px;
+      font-size: 12px;
+      letter-spacing: 0.2px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+
+    #popout-status.show {
+      opacity: 1;
+    }
+
+    #popout-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #9ca3b8;
+      font-size: 14px;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #popout-empty strong {
+      color: #e8eaf0;
+      font-size: 16px;
+    }
+
+    #popout-empty.hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="popout-stage">
+    <div id="popout-player"></div>
+  </div>
+  <div id="popout-empty">
+    <strong>Player externo de SimpleReplay</strong>
+    <span>Esperando video desde la app principal…</span>
+  </div>
+  <div id="popout-status">Listo</div>
+
+  <script type="module" src="js/popoutPlayer.js"></script>
+</body>
+
+</html>

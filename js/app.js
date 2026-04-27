@@ -16,6 +16,7 @@ import { FEATURES, resolveEffectivePlan, resolveFeaturesForUser } from './featur
 import { toMillis } from './access.js';
 import { ButtonboardTemplates } from './buttonboardTemplates.js';
 import { createSessionGuard } from './sessionGuard.js';
+import { PopoutController } from './popoutController.js';
 
 (function () {
     'use strict';
@@ -23,6 +24,8 @@ import { createSessionGuard } from './sessionGuard.js';
     const $ = UI.$;
     let latestUserDoc = null;
     let authMenuWired = false;
+    let _localVideoFileForCurrentGame = null;
+    let _mainAudioBeforePopout = null;
     let _liveProbeLastDuration = 0;
     let _liveProbeLastTs = 0;
     let _liveDurationGrowthHits = 0;
@@ -709,6 +712,205 @@ import { createSessionGuard } from './sessionGuard.js';
         });
     }
 
+    function _popoutGetSnapshot() {
+        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+        let snapshotMedia = null;
+        if (media) {
+            if (media.kind === 'youtube' && media.id) {
+                snapshotMedia = { kind: 'youtube', id: media.id };
+            } else if (media.kind === 'local' && media.file) {
+                snapshotMedia = { kind: 'local', file: media.file };
+            }
+        }
+        return {
+            media: snapshotMedia,
+            currentTime: YTPlayer.getCurrentTime ? (YTPlayer.getCurrentTime() || 0) : 0,
+            isPlaying: YTPlayer.isPlaying ? !!YTPlayer.isPlaying() : false,
+            rate: 1,
+            volume: YTPlayer.getVolume ? YTPlayer.getVolume() : 100,
+            muted: YTPlayer.isMuted ? !!YTPlayer.isMuted() : false
+        };
+    }
+
+    function wirePopout() {
+        if (typeof YTPlayer.setCommandListener !== 'function') return;
+
+        PopoutController.setProvider({ getSnapshot: _popoutGetSnapshot });
+        PopoutController.setMirrorHandler((payload) => {
+            // Policy: audio only in popup while it's active.
+            if (payload && payload.action === 'volume') return;
+            if (YTPlayer.mirrorRemotePlayback) YTPlayer.mirrorRemotePlayback(payload);
+        });
+
+        YTPlayer.setCommandListener((type, payload) => {
+            if (!PopoutController.isActive()) return;
+            switch (type) {
+                case 'mediaLoaded':
+                    if (payload && payload.kind === 'youtube') {
+                        PopoutController.notifyMediaLoaded({ kind: 'youtube', id: payload.id });
+                    } else if (payload && payload.kind === 'local' && payload.file) {
+                        PopoutController.notifyMediaLoaded({ kind: 'local', file: payload.file });
+                    }
+                    break;
+                case 'play':
+                    PopoutController.notifyPlay();
+                    break;
+                case 'pause':
+                    PopoutController.notifyPause();
+                    break;
+                case 'seek':
+                    if (payload && typeof payload.seconds === 'number') {
+                        PopoutController.notifySeek(payload.seconds);
+                    }
+                    break;
+                case 'speed':
+                    if (payload && typeof payload.rate === 'number') {
+                        PopoutController.notifySpeed(payload.rate);
+                    }
+                    break;
+                case 'volume':
+                    if (payload && (typeof payload.volume === 'number' || typeof payload.muted === 'boolean')) {
+                        PopoutController.notifyVolume(payload);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        const pill = $('#popout-status-pill');
+        const closeBtn = $('#btn-popout-close');
+        if (pill) pill.hidden = true;
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                PopoutController.close();
+            });
+        }
+        PopoutController.onActiveChange((active) => {
+            if (pill) pill.hidden = !active;
+            if (active) {
+                if (_mainAudioBeforePopout === null) {
+                    _mainAudioBeforePopout = {
+                        muted: YTPlayer.isMuted ? !!YTPlayer.isMuted() : false,
+                        volume: YTPlayer.getVolume ? YTPlayer.getVolume() : 100
+                    };
+                }
+                if (YTPlayer.mute) YTPlayer.mute();
+            } else if (_mainAudioBeforePopout) {
+                if (typeof _mainAudioBeforePopout.volume === 'number' && YTPlayer.setVolume) {
+                    YTPlayer.setVolume(_mainAudioBeforePopout.volume);
+                }
+                if (_mainAudioBeforePopout.muted) {
+                    if (YTPlayer.mute) YTPlayer.mute();
+                } else if (YTPlayer.unMute) {
+                    YTPlayer.unMute();
+                }
+                _mainAudioBeforePopout = null;
+            }
+        });
+
+        const openBtn = $('#btn-open-popout');
+        if (openBtn) {
+            openBtn.addEventListener('click', () => {
+                const game = AppState.getCurrentGame();
+                if (!game) {
+                    UI.toast('Abrí o creá un proyecto primero', 'info');
+                    return;
+                }
+                const ok = PopoutController.open();
+                if (!ok) {
+                    UI.toast('No se pudo abrir la ventana. Permití popups para este sitio.', 'error');
+                    return;
+                }
+                UI.toast('Player externo abierto', 'success');
+            });
+        }
+    }
+
+    function syncPlayerChromeUi() {
+        const chrome = $('#player-chrome');
+        if (!chrome || chrome.classList.contains('hidden')) return;
+        if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
+
+        const playBtn = $('#player-chrome-play');
+        if (playBtn) {
+            const playing = YTPlayer.isPlaying();
+            playBtn.innerHTML = playing
+                ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h4v12H7zM13 6h4v12h-4z" fill="currentColor"/></svg>'
+                : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>';
+            playBtn.setAttribute('aria-label', playing ? 'Pausa' : 'Reproducir');
+        }
+
+        const muteBtn = $('#player-chrome-mute');
+        if (muteBtn && YTPlayer.isMuted) {
+            const m = YTPlayer.isMuted();
+            muteBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
+            const popoutActive = PopoutController && PopoutController.isActive && PopoutController.isActive();
+            muteBtn.disabled = !!popoutActive;
+            muteBtn.title = popoutActive ? 'Audio solo en player externo' : 'Silenciar o activar sonido';
+            muteBtn.innerHTML = m
+                ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm10.8 2 2.9 2.9 1.4-1.4-2.9-2.9 2.9-2.9-1.4-1.4-2.9 2.9-2.9-2.9-1.4 1.4 2.9 2.9-2.9 2.9 1.4 1.4 2.9-2.9Z" fill="currentColor"/></svg>'
+                : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm12.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 15.5 12Z" fill="currentColor"/></svg>';
+        }
+    }
+
+    function wirePlayerChrome() {
+        const root = $('#player-chrome');
+        if (!root || root.dataset.wired === '1') return;
+        root.dataset.wired = '1';
+
+        const stepSeek = (dir) => {
+            if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return;
+            const t = YTPlayer.getCurrentTime() || 0;
+            const step = getSeekStep(false);
+            const next = dir < 0 ? Math.max(0, t - step) : t + step;
+            YTPlayer.seekTo(next);
+        };
+
+        $('#player-chrome-seek-back')?.addEventListener('click', () => stepSeek(-1));
+        $('#player-chrome-seek-fwd')?.addEventListener('click', () => stepSeek(1));
+
+        $('#player-chrome-play')?.addEventListener('click', () => {
+            if (typeof DrawingTool !== 'undefined' && DrawingTool.hasPlaybackOverlays()) {
+                DrawingTool.dismissPlaybackOverlays();
+                YTPlayer.play();
+            } else {
+                YTPlayer.togglePlay();
+            }
+            syncPlayerChromeUi();
+        });
+
+        $('#player-chrome-mute')?.addEventListener('click', () => {
+            if (PopoutController && PopoutController.isActive && PopoutController.isActive()) return;
+            if (YTPlayer.toggleMute) YTPlayer.toggleMute();
+            syncPlayerChromeUi();
+        });
+
+        setInterval(syncPlayerChromeUi, 450);
+    }
+
+    function wirePlayerSurfaceToggle() {
+        const container = $('#player-container');
+        if (!container || container.dataset.surfaceToggleWired === '1') return;
+        container.dataset.surfaceToggleWired = '1';
+
+        container.addEventListener('click', (ev) => {
+            // Only primary-button clicks; ignore modified clicks.
+            if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return;
+            // Ignore clicks on UI controls.
+            if (ev.target.closest('#player-chrome')) return;
+            if (ev.target.closest('#drawing-toolbar')) return;
+            // While drawing, clicking the canvas should not toggle playback.
+            if (typeof DrawingTool !== 'undefined' && typeof DrawingTool.isActive === 'function' && DrawingTool.isActive()) return;
+            // Ignore when no game loaded.
+            if (!AppState.get('currentGameId')) return;
+            if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.togglePlay) return;
+
+            YTPlayer.togglePlay();
+            syncPlayerChromeUi();
+        });
+    }
+
     function wireHeaderNavMenu() {
         const trigger = $('#btn-header-nav');
         const menu = $('#header-nav-menu');
@@ -1198,6 +1400,7 @@ import { createSessionGuard } from './sessionGuard.js';
             if (!title) { UI.toast('Ingresá un título', 'error'); return; }
             if (!localVideoInput) { UI.toast('Seleccioná un video local', 'error'); return; }
             localVideoUrl = URL.createObjectURL(localVideoInput);
+            _localVideoFileForCurrentGame = localVideoInput;
 
         } else if (activeProjectTab === 'json') {
             if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast('Importar datos requiere el plan PRO', 'error'); return; }
@@ -1264,7 +1467,7 @@ import { createSessionGuard } from './sessionGuard.js';
         UI.refreshAll();
 
         if (localVideoUrl) {
-            YTPlayer.loadLocalVideo(localVideoUrl);
+            YTPlayer.loadLocalVideo(localVideoUrl, _localVideoFileForCurrentGame);
         } else if (ytId) {
             YTPlayer.loadVideo(ytId);
         }
@@ -1285,7 +1488,8 @@ import { createSessionGuard } from './sessionGuard.js';
             const game = AppState.getCurrentGame();
             if (game) {
                 game.local_video_url = url;
-                YTPlayer.loadLocalVideo(url);
+                _localVideoFileForCurrentGame = file;
+                YTPlayer.loadLocalVideo(url, file);
                 UI.toast('Video re-vinculado ✅', 'success');
             }
         });
@@ -3124,6 +3328,23 @@ import { createSessionGuard } from './sessionGuard.js';
             await YTPlayer.init();
         } catch (e) {
             console.warn('YouTube Player no se pudo iniciar inmediatamente (común en file://).', e);
+        }
+
+        // Wire popout controller to the player commands
+        try {
+            wirePopout();
+        } catch (e) {
+            console.warn('Popout controller no se pudo iniciar:', e);
+        }
+        try {
+            wirePlayerChrome();
+        } catch (e) {
+            console.warn('Controles del reproductor no se pudieron iniciar:', e);
+        }
+        try {
+            wirePlayerSurfaceToggle();
+        } catch (e) {
+            console.warn('Toggle por click en video no se pudo iniciar:', e);
         }
 
         // Init state (loads whatever is in DemoData)

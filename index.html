@@ -66,6 +66,11 @@
     <div class="header-right">
       <h3 id="current-project-title" class="project-title-header project-title-header--compact"
         style="margin:0 8px; font-size: 0.88rem; font-weight: 500; color: var(--text);"></h3>
+      <div id="popout-status-pill" class="popout-status-pill" hidden>
+        <span class="popout-status-dot" aria-hidden="true"></span>
+        <span class="popout-status-label">Player externo</span>
+        <button type="button" id="btn-popout-close" class="popout-status-close" title="Cerrar player externo" aria-label="Cerrar player externo">✕</button>
+      </div>
       <button id="btn-new-game" class="btn btn-primary btn-sm btn-header-icon" title="Nuevo proyecto" aria-label="Nuevo proyecto">＋</button>
       <input type="file" id="input-import-xml" accept=".xml" style="display:none;" />
       <input type="file" id="input-relink-video" accept="video/*" style="display:none;" />
@@ -80,6 +85,7 @@
         </button>
         <div id="header-nav-menu" class="header-actions-menu" hidden>
           <button id="btn-open-preferences" class="header-action-item header-action-item--tool" type="button" title="Preferencias"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M12 8v5l3 2M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Preferencias</span></button>
+          <button id="btn-open-popout" class="header-action-item header-action-item--tool" type="button" title="Abrir player en ventana externa"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M14 13l5 5M14 18h5v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Abrir player externo</span></button>
           <div class="header-action-sep" aria-hidden="true"></div>
           <button id="btn-my-projects" class="header-action-item header-action-item--panel" type="button" title="Mis proyectos"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--panel" viewBox="0 0 24 24" fill="none"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.3a2 2 0 0 1 1.4.57l.74.73a2 2 0 0 0 1.4.58H19.5A1.5 1.5 0 0 1 21 9.38V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span>Proyectos</span></button>
           <button id="btn-open-buttonboards" class="header-action-item header-action-item--panel" type="button" title="Ventanas de código" style="display:none;"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--panel" viewBox="0 0 24 24" fill="none"><rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span>Ventanas de código</span></button>
@@ -113,6 +119,24 @@
     <section id="video-area">
       <div id="player-container">
         <div id="youtube-player"></div>
+        <div id="player-chrome" class="player-chrome hidden" aria-label="Controles del reproductor">
+          <div class="player-chrome__bar">
+            <button type="button" id="player-chrome-seek-back" class="player-chrome__btn" title="Retroceder (paso de preferencias)" aria-label="Retroceder en el video">
+              <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7l-6 5 6 5V7Zm8 0-6 5 6 5V7Z" fill="currentColor"/></svg>
+            </button>
+            <button type="button" id="player-chrome-play" class="player-chrome__btn player-chrome__btn--primary" title="Reproducir o pausa" aria-label="Reproducir o pausa">
+              <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>
+            </button>
+            <button type="button" id="player-chrome-seek-fwd" class="player-chrome__btn" title="Avanzar (paso de preferencias)" aria-label="Avanzar en el video">
+              <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 7v10l6-5-6-5ZM5 7v10l6-5-6-5Z" fill="currentColor"/></svg>
+            </button>
+            <div class="player-chrome__vol" title="Silenciar o activar sonido">
+              <button type="button" id="player-chrome-mute" class="player-chrome__btn player-chrome__btn--mute" aria-label="Silenciar" aria-pressed="false">
+                <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm12.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 15.5 12Z" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
         <div id="no-game-overlay" class="player-overlay">
           <div class="overlay-content">
             <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
@@ -135,13 +159,21 @@
               title="Blanco"></span>
           </div>
           <div class="draw-toolbar-group">
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-eraser" title="Borrador">🧹</button>
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-line" title="Línea recta (o Shift+drag)">📏</button>
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-arrow" title="Flecha">➡️</button>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-eraser" title="Borrador" aria-label="Borrador">
+              <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 15.5 13 7a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8l-5.9 5.9a2 2 0 0 1-1.4.6H7.3a2 2 0 0 1-1.4-.6l-1.4-1.4a2 2 0 0 1 0-2.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 19.5h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </button>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-line" title="Línea recta (o Shift+drag)" aria-label="Línea recta">
+              <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 20 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4" cy="20" r="1.8" fill="currentColor"/><circle cx="20" cy="4" r="1.8" fill="currentColor"/></svg>
+            </button>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-arrow" title="Flecha" aria-label="Flecha">
+              <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M14 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
             <input type="range" id="draw-size" min="2" max="12" value="4" class="draw-size-slider" title="Grosor" />
           </div>
           <div class="draw-toolbar-group">
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-undo" title="Deshacer">↩️</button>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-undo" title="Deshacer" aria-label="Deshacer">
+              <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8 4 12l5 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </button>
             <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-clear" title="Limpiar">🗑️</button>
           </div>
           <div class="draw-toolbar-group draw-toolbar-actions">
