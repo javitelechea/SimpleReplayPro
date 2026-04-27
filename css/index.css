@@ -1054,6 +1054,13 @@ select {
   transform: translateY(0);
 }
 
+/* While chat overlay is open, hide player chrome to avoid interaction overlap. */
+#player-container.chat-open .player-chrome {
+  opacity: 0 !important;
+  transform: translateY(8px) !important;
+  pointer-events: none !important;
+}
+
 .player-chrome__bar {
   display: flex;
   align-items: center;
@@ -1206,7 +1213,7 @@ select {
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 15;
+  z-index: 40;
   padding: 8px 12px;
   overflow-y: auto;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -3235,6 +3242,10 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   outline: none;
   width: 180px;
   transition: border-color var(--tr-fast);
+}
+
+.draw-author-input {
+  width: 130px;
 }
 
 .draw-description-input::placeholder {

@@ -121,6 +121,11 @@ export const DrawingTool = (() => {
         // Show canvas & toolbar
         _canvas.classList.add('active');
         _toolbar.classList.add('active');
+        const authorInput = _toolbar.querySelector('#draw-author');
+        if (authorInput) {
+            const preferred = AppState.getPreferredChatName ? AppState.getPreferredChatName() : 'Anónimo';
+            authorInput.value = preferred === 'Anónimo' ? '' : preferred;
+        }
 
         // Clear
         _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
@@ -158,6 +163,8 @@ export const DrawingTool = (() => {
         // Clear description field
         const descInput = _toolbar && _toolbar.querySelector('#draw-description');
         if (descInput) descInput.value = '';
+        const authorInput = _toolbar && _toolbar.querySelector('#draw-author');
+        if (authorInput) authorInput.value = '';
     }
 
     // ── Save drawing as comment ──
@@ -173,7 +180,20 @@ export const DrawingTool = (() => {
         }
 
         const dataUrl = _canvas.toDataURL('image/png');
-        const savedName = localStorage.getItem('sr_chat_name') || 'Anónimo';
+        const authorInput = _toolbar && _toolbar.querySelector('#draw-author');
+        let savedName = authorInput && authorInput.value ? authorInput.value.trim() : '';
+        const isGuest = !AppState.get('authUser');
+        const hasSavedChatName = (localStorage.getItem('sr_chat_name') || '').trim().length > 0;
+        if (!savedName && isGuest && !hasSavedChatName) {
+            const asked = window.prompt('¿Con qué nombre querés aparecer en el chat?', '') || '';
+            savedName = asked.trim();
+        }
+        if (!savedName) {
+            savedName = AppState.getPreferredChatName ? AppState.getPreferredChatName() : (localStorage.getItem('sr_chat_name') || 'Anónimo');
+        }
+        if (savedName && savedName !== 'Anónimo') {
+            localStorage.setItem('sr_chat_name', savedName);
+        }
 
         // Read description from toolbar input
         const descInput = _toolbar && _toolbar.querySelector('#draw-description');
@@ -181,8 +201,13 @@ export const DrawingTool = (() => {
 
         AppState.addComment(_playlistId, _clipId, savedName, description, dataUrl, _videoTimestamp);
 
-        UI.toast('Dibujo guardado 🎨', 'success');
+        // Always exit drawing mode right after a successful save.
         close();
+        // Ensure no stale drawing overlays remain visible.
+        dismissPlaybackOverlays();
+        const preview = document.getElementById('drawing-preview-overlay');
+        if (preview) preview.classList.remove('active');
+        UI.toast('Dibujo guardado y cerrado ✅', 'success');
     }
 
     // ── Clear canvas ──
@@ -447,13 +472,12 @@ export const DrawingTool = (() => {
 
             const t = YTPlayer.getCurrentTime();
             drawings.forEach(d => {
-                if (_watchShownIds.has(d.id)) return;
+                const drawingKey = d.timestamp || `${d.videoTimeSec}|${d.text || ''}`;
+                if (_watchShownIds.has(drawingKey)) return;
                 if (d.videoTimeSec === undefined || d.videoTimeSec === null) return;
                 if (t >= d.videoTimeSec) {
-                    _watchShownIds.add(d.id);
-                    // Seek back slightly before pausing to prevent YouTube showing
-                    // its "more videos" overlay (which it triggers at natural pause points)
-                    YTPlayer.seekTo(Math.max(0, d.videoTimeSec - 0.2));
+                    _watchShownIds.add(drawingKey);
+                    // No rewind jump: pause right where playback is.
                     YTPlayer.pause();
                     _showAutoOverlay(d);
                 }

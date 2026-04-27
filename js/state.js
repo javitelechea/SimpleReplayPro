@@ -578,6 +578,19 @@ export const AppState = (() => {
     return comment;
   }
 
+  function getPreferredChatName() {
+    const auth = state.authUser;
+    if (auth) {
+      const fromAuth = (auth.displayName || auth.email || '').trim();
+      if (fromAuth) return fromAuth;
+    }
+    if (typeof localStorage !== 'undefined') {
+      const saved = (localStorage.getItem('sr_chat_name') || '').trim();
+      if (saved) return saved;
+    }
+    return 'Anónimo';
+  }
+
   function getComments(playlistId, clipId) {
     const key = playlistId + '::' + clipId;
     return state.playlistComments[key] || [];
@@ -600,7 +613,7 @@ export const AppState = (() => {
 
   // ── Activity Log ──
   function addActivity(type, details) {
-    const name = (typeof localStorage !== 'undefined' && localStorage.getItem('sr_chat_name')) || 'Anónimo';
+    const name = getPreferredChatName();
     const entry = {
       type,
       name,
@@ -1013,7 +1026,7 @@ export const AppState = (() => {
     init, setFeatureFlags, hasFeature, setAuthenticatedUser,
     clearProject, saveToCloud, loadFromCloud, importXML, exportXML,
     exportProjectData, importProjectData,
-    addComment, getComments, removeComment, getClipNumber,
+    addComment, getComments, removeComment, getClipNumber, getPreferredChatName,
     addActivity, getActivityLog,
   };
 })();

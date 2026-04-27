@@ -297,12 +297,8 @@ export const UI = (() => {
     const MENTION_REGEX = /@(\w[\w\s]*?)(?=\s|$|[.,;:!?])/g;
 
     function getDefaultChatDisplayName() {
-        const auth = AppState.get('authUser');
-        if (auth) {
-            const fromAuth = (auth.displayName || auth.email || '').trim();
-            if (fromAuth) return fromAuth;
-        }
-        return (localStorage.getItem('sr_chat_name') || '').trim();
+        const preferred = AppState.getPreferredChatName ? AppState.getPreferredChatName() : '';
+        return preferred === 'Anónimo' ? '' : preferred;
     }
 
     function escapeChatAttr(s) {
@@ -425,13 +421,29 @@ export const UI = (() => {
                     updateClipEditControls();
                 });
             });
+
+            // Click on a drawing comment => jump to that drawing moment and show overlay
+            panel.querySelectorAll('.chat-message[data-drawing-ts]').forEach(row => {
+                row.style.cursor = 'pointer';
+                row.addEventListener('click', (e) => {
+                    if (e.target.closest('.drawing-delete-btn')) return;
+                    const ts = row.getAttribute('data-drawing-ts');
+                    const comments = AppState.getComments(playlistId, clipId);
+                    const c = comments.find(x => x.timestamp === ts && x.drawing);
+                    if (!c || !c.drawing) return;
+                    DrawingTool.showDrawingOverlay(c.drawing, c.videoTimeSec);
+                });
+            });
         }
     }
 
     // ═══ VIDEO CHAT OVERLAY ═══
-    function showVideoChatPanel(playlistId, clipId) {
+    function showVideoChatPanel(playlistId, clipId, options = {}) {
         const panel = $('#video-chat-panel');
         if (!panel || !playlistId || !clipId) return;
+        const shouldFocusInput = options.focusInput !== false;
+        const playerContainer = $('#player-container');
+        if (playerContainer) playerContainer.classList.add('chat-open');
 
         const comments = AppState.getComments(playlistId, clipId);
         const savedName = escapeChatAttr(getDefaultChatDisplayName());
@@ -479,9 +491,9 @@ export const UI = (() => {
             });
         }
 
-        // Focus text input
+        // Focus text input only for explicit user-opened chat.
         const textInput = panel.querySelector('.chat-text-input');
-        if (textInput) textInput.focus();
+        if (textInput && shouldFocusInput) textInput.focus();
 
         // Send handler
         const sendBtn = panel.querySelector('.chat-send-btn');
@@ -511,6 +523,19 @@ export const UI = (() => {
                 AppState.saveToCloud().catch(() => {});
             });
         });
+
+        // Click on a drawing comment => jump to that drawing moment and show overlay
+        panel.querySelectorAll('.chat-message[data-drawing-ts]').forEach(row => {
+            row.style.cursor = 'pointer';
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('.drawing-delete-btn')) return;
+                const ts = row.getAttribute('data-drawing-ts');
+                const comments = AppState.getComments(playlistId, clipId);
+                const c = comments.find(x => x.timestamp === ts && x.drawing);
+                if (!c || !c.drawing) return;
+                DrawingTool.showDrawingOverlay(c.drawing, c.videoTimeSec);
+            });
+        });
     }
 
     function hideVideoChatPanel() {
@@ -519,6 +544,8 @@ export const UI = (() => {
             panel.style.display = 'none';
             panel.innerHTML = '';
         }
+        const playerContainer = $('#player-container');
+        if (playerContainer) playerContainer.classList.remove('chat-open');
     }
 
     function attachChatHandlers(container, rerenderFn) {
@@ -1013,11 +1040,24 @@ export const UI = (() => {
     function updateClipEditControls() {
         const currentClipId = AppState.get('currentClipId');
         const toolbarEl = $('#clip-view-toolbar');
+        const clearDrawingOverlays = () => {
+            if (typeof DrawingTool !== 'undefined') {
+                if (typeof DrawingTool.dismissPlaybackOverlays === 'function') {
+                    DrawingTool.dismissPlaybackOverlays();
+                }
+                if (!currentClipId && typeof DrawingTool.stopPlaybackWatch === 'function') {
+                    DrawingTool.stopPlaybackWatch();
+                }
+            }
+            const preview = document.getElementById('drawing-preview-overlay');
+            if (preview) preview.classList.remove('active');
+        };
 
         if (toolbarEl) {
             if (currentClipId) {
                 // Close chat from previous clip
                 hideVideoChatPanel();
+                clearDrawingOverlays();
                 const currentClip = AppState.getCurrentClip();
                 if (currentClip && $('#toolbar-clip-name')) {
                     const tagInfo = AppState.getTagType(currentClip.tag_type_id);
@@ -1055,7 +1095,7 @@ export const UI = (() => {
                         // Auto-open chat if clip has comments
                         const comments = AppState.getComments(activePlaylistId, currentClipId);
                         if (comments.length > 0) {
-                            showVideoChatPanel(activePlaylistId, currentClipId);
+                            showVideoChatPanel(activePlaylistId, currentClipId, { focusInput: false });
                         }
                     } else {
                         chatBtn.style.setProperty('opacity', '0.3', 'important');
@@ -1071,6 +1111,7 @@ export const UI = (() => {
             } else {
                 toolbarEl.style.display = 'none';
                 hideVideoChatPanel();
+                clearDrawingOverlays();
             }
         }
     }
