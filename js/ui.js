@@ -1041,6 +1041,7 @@ export const UI = (() => {
     // ═══ CLIP EDIT CONTROLS ═══
     function updateClipEditControls() {
         const currentClipId = AppState.get('currentClipId');
+        const mode = AppState.get('mode');
         const toolbarEl = $('#clip-view-toolbar');
         const clearDrawingOverlays = () => {
             if (typeof DrawingTool !== 'undefined') {
@@ -1056,6 +1057,19 @@ export const UI = (() => {
         };
 
         if (toolbarEl) {
+            const restartBtn = $('#btn-clip-restart');
+            const playPauseBtn = $('#btn-clip-playpause');
+            const nextBtn = $('#btn-clip-next');
+            const markInBtn = $('#btn-clip-mark-in');
+            const markOutBtn = $('#btn-clip-mark-out');
+            const speedBtn = $('#btn-clip-speed');
+            const hideTransportOnly = mode !== 'analyze';
+            if (restartBtn) restartBtn.style.display = hideTransportOnly ? 'none' : '';
+            if (playPauseBtn) playPauseBtn.style.display = hideTransportOnly ? 'none' : '';
+            if (nextBtn) nextBtn.style.display = hideTransportOnly ? 'none' : '';
+            if (markInBtn) markInBtn.style.display = '';
+            if (markOutBtn) markOutBtn.style.display = '';
+            if (speedBtn) speedBtn.style.display = '';
             if (currentClipId) {
                 // Close chat from previous clip
                 hideVideoChatPanel();
@@ -1583,6 +1597,8 @@ export const UI = (() => {
         const mobileShareItem = document.querySelector('.mobile-mode-item[data-mode="share"]');
         const mobileAnalyzeItem = document.querySelector('.mobile-mode-item[data-mode="analyze"]');
         const mobileViewItem = document.querySelector('.mobile-mode-item[data-mode="view"]');
+        const navPrev = $('#btn-prev-clip');
+        const navNext = $('#btn-next-clip');
 
         btnAnalyze.classList.toggle('active', mode === 'analyze');
         btnView.classList.toggle('active', mode === 'view');
@@ -1603,16 +1619,23 @@ export const UI = (() => {
             panelView.classList.add('hidden');
             if (panelShare) panelShare.classList.add('hidden');
             tagBar.classList.remove('hidden');
+            if (navPrev) navPrev.style.display = '';
+            if (navNext) navNext.style.display = '';
         } else if (mode === 'view') {
             panelAnalyze.classList.add('hidden');
             panelView.classList.remove('hidden');
             if (panelShare) panelShare.classList.add('hidden');
             tagBar.classList.add('hidden');
+            // En Ver usamos la navegación del player-chrome para evitar controles duplicados.
+            if (navPrev) navPrev.style.display = 'none';
+            if (navNext) navNext.style.display = 'none';
         } else { // mode === 'share'
             panelAnalyze.classList.add('hidden');
             panelView.classList.add('hidden');
             if (panelShare) panelShare.classList.remove('hidden');
             tagBar.classList.add('hidden');
+            if (navPrev) navPrev.style.display = 'none';
+            if (navNext) navNext.style.display = 'none';
             renderSharePanel();
         }
         updateClipEditControls();
@@ -2005,7 +2028,7 @@ export const UI = (() => {
         else if (btn.dataset.action === 'delete-clip') {
             AppState.deleteClip(clipId);
         }
-    });
+    }, true);
 
     // ═══ BUTTONBOARDS PANEL ═══
     // Renders the system and user template lists inside #modal-buttonboards.

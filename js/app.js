@@ -852,6 +852,37 @@ import { PopoutController } from './popoutController.js';
                 ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm10.8 2 2.9 2.9 1.4-1.4-2.9-2.9 2.9-2.9-1.4-1.4-2.9 2.9-2.9-2.9-1.4 1.4 2.9 2.9-2.9 2.9 1.4 1.4 2.9-2.9Z" fill="currentColor"/></svg>'
                 : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm12.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 15.5 12Z" fill="currentColor"/></svg>';
         }
+
+        const canNavigateClips = AppState.get('mode') === 'view';
+        const btnBack = $('#player-chrome-seek-back');
+        const btnFwd = $('#player-chrome-seek-fwd');
+        if (btnBack) {
+            btnBack.disabled = !canNavigateClips;
+            btnBack.setAttribute('aria-disabled', (!canNavigateClips).toString());
+            btnBack.title = canNavigateClips ? 'Clip anterior' : 'Disponible en modo Ver';
+        }
+        if (btnFwd) {
+            btnFwd.disabled = !canNavigateClips;
+            btnFwd.setAttribute('aria-disabled', (!canNavigateClips).toString());
+            btnFwd.title = canNavigateClips ? 'Siguiente clip' : 'Disponible en modo Ver';
+        }
+
+        const fullscreenBtn = $('#player-chrome-fullscreen');
+        if (fullscreenBtn) {
+            const container = $('#player-container');
+            const mode = AppState.get('mode');
+            const isViewMode = mode === 'view';
+            fullscreenBtn.style.display = isViewMode ? '' : 'none';
+            if (container) {
+                const isFullscreen = document.fullscreenElement === container;
+                fullscreenBtn.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
+                fullscreenBtn.setAttribute('aria-label', isFullscreen ? 'Salir de pantalla completa' : 'Entrar en pantalla completa');
+                fullscreenBtn.title = isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa';
+                fullscreenBtn.innerHTML = isFullscreen
+                    ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5h2V5h3V3Zm13 0h-5v2h3v3h2V3ZM5 16H3v5h5v-2H5v-3Zm16 0h-2v3h-3v2h5v-5Z" fill="currentColor"/></svg>'
+                    : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H3v4h2V5h2V3Zm14 0h-4v2h2v2h2V3ZM5 17H3v4h4v-2H5v-2Zm16 0h-2v2h-2v2h4v-4Z" fill="currentColor"/></svg>';
+            }
+        }
     }
 
     function showPlayerSeekFeedback(dir, seconds, sideHint = null) {
@@ -872,22 +903,40 @@ import { PopoutController } from './popoutController.js';
         badge.classList.add('show');
     }
 
+    function navigateToClipAndPlay(direction) {
+        AppState.navigateClip(direction);
+        const clip = AppState.getCurrentClip();
+        if (!clip) return;
+        YTPlayer.playClip(clip.start_sec, clip.end_sec);
+        const plId = AppState.get('activePlaylistId');
+        if (plId && typeof DrawingTool !== 'undefined') DrawingTool.startPlaybackWatch(plId, clip.id);
+    }
+
     function wirePlayerChrome() {
         const root = $('#player-chrome');
         if (!root || root.dataset.wired === '1') return;
         root.dataset.wired = '1';
+        const swallow = (ev) => ev.stopPropagation();
+        root.addEventListener('click', swallow);
+        root.addEventListener('dblclick', swallow);
+        root.addEventListener('touchend', swallow, { passive: true });
 
-        const stepSeek = (dir) => {
-            if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return;
-            const t = YTPlayer.getCurrentTime() || 0;
-            const step = getSeekStep(false);
-            const next = dir < 0 ? Math.max(0, t - step) : t + step;
-            YTPlayer.seekTo(next);
-            showPlayerSeekFeedback(dir, step);
+        const clipToolbar = $('#clip-view-toolbar');
+        if (clipToolbar && clipToolbar.dataset.surfaceGuardWired !== '1') {
+            clipToolbar.dataset.surfaceGuardWired = '1';
+            clipToolbar.addEventListener('click', swallow);
+            clipToolbar.addEventListener('dblclick', swallow);
+            clipToolbar.addEventListener('touchend', swallow, { passive: true });
+        }
+
+        const navigateClipFromChrome = (dir) => {
+            if (AppState.get('mode') !== 'view') return;
+            if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
+            navigateToClipAndPlay(dir < 0 ? 'prev' : 'next');
         };
 
-        $('#player-chrome-seek-back')?.addEventListener('click', () => stepSeek(-1));
-        $('#player-chrome-seek-fwd')?.addEventListener('click', () => stepSeek(1));
+        $('#player-chrome-seek-back')?.addEventListener('click', () => navigateClipFromChrome(-1));
+        $('#player-chrome-seek-fwd')?.addEventListener('click', () => navigateClipFromChrome(1));
 
         $('#player-chrome-play')?.addEventListener('click', () => {
             if (typeof DrawingTool !== 'undefined' && DrawingTool.hasPlaybackOverlays()) {
@@ -904,6 +953,26 @@ import { PopoutController } from './popoutController.js';
             if (YTPlayer.toggleMute) YTPlayer.toggleMute();
             syncPlayerChromeUi();
         });
+
+        $('#player-chrome-fullscreen')?.addEventListener('click', async () => {
+            const container = $('#player-container');
+            if (!container) return;
+            try {
+                if (document.fullscreenElement === container) {
+                    await document.exitFullscreen();
+                } else if (!document.fullscreenElement) {
+                    await container.requestFullscreen();
+                } else {
+                    await document.exitFullscreen();
+                    await container.requestFullscreen();
+                }
+            } catch (_) {
+                UI.toast('No se pudo activar pantalla completa', 'error');
+            }
+            syncPlayerChromeUi();
+        });
+
+        document.addEventListener('fullscreenchange', syncPlayerChromeUi);
 
         setInterval(syncPlayerChromeUi, 450);
     }
@@ -924,7 +993,9 @@ import { PopoutController } from './popoutController.js';
             if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return false;
             if (!evTarget) return false;
             if (evTarget.closest('#player-chrome')) return false;
+            if (evTarget.closest('#clip-view-toolbar')) return false;
             if (evTarget.closest('#drawing-toolbar')) return false;
+            if (evTarget.closest('button, a, input, textarea, select, [role="button"]')) return false;
             if (typeof DrawingTool !== 'undefined' && typeof DrawingTool.isActive === 'function' && DrawingTool.isActive()) return false;
             return true;
         };
@@ -1221,7 +1292,10 @@ import { PopoutController } from './popoutController.js';
         });
     }
 
-    AppState.on('modeChanged', () => {
+    AppState.on('modeChanged', (mode) => {
+        if (mode === 'analyze' && AppState.get('currentClipId')) {
+            AppState.setCurrentClip(null);
+        }
         UI.updateMode();
         updateLiveEdgeButton();
     });
@@ -2632,23 +2706,11 @@ import { PopoutController } from './popoutController.js';
 
     // Nav arrows
     $('#btn-prev-clip').addEventListener('click', () => {
-        AppState.navigateClip('prev');
-        const clip = AppState.getCurrentClip();
-        if (clip) {
-            YTPlayer.playClip(clip.start_sec, clip.end_sec);
-            const plId = AppState.get('activePlaylistId');
-            if (plId && typeof DrawingTool !== 'undefined') DrawingTool.startPlaybackWatch(plId, clip.id);
-        }
+        navigateToClipAndPlay('prev');
     });
 
     $('#btn-next-clip').addEventListener('click', () => {
-        AppState.navigateClip('next');
-        const clip = AppState.getCurrentClip();
-        if (clip) {
-            YTPlayer.playClip(clip.start_sec, clip.end_sec);
-            const plId = AppState.get('activePlaylistId');
-            if (plId && typeof DrawingTool !== 'undefined') DrawingTool.startPlaybackWatch(plId, clip.id);
-        }
+        navigateToClipAndPlay('next');
     });
 
     // ═══════════════════════════════════════
@@ -2790,24 +2852,12 @@ import { PopoutController } from './popoutController.js';
             }
             if (e.key === 'ArrowLeft' && !e.shiftKey) {
                 e.preventDefault();
-                AppState.navigateClip('prev');
-                const clip = AppState.getCurrentClip();
-                if (clip) {
-                    YTPlayer.playClip(clip.start_sec, clip.end_sec);
-                    const plId = AppState.get('activePlaylistId');
-                    if (plId && typeof DrawingTool !== 'undefined') DrawingTool.startPlaybackWatch(plId, clip.id);
-                }
+                navigateToClipAndPlay('prev');
                 return;
             }
             if (e.key === 'ArrowRight' && !e.shiftKey) {
                 e.preventDefault();
-                AppState.navigateClip('next');
-                const clip = AppState.getCurrentClip();
-                if (clip) {
-                    YTPlayer.playClip(clip.start_sec, clip.end_sec);
-                    const plId = AppState.get('activePlaylistId');
-                    if (plId && typeof DrawingTool !== 'undefined') DrawingTool.startPlaybackWatch(plId, clip.id);
-                }
+                navigateToClipAndPlay('next');
                 return;
             }
 

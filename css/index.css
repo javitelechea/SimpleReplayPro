@@ -1103,6 +1103,13 @@ select {
   transform: scale(0.96);
 }
 
+.player-chrome__btn:disabled,
+.player-chrome__btn[aria-disabled="true"] {
+  opacity: 0.42;
+  cursor: default;
+  transform: none;
+}
+
 .player-chrome__btn--primary {
   min-width: 48px;
   background: rgba(124, 92, 252, 0.14);
@@ -1119,6 +1126,12 @@ select {
   margin-left: 6px;
   padding-left: 10px;
   border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.player-chrome__display {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
 }
 
 .player-chrome__btn--mute {
