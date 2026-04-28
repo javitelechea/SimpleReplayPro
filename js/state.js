@@ -46,6 +46,9 @@ export const AppState = (() => {
 
     // Feature flags { featureName: true/false }
     featureFlags: {},
+
+    /** @type {File|null} Video local en memoria (misma sesión). No se persiste en la nube. */
+    localVideoFile: null,
   };
 
   // Listeners
@@ -82,6 +85,14 @@ export const AppState = (() => {
 
   function getCurrentGame() {
     return state.games.find(g => g.id === state.currentGameId) || null;
+  }
+
+  function getLocalVideoFile() {
+    return state.localVideoFile;
+  }
+
+  function setLocalVideoFile(file) {
+    state.localVideoFile = (file && typeof file === 'object' && 'arrayBuffer' in file) ? file : null;
   }
 
   function getCurrentClip() {
@@ -172,6 +183,7 @@ export const AppState = (() => {
 
   function setCurrentGame(gameId) {
     state.currentGameId = gameId;
+    state.localVideoFile = null;
     state.currentClipId = null;
     state.currentClipIndex = -1;
     // Load clips/playlists for this game
@@ -524,6 +536,7 @@ export const AppState = (() => {
 
   function clearProject() {
     state.currentGameId = null;
+    state.localVideoFile = null;
     state.currentClipId = null;
     state.currentClipIndex = -1;
     state.games = [];
@@ -690,6 +703,7 @@ export const AppState = (() => {
     const data = await FirebaseData.loadProject(projectId);
     if (!data) return false;
 
+    state.localVideoFile = null;
     state.currentProjectId = projectId;
     state.games = data.games || [];
     state.clips = data.clips || [];
@@ -1014,7 +1028,7 @@ export const AppState = (() => {
 
   return {
     on, off, get, set: (k, v) => { state[k] = v; },
-    getCurrentGame, getCurrentClip, getTagType, getTagTypesForFilter, getFilteredClips, getClipUserFlags,
+    getCurrentGame, getLocalVideoFile, setLocalVideoFile, getCurrentClip, getTagType, getTagTypesForFilter, getFilteredClips, getClipUserFlags,
     setMode, setCurrentGame, setCurrentClip,
     addGame, addClip, updateClipBounds, updateClipAbsoluteBounds, deleteClip,
     addPlaylist, addClipToPlaylist, removeClipFromPlaylist, renamePlaylist, deletePlaylist, reorderPlaylist,

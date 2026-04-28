@@ -73,8 +73,22 @@ export const ClipExport = (() => {
         }
     }
 
-    async function _fetchLocalVideo(blobUrl) {
+    /**
+     * Prefer the live File (same session) — fetch(blob:) can throw "Failed to fetch" for large blobs
+     * or in some browser/network conditions. Falls back to blob URL from state.
+     */
+    async function _readVideoBytes(blobUrl, file) {
+        if (file && typeof file.arrayBuffer === 'function') {
+            const buf = await file.arrayBuffer();
+            return new Uint8Array(buf);
+        }
+        if (!blobUrl) {
+            throw new Error('No hay archivo de video local: volvé a vincular el video o reabrí el archivo.');
+        }
         const resp = await fetch(blobUrl);
+        if (!resp.ok) {
+            throw new Error(`No se pudo leer el video (${resp.status}). Probá re-vincular el archivo.`);
+        }
         const buf = await resp.arrayBuffer();
         return new Uint8Array(buf);
     }
@@ -110,12 +124,13 @@ export const ClipExport = (() => {
      * @param {number} endSec
      * @param {string} [label] - used for the filename
      * @param {Function} [onProgress] - status callback
+     * @param {File|Blob|null} [localFile] - same session file; avoids fetch(blob:)
      */
-    async function exportClip(blobUrl, startSec, endSec, label, onProgress) {
+    async function exportClip(blobUrl, startSec, endSec, label, onProgress, localFile = null) {
         const ffmpeg = await _ensureLoaded(onProgress);
 
         if (onProgress) onProgress('Leyendo video…');
-        const videoData = await _fetchLocalVideo(blobUrl);
+        const videoData = await _readVideoBytes(blobUrl, localFile);
         await ffmpeg.writeFile('input.mp4', videoData);
 
         const duration = endSec - startSec;
@@ -148,14 +163,15 @@ export const ClipExport = (() => {
      * @param {{ startSec: number, endSec: number }[]} clips
      * @param {string} [label] - playlist name for the filename
      * @param {Function} [onProgress] - status callback
+     * @param {File|Blob|null} [localFile] - same session file; avoids fetch(blob:)
      */
-    async function exportPlaylist(blobUrl, clips, label, onProgress) {
+    async function exportPlaylist(blobUrl, clips, label, onProgress, localFile = null) {
         if (!clips || clips.length === 0) return;
 
         const ffmpeg = await _ensureLoaded(onProgress);
 
         if (onProgress) onProgress('Leyendo video…');
-        const videoData = await _fetchLocalVideo(blobUrl);
+        const videoData = await _readVideoBytes(blobUrl, localFile);
         await ffmpeg.writeFile('input.mp4', videoData);
 
         const segmentNames = [];

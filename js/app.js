@@ -1468,6 +1468,7 @@ import { PopoutController } from './popoutController.js';
 
         if (localVideoUrl) {
             YTPlayer.loadLocalVideo(localVideoUrl, _localVideoFileForCurrentGame);
+            AppState.setLocalVideoFile(_localVideoFileForCurrentGame);
         } else if (ytId) {
             YTPlayer.loadVideo(ytId);
         }
@@ -1489,6 +1490,7 @@ import { PopoutController } from './popoutController.js';
             if (game) {
                 game.local_video_url = url;
                 _localVideoFileForCurrentGame = file;
+                AppState.setLocalVideoFile(file);
                 YTPlayer.loadLocalVideo(url, file);
                 UI.toast('Video re-vinculado ✅', 'success');
             }

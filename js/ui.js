@@ -619,7 +619,8 @@ export const UI = (() => {
                 clip.start_sec,
                 clip.end_sec,
                 label,
-                _showExportProgress
+                _showExportProgress,
+                AppState.getLocalVideoFile()
             );
             toast('Clip exportado ✅', 'success');
         } catch (err) {
@@ -654,7 +655,8 @@ export const UI = (() => {
                 _getLocalVideoUrl(),
                 segments,
                 playlistName || 'playlist',
-                _showExportProgress
+                _showExportProgress,
+                AppState.getLocalVideoFile()
             );
             toast('Playlist exportada ✅', 'success');
         } catch (err) {
