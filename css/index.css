@@ -1010,6 +1010,8 @@ select {
   justify-content: center;
   min-height: 0;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 #youtube-player {
@@ -1128,6 +1130,56 @@ select {
   height: 18px;
   opacity: 0.92;
   display: block;
+}
+
+.player-surface-seek-feedback {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.88);
+  min-width: 68px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(17, 20, 30, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.4rem;
+  text-align: center;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 16;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.player-surface-seek-feedback.left {
+  left: 25%;
+}
+
+.player-surface-seek-feedback.right {
+  left: 75%;
+}
+
+.player-surface-seek-feedback.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  animation: playerSeekFeedbackFade 520ms ease forwards;
+}
+
+@keyframes playerSeekFeedbackFade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.82);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
 }
 
 .player-overlay {

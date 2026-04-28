@@ -854,6 +854,24 @@ import { PopoutController } from './popoutController.js';
         }
     }
 
+    function showPlayerSeekFeedback(dir, seconds, sideHint = null) {
+        const container = $('#player-container');
+        if (!container) return;
+        let badge = container.querySelector('.player-surface-seek-feedback');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'player-surface-seek-feedback';
+            container.appendChild(badge);
+        }
+        const effectiveDir = dir < 0 ? -1 : 1;
+        const side = sideHint || (effectiveDir > 0 ? 'right' : 'left');
+        badge.textContent = `${effectiveDir > 0 ? '+' : '-'}${Math.max(1, Math.round(Number(seconds) || 0))}`;
+        badge.classList.remove('left', 'right', 'show');
+        badge.classList.add(side === 'left' ? 'left' : 'right');
+        void badge.offsetWidth; // restart animation
+        badge.classList.add('show');
+    }
+
     function wirePlayerChrome() {
         const root = $('#player-chrome');
         if (!root || root.dataset.wired === '1') return;
@@ -865,6 +883,7 @@ import { PopoutController } from './popoutController.js';
             const step = getSeekStep(false);
             const next = dir < 0 ? Math.max(0, t - step) : t + step;
             YTPlayer.seekTo(next);
+            showPlayerSeekFeedback(dir, step);
         };
 
         $('#player-chrome-seek-back')?.addEventListener('click', () => stepSeek(-1));
@@ -893,21 +912,83 @@ import { PopoutController } from './popoutController.js';
         const container = $('#player-container');
         if (!container || container.dataset.surfaceToggleWired === '1') return;
         container.dataset.surfaceToggleWired = '1';
+        let singleClickTimer = null;
+        let suppressSingleClickUntil = 0;
+        let lastTapTs = 0;
+        let lastTapX = 0;
+        const DOUBLE_TAP_MS = 320;
+        const DOUBLE_TAP_MAX_DELTA_X = 140;
+
+        const canHandleSurfaceGesture = (evTarget) => {
+            if (!AppState.get('currentGameId')) return false;
+            if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return false;
+            if (!evTarget) return false;
+            if (evTarget.closest('#player-chrome')) return false;
+            if (evTarget.closest('#drawing-toolbar')) return false;
+            if (typeof DrawingTool !== 'undefined' && typeof DrawingTool.isActive === 'function' && DrawingTool.isActive()) return false;
+            return true;
+        };
+
+        const seekBySurface = (dir) => {
+            const t = YTPlayer.getCurrentTime() || 0;
+            const step = getSeekStep(false);
+            const next = dir < 0 ? Math.max(0, t - step) : t + step;
+            YTPlayer.seekTo(next);
+            showPlayerSeekFeedback(dir, step, dir < 0 ? 'left' : 'right');
+        };
+
+        const resolveDirectionFromX = (clientX) => {
+            const rect = container.getBoundingClientRect();
+            const midX = rect.left + (rect.width / 2);
+            return clientX < midX ? -1 : 1;
+        };
 
         container.addEventListener('click', (ev) => {
+            if (Date.now() < suppressSingleClickUntil) return;
             // Only primary-button clicks; ignore modified clicks.
             if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return;
-            // Ignore clicks on UI controls.
-            if (ev.target.closest('#player-chrome')) return;
-            if (ev.target.closest('#drawing-toolbar')) return;
-            // While drawing, clicking the canvas should not toggle playback.
-            if (typeof DrawingTool !== 'undefined' && typeof DrawingTool.isActive === 'function' && DrawingTool.isActive()) return;
-            // Ignore when no game loaded.
-            if (!AppState.get('currentGameId')) return;
-            if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.togglePlay) return;
+            if (!canHandleSurfaceGesture(ev.target)) return;
+            if (typeof YTPlayer === 'undefined' || !YTPlayer.togglePlay) return;
+            if (singleClickTimer) clearTimeout(singleClickTimer);
+            singleClickTimer = setTimeout(() => {
+                YTPlayer.togglePlay();
+                syncPlayerChromeUi();
+                singleClickTimer = null;
+            }, 260);
+        });
 
-            YTPlayer.togglePlay();
-            syncPlayerChromeUi();
+        container.addEventListener('dblclick', (ev) => {
+            if (ev.button !== 0) return;
+            if (!canHandleSurfaceGesture(ev.target)) return;
+            ev.preventDefault();
+            if (singleClickTimer) {
+                clearTimeout(singleClickTimer);
+                singleClickTimer = null;
+            }
+            suppressSingleClickUntil = Date.now() + 350;
+            seekBySurface(resolveDirectionFromX(ev.clientX));
+        });
+
+        container.addEventListener('touchend', (ev) => {
+            if (!canHandleSurfaceGesture(ev.target)) return;
+            const touch = ev.changedTouches && ev.changedTouches[0];
+            if (!touch) return;
+            const now = Date.now();
+            const dt = now - lastTapTs;
+            const dx = Math.abs(touch.clientX - lastTapX);
+            if (dt > 0 && dt <= DOUBLE_TAP_MS && dx <= DOUBLE_TAP_MAX_DELTA_X) {
+                if (singleClickTimer) {
+                    clearTimeout(singleClickTimer);
+                    singleClickTimer = null;
+                }
+                suppressSingleClickUntil = Date.now() + 350;
+                seekBySurface(resolveDirectionFromX(touch.clientX));
+                lastTapTs = 0;
+                lastTapX = 0;
+                return;
+            }
+            lastTapTs = now;
+            lastTapX = touch.clientX;
         });
     }
 
@@ -2666,6 +2747,7 @@ import { PopoutController } from './popoutController.js';
                 const t = YTPlayer.getCurrentTime();
                 const step = matchesShortcut(e, 'seekLeftFast') ? getSeekStep(true) : getSeekStep(false);
                 YTPlayer.seekTo(Math.max(0, t - step));
+                showPlayerSeekFeedback(-1, step);
                 return;
             }
             if (matchesShortcut(e, 'seekRight') || matchesShortcut(e, 'seekRightFast')) {
@@ -2673,6 +2755,7 @@ import { PopoutController } from './popoutController.js';
                 const t = YTPlayer.getCurrentTime();
                 const step = matchesShortcut(e, 'seekRightFast') ? getSeekStep(true) : getSeekStep(false);
                 YTPlayer.seekTo(t + step);
+                showPlayerSeekFeedback(1, step);
                 return;
             }
 
@@ -2694,6 +2777,7 @@ import { PopoutController } from './popoutController.js';
                 const t = YTPlayer.getCurrentTime();
                 const step = getSeekStep(true);
                 YTPlayer.seekTo(Math.max(0, t - step));
+                showPlayerSeekFeedback(-1, step);
                 return;
             }
             if (matchesShortcut(e, 'seekRightFast')) {
@@ -2701,6 +2785,7 @@ import { PopoutController } from './popoutController.js';
                 const t = YTPlayer.getCurrentTime();
                 const step = getSeekStep(true);
                 YTPlayer.seekTo(t + step);
+                showPlayerSeekFeedback(1, step);
                 return;
             }
             if (e.key === 'ArrowLeft' && !e.shiftKey) {
