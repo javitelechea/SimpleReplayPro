@@ -9,12 +9,18 @@ export function toMillis(value) {
 export function isEffectivePro(userDoc, nowMs = Date.now()) {
   if (!userDoc) return false;
 
-  if (userDoc.accessType === 'paid') return true;
+  const accessType = String(userDoc.accessType || '').trim().toLowerCase();
+  const plan = String(userDoc.plan || '').trim().toLowerCase();
 
-  if (userDoc.accessType === 'granted') {
+  // Legacy/compat values used before current access model.
+  if (['paid', 'pro', 'premium', 'lifetime'].includes(accessType)) return true;
+
+  if (accessType === 'granted') {
     const expMs = toMillis(userDoc.grantExpiresAt);
-    return !!expMs && expMs > nowMs;
+    // Backward compatibility: old docs may have granted access without expiry.
+    if (!expMs) return true;
+    return expMs > nowMs;
   }
 
-  return userDoc.plan === 'pro';
+  return ['pro', 'premium', 'paid'].includes(plan);
 }
