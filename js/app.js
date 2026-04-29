@@ -843,9 +843,9 @@ import { PopoutController } from './popoutController.js';
         if (muteBtn && YTPlayer.isMuted) {
             const m = YTPlayer.isMuted();
             muteBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
-            const popoutActive = PopoutController && PopoutController.isActive && PopoutController.isActive();
-            muteBtn.disabled = !!popoutActive;
-            muteBtn.title = popoutActive ? 'Audio solo en player externo' : 'Silenciar o activar sonido';
+            const popoutConnected = PopoutController && PopoutController.isConnected && PopoutController.isConnected();
+            muteBtn.disabled = !!popoutConnected;
+            muteBtn.title = popoutConnected ? 'Audio solo en player externo' : 'Silenciar o activar sonido';
             muteBtn.innerHTML = m
                 ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm10.8 2 2.9 2.9 1.4-1.4-2.9-2.9 2.9-2.9-1.4-1.4-2.9 2.9-2.9-2.9-1.4 1.4 2.9 2.9-2.9 2.9 1.4 1.4 2.9-2.9Z" fill="currentColor"/></svg>'
                 : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm12.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 15.5 12Z" fill="currentColor"/></svg>';
@@ -947,7 +947,7 @@ import { PopoutController } from './popoutController.js';
         });
 
         $('#player-chrome-mute')?.addEventListener('click', () => {
-            if (PopoutController && PopoutController.isActive && PopoutController.isActive()) return;
+            if (PopoutController && PopoutController.isConnected && PopoutController.isConnected()) return;
             if (YTPlayer.toggleMute) YTPlayer.toggleMute();
             syncPlayerChromeUi();
         });
