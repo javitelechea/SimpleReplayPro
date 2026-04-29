@@ -43,6 +43,10 @@ export const PopoutController = (() => {
         return !!(_popupWindow && !_popupWindow.closed);
     }
 
+    function isConnected() {
+        return !!(_channel && _ready);
+    }
+
     function _ensureChannel() {
         if (_channel) return _channel;
         _channel = new BroadcastChannel(CHANNEL_NAME);
@@ -80,7 +84,7 @@ export const PopoutController = (() => {
     function _startContinuousSync() {
         _stopContinuousSync();
         _syncTimer = setInterval(() => {
-            if (!_ready || !_channel || !_provider || !isActive()) return;
+            if (!_ready || !_channel || !_provider) return;
             const snapshot = _safe(() => _provider.getSnapshot());
             if (!snapshot) return;
             try {
@@ -181,7 +185,7 @@ export const PopoutController = (() => {
     }
 
     function send(type, payload) {
-        if (!isActive() || !_channel) return;
+        if (!_channel || !_ready) return;
         try {
             _channel.postMessage(payload === undefined ? { type } : { type, payload });
         } catch (_) { /* noop */ }
@@ -189,7 +193,7 @@ export const PopoutController = (() => {
 
     function notifyMediaLoaded(media) {
         _lastMedia = media || null;
-        if (!isActive() || !_channel) return;
+        if (!_channel || !_ready) return;
         if (_ready) {
             send('load', media);
         } else {
@@ -217,6 +221,7 @@ export const PopoutController = (() => {
         setMirrorHandler,
         onActiveChange,
         isActive,
+        isConnected,
         open,
         close,
         notifyMediaLoaded,

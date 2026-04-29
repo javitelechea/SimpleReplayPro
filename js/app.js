@@ -737,7 +737,7 @@ import { PopoutController } from './popoutController.js';
         });
 
         YTPlayer.setCommandListener((type, payload) => {
-            if (!PopoutController.isActive()) return;
+            if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
             switch (type) {
                 case 'mediaLoaded':
                     if (payload && payload.kind === 'youtube') {
