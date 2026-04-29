@@ -2385,7 +2385,7 @@ import { PopoutController } from './popoutController.js';
                 wrap.innerHTML = `
                     <input id="project-search-input" type="text" class="input-sm project-search-input" placeholder="Buscar proyecto..." />
                 `;
-                modalBox.insertBefore(wrap, listOwned);
+                listOwned.parentNode.insertBefore(wrap, listOwned);
             }
             const input = $('#project-search-input');
             if (input && !input.dataset.wiredProjectSearch) {
@@ -2833,6 +2833,7 @@ import { PopoutController } from './popoutController.js';
             renderOwnedWithFolders();
             if (hasShareFeature) renderList(listShared, sharedProjects);
         } catch (err) {
+            console.error('[openProjectsModal] error:', err);
             listOwned.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Error al conectar.</p>';
             if (listShared) {
                 listShared.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Error al conectar.</p>';
