@@ -8,7 +8,7 @@ import { VideoPlayer } from './VideoPlayer.js';
 const CHANNEL_NAME = 'simplereplay-popout';
 const channel = new BroadcastChannel(CHANNEL_NAME);
 
-const player = new VideoPlayer('popout-player');
+const player = new VideoPlayer('popout-player', { youtubeShowControls: false });
 player.setPlaybackActivityCallback((ev) => {
     if (!ev || !ev.action) return;
     try {
