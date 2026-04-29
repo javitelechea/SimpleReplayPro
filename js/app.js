@@ -902,6 +902,10 @@ import { PopoutController } from './popoutController.js';
     }
 
     function navigateToClipAndPlay(direction) {
+        if (AppState.get('activeCollection')) {
+            AppState.navigateCollectionItem(direction);
+            return;
+        }
         AppState.navigateClip(direction);
         const clip = AppState.getCurrentClip();
         if (!clip) return;
@@ -1442,6 +1446,33 @@ import { PopoutController } from './popoutController.js';
         if (AppState.get('mode') === 'view') {
             UI.renderViewClips();
         }
+    });
+
+    // ── Collection events ──
+    AppState.on('collectionOpened', () => {
+        AppState.setMode('view');
+        UI.updateCollectionBar();
+        UI.renderViewClips();
+    });
+
+    AppState.on('collectionClosed', () => {
+        UI.updateCollectionBar();
+        UI.renderViewClips();
+    });
+
+    AppState.on('collectionItemsChanged', () => {
+        UI.renderViewClips();
+    });
+
+    AppState.on('collectionItemChanged', async (item) => {
+        if (!item) return;
+        UI.renderViewClips();
+        const currentVideoId = YTPlayer.getCurrentVideoId();
+        if (item.youtubeVideoId && item.youtubeVideoId !== currentVideoId) {
+            UI.toast('Cargando video…', 'info');
+            await YTPlayer.loadVideoAsync(item.youtubeVideoId);
+        }
+        YTPlayer.playClip(item.startSec, item.endSec);
     });
 
     AppState.on('flagsUpdated', () => {
@@ -2816,6 +2847,170 @@ import { PopoutController } from './popoutController.js';
         UI.hideModal('modal-projects');
     });
 
+    // ── Modal tabs (Proyectos / Colecciones) ──
+    document.querySelectorAll('[data-modal-tab]').forEach(tab => {
+        tab.addEventListener('click', async () => {
+            document.querySelectorAll('[data-modal-tab]').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const which = tab.dataset.modalTab;
+            $('#modal-tab-projects').style.display = which === 'projects' ? '' : 'none';
+            $('#modal-tab-collections').style.display = which === 'collections' ? '' : 'none';
+            if (which === 'collections') await _loadAndRenderCollections();
+        });
+    });
+
+    async function _loadAndRenderCollections() {
+        const uid = AppState.get('userId');
+        if (!uid || uid === 'anonymous') {
+            UI.renderCollectionsTab([]);
+            return;
+        }
+        const list = $('#collection-list');
+        if (list) list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Cargando...</p>';
+        const cols = await FirebaseData.listUserCollections(uid);
+        UI.renderCollectionsTab(cols);
+        _wireCollectionTabButtons();
+    }
+
+    function _wireCollectionTabButtons() {
+        $('#collection-list')?.querySelectorAll('.col-open-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const colId = btn.dataset.colId;
+                UI.hideModal('modal-projects');
+                const data = await FirebaseData.loadCollection(colId);
+                if (!data) { UI.toast('No se pudo cargar la colección', 'error'); return; }
+                AppState.openCollection(data);
+            });
+        });
+        $('#collection-list')?.querySelectorAll('.col-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const { colId, colName } = btn.dataset;
+                if (!confirm(`¿Eliminar la colección "${colName}"?\nEsta acción no se puede deshacer.`)) return;
+                await FirebaseData.deleteCollectionDoc(colId);
+                UI.toast('Colección eliminada', 'success');
+                await _loadAndRenderCollections();
+            });
+        });
+    }
+
+    // Create collection from modal tab
+    $('#btn-create-collection')?.addEventListener('click', async () => {
+        const input = $('#new-collection-name');
+        const name = (input?.value || '').trim();
+        if (!name) { UI.toast('Ingresá un nombre', 'error'); return; }
+        const uid = AppState.get('userId');
+        await FirebaseData.saveCollection(null, { name, ownerUid: uid === 'anonymous' ? null : uid, items: [] });
+        if (input) input.value = '';
+        UI.toast(`Colección "${name}" creada`, 'success');
+        await _loadAndRenderCollections();
+    });
+    $('#new-collection-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-create-collection')?.click(); });
+
+    // ── Active collection bar ──
+    $('#btn-collection-close')?.addEventListener('click', () => {
+        AppState.closeCollection();
+    });
+
+    $('#btn-collection-rename')?.addEventListener('click', async () => {
+        const col = AppState.get('activeCollection');
+        if (!col) return;
+        const name = prompt('Nuevo nombre:', col.name);
+        if (!name?.trim()) return;
+        const updated = { ...col, name: name.trim() };
+        AppState.openCollection(updated);
+        await FirebaseData.saveCollection(col.id, updated);
+        UI.toast('Colección renombrada', 'success');
+    });
+
+    $('#btn-collection-delete')?.addEventListener('click', async () => {
+        const col = AppState.get('activeCollection');
+        if (!col) return;
+        if (!confirm(`¿Eliminar la colección "${col.name}"?\nEsta acción no se puede deshacer.`)) return;
+        await FirebaseData.deleteCollectionDoc(col.id);
+        AppState.closeCollection();
+        UI.toast('Colección eliminada', 'success');
+    });
+
+    // ── Enviar playlist a colección ──
+    let _exportTargetPlaylistId = null;
+
+    $('#btn-pl-to-collection')?.addEventListener('click', async () => {
+        const playlistId = AppState.get('activePlaylistId');
+        if (!playlistId) return;
+        const pl = (AppState.get('playlists') || []).find(p => p.id === playlistId);
+        _exportTargetPlaylistId = playlistId;
+        const nameEl = $('#export-collection-playlist-name');
+        if (nameEl) nameEl.textContent = `Playlist: ${pl ? pl.name : playlistId}`;
+        // Load user collections for the picker
+        const uid = AppState.get('userId');
+        const cols = uid && uid !== 'anonymous' ? await FirebaseData.listUserCollections(uid) : [];
+        UI.renderExportCollectionList(cols);
+        _wireExportCollectionPicker();
+        UI.showModal('modal-export-collection');
+    });
+
+    function _buildSnapshotItems(playlistId) {
+        const playlistItems = AppState.get('playlistItems')[playlistId] || [];
+        const clips = AppState.get('clips');
+        const clipFlags = AppState.get('clipFlags');
+        const game = AppState.getCurrentGame();
+        const pl = (AppState.get('playlists') || []).find(p => p.id === playlistId);
+
+        return playlistItems.map(clipId => {
+            const clip = clips.find(c => c.id === clipId);
+            if (!clip) return null;
+            const tag = AppState.getTagType(clip.tag_type_id);
+            const comments = AppState.getComments(playlistId, clipId);
+            return {
+                id: 'ci_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+                sourceProjectId: AppState.get('currentProjectId') || '',
+                sourceProjectTitle: game ? (game.title || 'Partido') : 'Partido',
+                sourcePlaylistId: playlistId,
+                sourcePlaylistName: pl ? pl.name : '',
+                youtubeVideoId: game ? (game.youtube_video_id || '') : '',
+                tagLabel: tag ? tag.label : 'Clip',
+                startSec: clip.start_sec,
+                endSec: clip.end_sec,
+                t_sec: clip.t_sec,
+                flags: [...(clipFlags[clipId] || [])],
+                comments: [...comments],
+            };
+        }).filter(Boolean);
+    }
+
+    async function _exportPlaylistToCollection(colId, colName) {
+        const newItems = _buildSnapshotItems(_exportTargetPlaylistId);
+        if (!newItems.length) { UI.toast('La playlist no tiene clips', 'error'); return; }
+        const existing = await FirebaseData.loadCollection(colId);
+        const merged = { ...existing, items: [...(existing?.items || []), ...newItems] };
+        await FirebaseData.saveCollection(colId, merged);
+        UI.hideModal('modal-export-collection');
+        UI.toast(`${newItems.length} clips enviados a "${colName}" ✅`, 'success');
+    }
+
+    function _wireExportCollectionPicker() {
+        $('#export-collection-list')?.querySelectorAll('[data-col-id]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                _exportPlaylistToCollection(btn.dataset.colId, btn.dataset.colName);
+            });
+        });
+    }
+
+    $('#btn-export-create-collection')?.addEventListener('click', async () => {
+        const input = $('#export-new-collection-name');
+        const name = (input?.value || '').trim();
+        if (!name) { UI.toast('Ingresá un nombre para la colección', 'error'); return; }
+        const uid = AppState.get('userId');
+        const colId = await FirebaseData.saveCollection(null, { name, ownerUid: uid === 'anonymous' ? null : uid, items: [] });
+        if (input) input.value = '';
+        await _exportPlaylistToCollection(colId, name);
+    });
+    $('#export-new-collection-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-export-create-collection')?.click(); });
+
+    $('#btn-cancel-export-collection')?.addEventListener('click', () => {
+        UI.hideModal('modal-export-collection');
+    });
+
     // Focus view toggle
     const btnFocusView = $('#btn-focus-view');
     if (btnFocusView) {
@@ -3070,8 +3265,6 @@ import { PopoutController } from './popoutController.js';
     $('#btn-cancel-add-playlist').addEventListener('click', () => {
         UI.hideModal('modal-add-to-playlist');
     });
-
-
 
     // ═══════════════════════════════════════
     // XML IMPORT / EXPORT

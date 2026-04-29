@@ -769,10 +769,170 @@ export const UI = (() => {
         }
     }
 
+    // ═══ COLLECTIONS ═══
+
+    function renderCollectionsTab(collections) {
+        const list = $('#collection-list');
+        if (!list) return;
+        if (!collections || !collections.length) {
+            list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">No tenés colecciones todavía.</p>';
+            return;
+        }
+        list.innerHTML = '';
+        collections.forEach(col => {
+            const row = document.createElement('div');
+            row.className = 'project-row';
+            row.innerHTML = `
+                <div class="project-row-info" style="cursor:pointer;">
+                    <span class="project-row-title">🗂️ ${col.name}</span>
+                    <span class="project-row-meta">${col.itemCount} clip${col.itemCount !== 1 ? 's' : ''}</span>
+                </div>
+                <div class="project-row-actions">
+                    <button class="btn btn-xs btn-primary col-open-btn" data-col-id="${col.id}">Abrir</button>
+                    <button class="btn btn-xs btn-ghost col-delete-btn" data-col-id="${col.id}" data-col-name="${col.name}">🗑️</button>
+                </div>`;
+            list.appendChild(row);
+        });
+    }
+
+    function renderExportCollectionList(collections) {
+        const list = $('#export-collection-list');
+        if (!list) return;
+        if (!collections || !collections.length) {
+            list.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">No tenés colecciones. Creá una arriba.</p>';
+            return;
+        }
+        list.innerHTML = '';
+        collections.forEach(col => {
+            const btn = document.createElement('button');
+            btn.className = 'playlist-select-item';
+            btn.dataset.colId = col.id;
+            btn.dataset.colName = col.name;
+            btn.textContent = `🗂️ ${col.name} (${col.itemCount} clips)`;
+            list.appendChild(btn);
+        });
+    }
+
+    function renderCollectionItems() {
+        const col = AppState.get('activeCollection');
+        const container = $('#view-clip-list');
+        if (!col || !container) return;
+
+        const items = col.items || [];
+        const activeIdx = AppState.get('activeCollectionItemIdx');
+
+        container.innerHTML = '';
+        $('#view-clip-count').textContent = items.length;
+
+        if (!items.length) {
+            container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">Esta colección está vacía.</p>';
+            return;
+        }
+
+        items.forEach((item, idx) => {
+            const el = document.createElement('div');
+            el.className = 'clip-item collection-clip-item' + (idx === activeIdx ? ' active' : '');
+            el.dataset.idx = String(idx);
+
+            const gameLabel = item.sourceProjectTitle
+                ? (item.sourceProjectTitle.length > 20 ? item.sourceProjectTitle.slice(0, 19) + '…' : item.sourceProjectTitle)
+                : 'Partido';
+
+            el.innerHTML = `
+                <span class="collection-game-badge" title="${item.sourceProjectTitle || ''}">${gameLabel}</span>
+                <span class="clip-tag-badge">${item.tagLabel || 'Clip'}</span>
+                <span class="collection-clip-time">${formatTime(item.startSec)} – ${formatTime(item.endSec)}</span>
+                <button class="clip-action-btn col-item-delete-btn" data-idx="${idx}" title="Quitar de colección">✕</button>
+            `;
+
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.clip-action-btn')) return;
+                AppState.setCollectionItemIndex(idx);
+            });
+
+            container.appendChild(el);
+        });
+
+        // Drag-to-reorder
+        _attachCollectionDrag(container, col.id);
+
+        container.querySelectorAll('.col-item-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.idx, 10);
+                const updated = AppState.removeCollectionItem(idx);
+                if (updated) {
+                    FirebaseData.saveCollection(updated.id, updated).catch(console.error);
+                }
+            });
+        });
+    }
+
+    function _attachCollectionDrag(container, colId) {
+        if (container.dataset.colDragWired === colId) return;
+        container.dataset.colDragWired = colId;
+
+        let dragSrcIdx = null;
+
+        container.addEventListener('dragstart', (e) => {
+            const el = e.target.closest('.collection-clip-item');
+            if (!el) return;
+            dragSrcIdx = parseInt(el.dataset.idx, 10);
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => el.style.opacity = '0.4', 0);
+        });
+        container.addEventListener('dragend', (e) => {
+            container.querySelectorAll('.collection-clip-item').forEach(el => el.style.opacity = '');
+            document.querySelectorAll('.collection-clip-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+        });
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const el = e.target.closest('.collection-clip-item');
+            container.querySelectorAll('.collection-clip-item.drag-over').forEach(x => x.classList.remove('drag-over'));
+            if (el) el.classList.add('drag-over');
+        });
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const el = e.target.closest('.collection-clip-item');
+            if (!el || dragSrcIdx === null) return;
+            const destIdx = parseInt(el.dataset.idx, 10);
+            if (dragSrcIdx === destIdx) return;
+            const updated = AppState.reorderCollectionItems(dragSrcIdx, destIdx);
+            if (updated) {
+                FirebaseData.saveCollection(updated.id, updated).catch(console.error);
+            }
+            dragSrcIdx = null;
+        });
+
+        container.querySelectorAll('.collection-clip-item').forEach(el => {
+            el.setAttribute('draggable', 'true');
+        });
+    }
+
+    function updateCollectionBar() {
+        const col = AppState.get('activeCollection');
+        const bar = $('#active-collection-bar');
+        const nameEl = $('#active-collection-bar-name');
+        const viewSourceSelector = $('#view-source-selector');
+
+        if (col) {
+            if (bar) bar.style.display = 'block';
+            if (nameEl) nameEl.textContent = `🗂️ ${col.name}`;
+            if (viewSourceSelector) viewSourceSelector.style.display = 'none';
+        } else {
+            if (bar) bar.style.display = 'none';
+            if (viewSourceSelector) viewSourceSelector.style.display = '';
+        }
+    }
+
     // ═══ CLIP LIST (View) ═══
     let _selectedClipIds = new Set();
 
     function renderViewClips() {
+        if (AppState.get('activeCollection')) {
+            renderCollectionItems();
+            return;
+        }
         const container = $('#view-clip-list');
         const clips = AppState.getFilteredClips();
         const currentClipId = AppState.get('currentClipId');
@@ -2510,7 +2670,9 @@ export const UI = (() => {
         renderViewSources, updateFlagFilterBar, updateFlagButtons,
         updateFocusView, updatePanelState, updateMode,
         updateNoGameOverlay,
-        showAddToPlaylistModal, renderPlaylistModalList, showModal, hideModal,
+        showAddToPlaylistModal, renderPlaylistModalList,
+        renderCollectionsTab, renderExportCollectionList, renderCollectionItems, updateCollectionBar,
+        showModal, hideModal,
         toggleTagEditor, saveTagFromEditor, deleteTagFromEditor, closeTagInlineEditor,
         getSelectedClipIds, clearClipSelection, renderNotifications,
         renderSharePanel,

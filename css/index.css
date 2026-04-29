@@ -2650,6 +2650,69 @@ body.is-dragging-clip .clip-item * {
   color: #fca5a5;
 }
 
+/* ── Modal tabs ── */
+.modal-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.modal-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.modal-tab:hover { color: var(--text); }
+
+.modal-tab.active {
+  color: var(--accent-hover);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Collection clip list ── */
+.collection-clip-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: grab;
+}
+
+.collection-clip-item.drag-over {
+  border-top: 2px solid var(--accent);
+}
+
+.collection-game-badge {
+  font-size: 0.68rem;
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.collection-clip-time {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+
 .source-group {
   margin-top: 2px;
 }

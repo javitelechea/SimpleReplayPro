@@ -49,6 +49,10 @@ export const AppState = (() => {
 
     /** @type {File|null} Video local en memoria (misma sesión). No se persiste en la nube. */
     localVideoFile: null,
+
+    // Active open collection (cross-project, not saved inside a project doc)
+    activeCollection: null,      // { id, name, ownerUid, items: [...] }
+    activeCollectionItemIdx: -1,
   };
 
   // Listeners
@@ -471,6 +475,61 @@ export const AppState = (() => {
     state.tagTypes = DemoData.getTagTypes();
     _syncTagsToActiveBoard();
     emit('tagTypesUpdated', state.tagTypes);
+  }
+
+  // ── Collection view (cross-project) ──
+  function openCollection(colData) {
+    state.activeCollection = colData;
+    state.activeCollectionItemIdx = -1;
+    emit('collectionOpened', colData);
+  }
+
+  function closeCollection() {
+    state.activeCollection = null;
+    state.activeCollectionItemIdx = -1;
+    emit('collectionClosed');
+  }
+
+  function setCollectionItemIndex(idx) {
+    if (!state.activeCollection) return null;
+    const items = state.activeCollection.items || [];
+    if (idx < 0 || idx >= items.length) return null;
+    state.activeCollectionItemIdx = idx;
+    emit('collectionItemChanged', items[idx]);
+    return items[idx];
+  }
+
+  function navigateCollectionItem(direction) {
+    if (!state.activeCollection) return null;
+    const items = state.activeCollection.items || [];
+    if (!items.length) return null;
+    let idx = state.activeCollectionItemIdx;
+    idx = direction === 'next'
+      ? Math.min(items.length - 1, idx + 1)
+      : Math.max(0, idx - 1);
+    return setCollectionItemIndex(idx);
+  }
+
+  function removeCollectionItem(idx) {
+    if (!state.activeCollection) return;
+    const items = [...(state.activeCollection.items || [])];
+    items.splice(idx, 1);
+    state.activeCollection = { ...state.activeCollection, items };
+    if (state.activeCollectionItemIdx >= items.length) {
+      state.activeCollectionItemIdx = items.length - 1;
+    }
+    emit('collectionItemsChanged', items);
+    return state.activeCollection;
+  }
+
+  function reorderCollectionItems(oldIdx, newIdx) {
+    if (!state.activeCollection) return;
+    const items = [...(state.activeCollection.items || [])];
+    const [moved] = items.splice(oldIdx, 1);
+    items.splice(newIdx, 0, moved);
+    state.activeCollection = { ...state.activeCollection, items };
+    emit('collectionItemsChanged', items);
+    return state.activeCollection;
   }
 
   function togglePanel() {
@@ -1042,5 +1101,7 @@ export const AppState = (() => {
     exportProjectData, importProjectData,
     addComment, getComments, removeComment, getClipNumber, getPreferredChatName,
     addActivity, getActivityLog,
+    openCollection, closeCollection, setCollectionItemIndex, navigateCollectionItem,
+    removeCollectionItem, reorderCollectionItems,
   };
 })();

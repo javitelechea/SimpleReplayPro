@@ -232,6 +232,19 @@ export const YTPlayer = (() => {
         return _videoPlayer.isYoutubeLive();
     }
 
+    function getCurrentVideoId() {
+        return (_lastMedia && _lastMedia.kind === 'youtube') ? _lastMedia.id : null;
+    }
+
+    async function loadVideoAsync(videoId) {
+        if (!_ready || !_videoPlayer || !videoId) return;
+        _clipEndSec = null;
+        _stopPoll();
+        await _videoPlayer.loadVideo({ type: 'youtube', id: videoId });
+        _lastMedia = { kind: 'youtube', id: videoId };
+        _emit('mediaLoaded', _lastMedia);
+    }
+
     // Dummy for compatibility
     function getPlayerState() { return -1; }
     function isReady() { return _ready; }
@@ -256,5 +269,5 @@ export const YTPlayer = (() => {
         }
     }
 
-    return { init, loadVideo, loadLocalVideo, seekTo, play, pause, togglePlay, getCurrentTime, getDuration, playClip, clearClipEnd, clearAutoPause, isReady, isPlaying, getPlayerState, setSpeed, getSourceType, jumpToLiveEdge, isLiveStream, setCommandListener, getLastMedia, mirrorRemotePlayback, getVolume, setVolume, isMuted, mute, unMute, toggleMute };
+    return { init, loadVideo, loadVideoAsync, getCurrentVideoId, loadLocalVideo, seekTo, play, pause, togglePlay, getCurrentTime, getDuration, playClip, clearClipEnd, clearAutoPause, isReady, isPlaying, getPlayerState, setSpeed, getSourceType, jumpToLiveEdge, isLiveStream, setCommandListener, getLastMedia, mirrorRemotePlayback, getVolume, setVolume, isMuted, mute, unMute, toggleMute };
 })();

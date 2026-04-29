@@ -269,6 +269,53 @@ export const FirebaseData = (() => {
         }, { merge: true });
     }
 
+    // ── Collections (own Firestore top-level collection) ──
+    async function saveCollection(colId, data) {
+        const payload = {
+            name: data.name || 'Sin nombre',
+            ownerUid: data.ownerUid || null,
+            items: data.items || [],
+            updatedAt: serverTimestamp(),
+        };
+        if (colId) {
+            await setDoc(doc(db, 'collections', colId), payload, { merge: true });
+            return colId;
+        }
+        const ref = await addDoc(collection(db, 'collections'), { ...payload, createdAt: serverTimestamp() });
+        return ref.id;
+    }
+
+    async function loadCollection(colId) {
+        try {
+            const snap = await getDoc(doc(db, 'collections', colId));
+            if (!snap.exists()) return null;
+            return { id: snap.id, ...snap.data() };
+        } catch (e) {
+            console.error('loadCollection:', e);
+            return null;
+        }
+    }
+
+    async function listUserCollections(ownerUid) {
+        if (!ownerUid) return [];
+        try {
+            const q = query(collection(db, 'collections'), where('ownerUid', '==', ownerUid));
+            const snap = await getDocs(q);
+            return snap.docs.map(d => ({
+                id: d.id,
+                name: d.data().name || 'Sin nombre',
+                itemCount: (d.data().items || []).length,
+            }));
+        } catch (e) {
+            console.error('listUserCollections:', e);
+            return [];
+        }
+    }
+
+    async function deleteCollectionDoc(colId) {
+        await deleteDoc(doc(db, 'collections', colId));
+    }
+
     return {
         saveProject,
         loadProject,
@@ -284,5 +331,9 @@ export const FirebaseData = (() => {
         removeProjectLocally,
         loadUserProjectFolders,
         saveUserProjectFolders,
+        saveCollection,
+        loadCollection,
+        listUserCollections,
+        deleteCollectionDoc,
     };
 })();
