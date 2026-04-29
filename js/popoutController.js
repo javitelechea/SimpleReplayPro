@@ -11,6 +11,7 @@ export const PopoutController = (() => {
     let _popupWindow = null;
     let _watchTimer = null;
     let _syncTimer = null;
+    let _handshakeTimer = null;
     let _ready = false;
     let _activeListeners = new Set();
     let _lastMedia = null;
@@ -49,11 +50,13 @@ export const PopoutController = (() => {
             const msg = ev.data || {};
             if (msg.type === 'ready') {
                 _ready = true;
+                _clearHandshakeTimer();
                 _sendInitialSync();
                 _startContinuousSync();
             } else if (msg.type === 'pong') {
                 // Re-handshake path when popup was already open before main reloaded.
                 _ready = true;
+                _clearHandshakeTimer();
                 _sendInitialSync();
                 _startContinuousSync();
             } else if (msg.type === 'closing') {
@@ -97,21 +100,45 @@ export const PopoutController = (() => {
         try { return fn(); } catch (_) { return null; }
     }
 
+    function _playerUrl() {
+        return `player.html?v=${Date.now()}`;
+    }
+
+    function _clearHandshakeTimer() {
+        if (_handshakeTimer) {
+            clearTimeout(_handshakeTimer);
+            _handshakeTimer = null;
+        }
+    }
+
+    function _scheduleHandshakeRecovery() {
+        _clearHandshakeTimer();
+        _handshakeTimer = setTimeout(() => {
+            if (!isActive() || _ready) return;
+            try {
+                _popupWindow.location.replace(_playerUrl());
+            } catch (_) { /* noop */ }
+        }, 1400);
+    }
+
     function open() {
         if (isActive()) {
             _ensureChannel();
+            _ready = false;
             try { _channel.postMessage({ type: 'ping' }); } catch (_) { /* noop */ }
+            _scheduleHandshakeRecovery();
             try { _popupWindow.focus(); } catch (_) { /* noop */ }
             return true;
         }
         const features = 'popup,width=960,height=560,resizable=yes,scrollbars=no';
-        const win = window.open('player.html', 'sr-popout', features);
+        const win = window.open(_playerUrl(), 'sr-popout', features);
         if (!win) {
             return false;
         }
         _popupWindow = win;
         _ready = false;
         _ensureChannel();
+        _scheduleHandshakeRecovery();
         _watchClose();
         _emitState();
         return true;
@@ -126,6 +153,7 @@ export const PopoutController = (() => {
         }
         _stopWatch();
         _stopContinuousSync();
+        _clearHandshakeTimer();
         _popupWindow = null;
         _ready = false;
         _emitState();
@@ -137,6 +165,7 @@ export const PopoutController = (() => {
             if (_popupWindow && _popupWindow.closed) {
                 _stopWatch();
                 _stopContinuousSync();
+                _clearHandshakeTimer();
                 _popupWindow = null;
                 _ready = false;
                 _emitState();
