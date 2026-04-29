@@ -51,6 +51,11 @@ export const PopoutController = (() => {
                 _ready = true;
                 _sendInitialSync();
                 _startContinuousSync();
+            } else if (msg.type === 'pong') {
+                // Re-handshake path when popup was already open before main reloaded.
+                _ready = true;
+                _sendInitialSync();
+                _startContinuousSync();
             } else if (msg.type === 'closing') {
                 _ready = false;
                 _stopContinuousSync();
@@ -94,6 +99,8 @@ export const PopoutController = (() => {
 
     function open() {
         if (isActive()) {
+            _ensureChannel();
+            try { _channel.postMessage({ type: 'ping' }); } catch (_) { /* noop */ }
             try { _popupWindow.focus(); } catch (_) { /* noop */ }
             return true;
         }
