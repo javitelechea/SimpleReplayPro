@@ -21,8 +21,22 @@ const statusEl = document.getElementById('popout-status');
 let _currentObjectUrl = null;
 let _hasMedia = false;
 let _statusTimer = null;
+let _currentMediaKey = '';
 /** Evita eco cuando el volumen viene de la app principal */
 let _lastVolMirror = { v: -1, m: null };
+
+function _mediaKey(payload) {
+    if (!payload || typeof payload !== 'object') return '';
+    if (payload.kind === 'youtube' && payload.id) return `yt:${payload.id}`;
+    if (payload.kind === 'local' && payload.file) {
+        const f = payload.file;
+        const name = typeof f.name === 'string' ? f.name : '';
+        const size = typeof f.size === 'number' ? f.size : -1;
+        const lm = typeof f.lastModified === 'number' ? f.lastModified : -1;
+        return `local:${name}:${size}:${lm}`;
+    }
+    return '';
+}
 
 function _snapVolFromPlayer() {
     try {
@@ -58,6 +72,8 @@ function hideEmpty() {
 
 async function loadMedia(payload) {
     if (!payload) return;
+    const key = _mediaKey(payload);
+    if (key && key === _currentMediaKey) return;
 
     if (_currentObjectUrl) {
         try { URL.revokeObjectURL(_currentObjectUrl); } catch (_) { /* noop */ }
@@ -67,6 +83,7 @@ async function loadMedia(payload) {
     if (payload.kind === 'youtube' && payload.id) {
         await player.loadVideo({ type: 'youtube', id: payload.id });
         _hasMedia = true;
+        _currentMediaKey = key;
         _snapVolFromPlayer();
         hideEmpty();
         showStatus('YouTube cargado');
@@ -85,6 +102,7 @@ async function loadMedia(payload) {
         _currentObjectUrl = url;
         await player.loadVideo({ type: 'local', url });
         _hasMedia = true;
+        _currentMediaKey = key;
         _snapVolFromPlayer();
         hideEmpty();
         showStatus('Video local cargado');
