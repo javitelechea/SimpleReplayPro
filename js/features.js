@@ -8,6 +8,7 @@ export const FEATURES = {
     EXPORT_DATA: 'exportData',
     COMMENTS: 'comments',
     BUTTONBOARD_TEMPLATES: 'buttonboardTemplates', // Ventanas de código — panel de templates (PRO)
+    POPOUT_PLAYER: 'popoutPlayer',
     // MULTIPLE_BUTTONBOARDS: 'multipleButtonboards', // Reservado: múltiples ventanas de código activas
 };
 

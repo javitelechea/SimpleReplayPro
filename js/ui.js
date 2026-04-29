@@ -1604,10 +1604,13 @@ export const UI = (() => {
         btnView.classList.toggle('active', mode === 'view');
         if (btnShareTab) {
             btnShareTab.classList.toggle('active', mode === 'share');
-            btnShareTab.style.display = AppState.hasFeature('share') ? 'inline-flex' : 'none';
+            btnShareTab.style.display = 'inline-flex';
+            btnShareTab.classList.toggle('is-pro-locked', !AppState.hasFeature('share'));
+            btnShareTab.title = AppState.hasFeature('share') ? 'Compartir' : 'Compartir — PRO';
         }
         if (mobileShareItem) {
-            mobileShareItem.style.display = AppState.hasFeature('share') ? 'block' : 'none';
+            mobileShareItem.style.display = 'block';
+            mobileShareItem.classList.toggle('is-pro-locked', !AppState.hasFeature('share'));
         }
         if (mobileModeLabel) {
             const modeName = mode === 'analyze' ? 'Analizar' : mode === 'view' ? 'Ver' : 'Compartir';
@@ -1665,7 +1668,7 @@ export const UI = (() => {
         if (mobileModeMenu && isReadOnly) mobileModeMenu.hidden = true;
         if (mobileAnalyzeItem) mobileAnalyzeItem.style.display = isReadOnly ? 'none' : 'block';
         if (mobileViewItem) mobileViewItem.style.display = 'block';
-        if (mobileShareItem) mobileShareItem.style.display = (isReadOnly || !AppState.hasFeature('share')) ? 'none' : 'block';
+        if (mobileShareItem) mobileShareItem.style.display = isReadOnly ? 'none' : 'block';
         if (mobileModeLabel && isReadOnly) {
             mobileModeLabel.textContent = 'Solo lectura';
         }
@@ -1689,7 +1692,11 @@ export const UI = (() => {
         } else {
             if (btnSave) btnSave.style.display = 'inline-flex';
             if (btnImportXml) {
-                btnImportXml.style.display = AppState.hasFeature('importData') ? 'inline-flex' : 'none';
+                btnImportXml.style.display = 'inline-flex';
+                btnImportXml.classList.toggle('is-pro-locked', !AppState.hasFeature('importData'));
+                btnImportXml.title = AppState.hasFeature('importData')
+                    ? 'Importar proyecto desde XML'
+                    : 'Importar XML — PRO';
             }
             if (btnExportXml) {
                 btnExportXml.style.display = AppState.hasFeature('exportData') ? 'inline-flex' : 'none';

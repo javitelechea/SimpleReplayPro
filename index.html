@@ -72,6 +72,7 @@
         <button type="button" id="btn-popout-close" class="popout-status-close" title="Cerrar player externo" aria-label="Cerrar player externo">✕</button>
       </div>
       <button id="btn-new-game" class="btn btn-primary btn-sm btn-header-icon" title="Nuevo proyecto" aria-label="Nuevo proyecto">＋</button>
+      <button id="btn-open-projects-header" class="btn btn-ghost btn-sm btn-header-icon btn-projects-header" title="Abrir proyectos" aria-label="Abrir proyectos">📂</button>
       <input type="file" id="input-import-xml" accept=".xml" style="display:none;" />
       <input type="file" id="input-relink-video" accept="video/*" style="display:none;" />
       <div class="header-divider"></div>
@@ -84,14 +85,16 @@
           </svg>
         </button>
         <div id="header-nav-menu" class="header-actions-menu" hidden>
-          <button id="btn-open-preferences" class="header-action-item header-action-item--tool" type="button" title="Preferencias"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M12 8v5l3 2M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Preferencias</span></button>
-          <button id="btn-open-popout" class="header-action-item header-action-item--tool" type="button" title="Abrir player en ventana externa"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M14 13l5 5M14 18h5v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Abrir player externo</span></button>
-          <div class="header-action-sep" aria-hidden="true"></div>
+          <div class="header-action-group-label">Trabajo</div>
           <button id="btn-my-projects" class="header-action-item header-action-item--panel" type="button" title="Mis proyectos"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--panel" viewBox="0 0 24 24" fill="none"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.3a2 2 0 0 1 1.4.57l.74.73a2 2 0 0 0 1.4.58H19.5A1.5 1.5 0 0 1 21 9.38V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span>Proyectos</span></button>
           <button id="btn-open-buttonboards" class="header-action-item header-action-item--panel" type="button" title="Ventanas de código" style="display:none;"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--panel" viewBox="0 0 24 24" fill="none"><rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span>Ventanas de código</span></button>
-          <div class="header-action-sep" aria-hidden="true"></div>
-          <button id="btn-relink-video" class="header-action-item header-action-item--tool" type="button" style="display:none;" title="Re-vincular video local"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M15 7h4v4M9 17H5v-4M19 11a7 7 0 0 0-12-3M5 13a7 7 0 0 0 12 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Vincular video</span></button>
           <button id="btn-import-xml" class="header-action-item header-action-item--tool" type="button" title="Importar proyecto desde XML"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M12 4v11M8 11l4 4 4-4M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Importar XML</span></button>
+          <div class="header-action-group-label">Reproducción</div>
+          <button id="btn-open-popout" class="header-action-item header-action-item--tool" type="button" title="Abrir player en ventana externa"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M14 13l5 5M14 18h5v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Player externo</span></button>
+          <button id="btn-relink-video" class="header-action-item header-action-item--tool" type="button" style="display:none;" title="Re-vincular video local"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M15 7h4v4M9 17H5v-4M19 11a7 7 0 0 0-12-3M5 13a7 7 0 0 0 12 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Vincular video</span></button>
+          <div class="header-action-group-label">Sistema</div>
+          <button id="btn-toggle-autosave" class="header-action-item header-action-item--tool" type="button" title="Activar auto-guardado"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M7 7h8a4 4 0 0 1 4 4v1M17 17H9a4 4 0 0 1-4-4v-1M16 4l3 3-3 3M8 20l-3-3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Auto-guardado</span><span id="autosave-menu-state" class="header-action-state">OFF</span></button>
+          <button id="btn-open-preferences" class="header-action-item header-action-item--tool" type="button" title="Preferencias"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M12 8v5l3 2M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Preferencias</span></button>
         </div>
       </div>
       <div class="auth-menu-wrap">
@@ -100,8 +103,14 @@
           <span class="auth-status-dot" aria-hidden="true"></span>
         </button>
         <div id="auth-menu" class="auth-menu" hidden>
-          <div id="auth-menu-name" class="auth-menu-name">No logueado</div>
-          <div id="auth-menu-plan" class="auth-menu-plan">Plan: FREE</div>
+          <div class="auth-menu-head">
+            <div class="auth-menu-avatar" aria-hidden="true">👤</div>
+            <div class="auth-menu-identity">
+              <div id="auth-menu-name" class="auth-menu-name">No logueado</div>
+              <div id="auth-menu-plan" class="auth-menu-plan">FREE</div>
+            </div>
+          </div>
+          <div id="auth-menu-help" class="auth-menu-help">Iniciá sesión para ver tus proyectos y activar funciones PRO.</div>
           <div id="auth-menu-grant" class="auth-menu-grant" style="display:none;"></div>
           <a href="https://survision.ar/cuenta.html" target="_blank" rel="noopener" id="auth-menu-account" class="btn btn-outline btn-sm" style="display:none; width:100%; text-align:center; margin-bottom:6px;">Mi cuenta</a>
           <div class="auth-menu-actions">
@@ -622,39 +631,54 @@
   <!-- ═══════ PREFERENCES MODAL ═══════ -->
   <div id="modal-preferences" class="modal hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-box modal-sm">
-      <h2>Preferencias</h2>
-
-      <h4 style="margin: 10px 0 8px; font-size: .86rem; color: var(--text-muted);">Reproducción</h4>
-      <div style="display:grid; grid-template-columns: 1fr 90px; gap:8px; align-items:center;">
-        <label for="pref-seek-step">Salto ←/→ (seg)</label>
-        <input id="pref-seek-step" class="input input-sm" type="number" min="1" max="60" step="1" />
-        <label for="pref-seek-step-shift">Salto Shift+←/→ (seg)</label>
-        <input id="pref-seek-step-shift" class="input input-sm" type="number" min="1" max="60" step="1" />
-      </div>
-      <div style="margin-top: 10px;">
-        <label style="display:flex; align-items:center; gap:8px; font-size:.82rem;">
-          <input id="pref-auto-save-enabled" type="checkbox" />
-          Auto-guardar cada 60 segundos
-        </label>
+    <div class="modal-box modal-sm preferences-modal">
+      <div class="preferences-header">
+        <h2>Preferencias</h2>
+        <p>Ajustá reproducción y guardado del proyecto.</p>
       </div>
 
-      <h4 style="margin: 14px 0 8px; font-size: .86rem; color: var(--text-muted);">Atajos de teclado</h4>
-      <div style="display:grid; grid-template-columns: 1fr 150px; gap:8px; align-items:center;">
-        <label for="pref-shortcut-play">Play/Pause</label>
-        <input id="pref-shortcut-play" class="input input-sm pref-shortcut-input" type="text" readonly />
-        <label for="pref-shortcut-left">Retroceder</label>
-        <input id="pref-shortcut-left" class="input input-sm pref-shortcut-input" type="text" readonly />
-        <label for="pref-shortcut-right">Avanzar</label>
-        <input id="pref-shortcut-right" class="input input-sm pref-shortcut-input" type="text" readonly />
-        <label for="pref-shortcut-left-fast">Retroceder rápido</label>
-        <input id="pref-shortcut-left-fast" class="input input-sm pref-shortcut-input" type="text" readonly />
-        <label for="pref-shortcut-right-fast">Avanzar rápido</label>
-        <input id="pref-shortcut-right-fast" class="input input-sm pref-shortcut-input" type="text" readonly />
+      <div class="pref-section">
+        <div class="pref-section-title">Reproducción</div>
+        <div class="pref-setting-row">
+          <div class="pref-setting-copy">
+            <label class="pref-setting-title" for="pref-seek-step">Salto normal</label>
+            <span class="pref-setting-desc">Flechas izquierda y derecha</span>
+          </div>
+          <input id="pref-seek-step" class="input input-sm pref-number-input" type="number" min="1" max="60" step="1" />
+        </div>
+        <div class="pref-setting-row">
+          <div class="pref-setting-copy">
+            <label class="pref-setting-title" for="pref-seek-step-shift">Salto rápido</label>
+            <span class="pref-setting-desc">Shift + flechas izquierda y derecha</span>
+          </div>
+          <input id="pref-seek-step-shift" class="input input-sm pref-number-input" type="number" min="1" max="60" step="1" />
+        </div>
+        <div class="pref-setting-row pref-setting-row-accent">
+          <div class="pref-setting-copy">
+            <span class="pref-setting-title">Auto-guardado</span>
+            <span class="pref-setting-desc">Guardar cambios cada 60 segundos</span>
+          </div>
+          <label class="pref-toggle" aria-label="Activar auto-guardado">
+            <input id="pref-auto-save-enabled" type="checkbox" />
+            <span class="pref-toggle-track">
+              <span class="pref-toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
       </div>
-      <p style="margin-top:8px; font-size:.75rem; color:var(--text-muted);">Tip: hacé foco en un campo y presioná la combinación. Backspace limpia.</p>
 
-      <div class="modal-actions" style="margin-top: 14px;">
+      <div class="pref-section">
+        <div class="pref-section-title">Atajo fijo</div>
+        <div class="pref-setting-row pref-shortcut-note">
+          <div class="pref-setting-copy">
+            <span class="pref-setting-title">Menú rápido de clip</span>
+            <span class="pref-setting-desc">Abre el menú del último clip en Analizar</span>
+          </div>
+          <span class="pref-kbd">Shift + Cmd + M</span>
+        </div>
+      </div>
+
+      <div class="modal-actions preferences-actions">
         <button id="btn-pref-reset" class="btn btn-ghost">Restablecer</button>
         <button id="btn-pref-cancel" class="btn btn-ghost">Cancelar</button>
         <button id="btn-pref-save" class="btn btn-primary">Guardar</button>

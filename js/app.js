@@ -38,13 +38,6 @@ import { PopoutController } from './popoutController.js';
     const DEFAULT_SEEK_STEP_SHIFT = 1;
     const AUTO_SAVE_ENABLED_KEY = 'sr_auto_save_enabled';
     const AUTO_SAVE_INTERVAL_MS = 60000;
-    const SHORTCUT_KEYS = {
-        playPause: 'sr_shortcut_play_pause',
-        seekLeft: 'sr_shortcut_seek_left',
-        seekRight: 'sr_shortcut_seek_right',
-        seekLeftFast: 'sr_shortcut_seek_left_fast',
-        seekRightFast: 'sr_shortcut_seek_right_fast',
-    };
     const DEFAULT_SHORTCUTS = {
         playPause: 'Space',
         seekLeft: 'ArrowLeft',
@@ -335,6 +328,21 @@ import { PopoutController } from './popoutController.js';
 
     function setAutoSaveEnabled(enabled) {
         localStorage.setItem(AUTO_SAVE_ENABLED_KEY, enabled ? '1' : '0');
+        syncAutoSaveMenuState();
+    }
+
+    function syncAutoSaveMenuState() {
+        const btn = $('#btn-toggle-autosave');
+        const state = $('#autosave-menu-state');
+        const enabled = isAutoSaveEnabled();
+        if (btn) {
+            btn.classList.toggle('is-active', enabled);
+            btn.title = enabled ? 'Desactivar auto-guardado' : 'Activar auto-guardado';
+        }
+        if (state) {
+            state.textContent = enabled ? 'ON' : 'OFF';
+            state.classList.toggle('is-on', enabled);
+        }
     }
 
     function normalizeKeyName(key) {
@@ -356,15 +364,7 @@ import { PopoutController } from './popoutController.js';
     }
 
     function getShortcut(action) {
-        const k = SHORTCUT_KEYS[action];
-        const fallback = DEFAULT_SHORTCUTS[action];
-        const saved = (localStorage.getItem(k) || '').trim();
-        return saved || fallback;
-    }
-
-    function setShortcut(action, val) {
-        const k = SHORTCUT_KEYS[action];
-        localStorage.setItem(k, (val || '').trim());
+        return DEFAULT_SHORTCUTS[action];
     }
 
     function matchesShortcut(e, action) {
@@ -376,11 +376,6 @@ import { PopoutController } from './popoutController.js';
         if (!modal) return;
         $('#pref-seek-step').value = String(getSeekStep(false));
         $('#pref-seek-step-shift').value = String(getSeekStep(true));
-        $('#pref-shortcut-play').value = getShortcut('playPause');
-        $('#pref-shortcut-left').value = getShortcut('seekLeft');
-        $('#pref-shortcut-right').value = getShortcut('seekRight');
-        $('#pref-shortcut-left-fast').value = getShortcut('seekLeftFast');
-        $('#pref-shortcut-right-fast').value = getShortcut('seekRightFast');
         $('#pref-auto-save-enabled').checked = isAutoSaveEnabled();
         UI.showModal('modal-preferences');
     }
@@ -401,11 +396,6 @@ import { PopoutController } from './popoutController.js';
         localStorage.setItem(SEEK_STEP_KEY, String(normal));
         localStorage.setItem(SEEK_STEP_SHIFT_KEY, String(fast));
 
-        setShortcut('playPause', $('#pref-shortcut-play').value || DEFAULT_SHORTCUTS.playPause);
-        setShortcut('seekLeft', $('#pref-shortcut-left').value || DEFAULT_SHORTCUTS.seekLeft);
-        setShortcut('seekRight', $('#pref-shortcut-right').value || DEFAULT_SHORTCUTS.seekRight);
-        setShortcut('seekLeftFast', $('#pref-shortcut-left-fast').value || DEFAULT_SHORTCUTS.seekLeftFast);
-        setShortcut('seekRightFast', $('#pref-shortcut-right-fast').value || DEFAULT_SHORTCUTS.seekRightFast);
         setAutoSaveEnabled(!!($('#pref-auto-save-enabled') && $('#pref-auto-save-enabled').checked));
 
         closePreferencesModal();
@@ -415,7 +405,6 @@ import { PopoutController } from './popoutController.js';
     function resetPreferences() {
         localStorage.setItem(SEEK_STEP_KEY, String(DEFAULT_SEEK_STEP));
         localStorage.setItem(SEEK_STEP_SHIFT_KEY, String(DEFAULT_SEEK_STEP_SHIFT));
-        Object.entries(DEFAULT_SHORTCUTS).forEach(([action, val]) => setShortcut(action, val));
         setAutoSaveEnabled(false);
         openPreferencesModal();
         UI.toast('Preferencias restablecidas', 'info');
@@ -459,26 +448,6 @@ import { PopoutController } from './popoutController.js';
             }
         });
 
-        modal.querySelectorAll('.pref-shortcut-input').forEach((input) => {
-            input.addEventListener('focus', () => { input.placeholder = 'Presioná una tecla…'; });
-            input.addEventListener('blur', () => { input.placeholder = ''; });
-            input.addEventListener('keydown', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (e.key === 'Escape') {
-                    input.blur();
-                    return;
-                }
-                if (e.key === 'Backspace' || e.key === 'Delete') {
-                    input.value = '';
-                    return;
-                }
-                const sc = eventToShortcut(e);
-                if (!sc) return;
-                input.value = sc;
-                input.blur();
-            });
-        });
     }
 
     function guardFeature(feature, action) {
@@ -486,8 +455,14 @@ import { PopoutController } from './popoutController.js';
             action();
             return true;
         }
-        UI.toast('Esta función requiere el plan PRO', 'error');
+        UI.toast(getProFeatureMessage(), 'info');
         return false;
+    }
+
+    function getProFeatureMessage() {
+        return getCurrentUser()
+            ? 'Esta función requiere el plan PRO'
+            : 'Iniciá sesión para activar funciones PRO';
     }
 
     function resetLiveProbe() {
@@ -604,6 +579,7 @@ import { PopoutController } from './popoutController.js';
         const menu = $('#auth-menu');
         const nameEl = $('#auth-menu-name');
         const planEl = $('#auth-menu-plan');
+        const helpEl = $('#auth-menu-help');
         const grantEl = $('#auth-menu-grant');
         const loginBtn = $('#auth-menu-login');
         const logoutBtn = $('#auth-menu-logout');
@@ -619,7 +595,14 @@ import { PopoutController } from './popoutController.js';
 
         const plan = resolveEffectivePlan(latestUserDoc);
         if (planEl) {
-            planEl.textContent = `Plan: ${String(plan || 'free').toUpperCase()}`;
+            planEl.textContent = String(plan || 'free').toUpperCase();
+        }
+        if (helpEl) {
+            helpEl.textContent = !isLogged
+                ? 'Iniciá sesión para ver tus proyectos y activar funciones PRO.'
+                : plan === 'pro'
+                    ? 'Tu cuenta PRO tiene todas las funciones activas.'
+                    : 'Actualizá a PRO para compartir, importar y usar video local.';
         }
 
         const grantText = getGrantRemainingText(latestUserDoc);
@@ -812,6 +795,10 @@ import { PopoutController } from './popoutController.js';
         const openBtn = $('#btn-open-popout');
         if (openBtn) {
             openBtn.addEventListener('click', () => {
+                if (!AppState.hasFeature(FEATURES.POPOUT_PLAYER)) {
+                    UI.toast(getProFeatureMessage(), 'info');
+                    return;
+                }
                 const game = AppState.getCurrentGame();
                 if (!game) {
                     UI.toast('Abrí o creá un proyecto primero', 'info');
@@ -1069,12 +1056,14 @@ import { PopoutController } from './popoutController.js';
         if (!trigger || !menu || trigger.dataset.bbWired) return;
         trigger.dataset.bbWired = '1';
         const prefBtn = $('#btn-open-preferences');
+        const autoSaveBtn = $('#btn-toggle-autosave');
 
         const closeMenu = () => {
             menu.hidden = true;
             trigger.setAttribute('aria-expanded', 'false');
         };
         const openMenu = () => {
+            syncAutoSaveMenuState();
             menu.hidden = false;
             trigger.setAttribute('aria-expanded', 'true');
         };
@@ -1094,6 +1083,16 @@ import { PopoutController } from './popoutController.js';
         });
 
         menu.addEventListener('click', (ev) => {
+            const localAutoSaveBtn = ev.target.closest('#btn-toggle-autosave');
+            if (localAutoSaveBtn) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const enabled = !isAutoSaveEnabled();
+                setAutoSaveEnabled(enabled);
+                UI.toast(enabled ? 'Auto-guardado activado (60s) ✅' : 'Auto-guardado desactivado', enabled ? 'success' : 'info');
+                closeMenu();
+                return;
+            }
             const localPrefBtn = ev.target.closest('#btn-open-preferences');
             if (localPrefBtn) {
                 ev.preventDefault();
@@ -1112,6 +1111,14 @@ import { PopoutController } from './popoutController.js';
             };
             prefBtn.addEventListener('pointerdown', onPref);
             prefBtn.addEventListener('click', onPref);
+        }
+
+        if (autoSaveBtn) {
+            autoSaveBtn.addEventListener('pointerdown', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                autoSaveBtn.click();
+            });
         }
 
         document.addEventListener('click', (ev) => {
@@ -1157,6 +1164,11 @@ import { PopoutController } from './popoutController.js';
                 closeMenu();
                 return;
             }
+            if (mode === 'share' && !AppState.hasFeature(FEATURES.SHARE)) {
+                UI.toast(getProFeatureMessage(), 'info');
+                closeMenu();
+                return;
+            }
             if (mode) AppState.setMode(mode);
             closeMenu();
         };
@@ -1198,11 +1210,9 @@ import { PopoutController } from './popoutController.js';
         updateAuthHeader(user);
         AppState.setFeatureFlags(resolveFeaturesForUser(latestUserDoc));
         syncReadOnlyCapabilitiesClass();
-        // Show/hide Ventanas de código menu item based on plan
-        const btnBB = $('#btn-open-buttonboards');
-        if (btnBB) {
-            btnBB.style.display = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES) ? '' : 'none';
-        }
+        syncHeaderProFeatureStates();
+        UI.updateMode();
+        syncNewProjectModalByPlan();
     });
 
     async function rememberLastProject(projectId) {
@@ -1218,6 +1228,25 @@ import { PopoutController } from './popoutController.js';
     function syncReadOnlyCapabilitiesClass() {
         const canUseProNav = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES);
         document.body.classList.toggle('read-only-pro', !!canUseProNav);
+    }
+
+    function syncHeaderProFeatureStates() {
+        const btnBB = $('#btn-open-buttonboards');
+        if (btnBB) {
+            btnBB.style.display = '';
+            btnBB.classList.toggle('is-pro-locked', !AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES));
+            btnBB.title = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES)
+                ? 'Ventanas de código'
+                : 'Ventanas de código — PRO';
+        }
+
+        const btnPopout = $('#btn-open-popout');
+        if (btnPopout) {
+            btnPopout.classList.toggle('is-pro-locked', !AppState.hasFeature(FEATURES.POPOUT_PLAYER));
+            btnPopout.title = AppState.hasFeature(FEATURES.POPOUT_PLAYER)
+                ? 'Abrir player en ventana externa'
+                : 'Player externo — PRO';
+        }
     }
 
     // Extract YouTube video ID from any input (full URL or raw ID)
@@ -1247,13 +1276,57 @@ import { PopoutController } from './popoutController.js';
     // ═══════════════════════════════════════
 
     let hasUnsavedChanges = false;
+    let _saveButtonResetTimer = null;
+
+    function setSaveButtonState(state = hasUnsavedChanges ? 'dirty' : 'idle') {
+        const btn = $('#btn-save-project');
+        if (!btn) return;
+        btn.classList.remove('is-dirty', 'is-saving', 'is-saved');
+        btn.disabled = state === 'saving';
+
+        if (_saveButtonResetTimer) {
+            clearTimeout(_saveButtonResetTimer);
+            _saveButtonResetTimer = null;
+        }
+
+        if (state === 'saving') {
+            btn.textContent = '…';
+            btn.title = 'Guardando proyecto';
+            btn.setAttribute('aria-label', 'Guardando proyecto');
+            btn.classList.add('is-saving');
+            return;
+        }
+
+        if (state === 'saved') {
+            btn.textContent = '✓';
+            btn.title = 'Proyecto guardado';
+            btn.setAttribute('aria-label', 'Proyecto guardado');
+            btn.classList.add('is-saved');
+            _saveButtonResetTimer = setTimeout(() => setSaveButtonState(), 1400);
+            return;
+        }
+
+        btn.textContent = '💾';
+        btn.title = hasUnsavedChanges ? 'Guardar cambios pendientes' : 'Guardar proyecto';
+        btn.setAttribute('aria-label', btn.title);
+        btn.classList.toggle('is-dirty', !!hasUnsavedChanges);
+    }
 
     // Reset unsaved changes on load/save
-    AppState.on('projectLoaded', () => hasUnsavedChanges = false);
-    AppState.on('projectSaved', () => hasUnsavedChanges = false);
+    AppState.on('projectLoaded', () => {
+        hasUnsavedChanges = false;
+        setSaveButtonState();
+    });
+    AppState.on('projectSaved', () => {
+        hasUnsavedChanges = false;
+        setSaveButtonState('saved');
+    });
 
     // Mark as unsaved when anything editable changes
-    const markUnsaved = () => hasUnsavedChanges = true;
+    const markUnsaved = () => {
+        hasUnsavedChanges = true;
+        setSaveButtonState();
+    };
     AppState.on('clipChanged', markUnsaved);
     AppState.on('clipsUpdated', markUnsaved);
     AppState.on('playlistsUpdated', markUnsaved);
@@ -1281,6 +1354,8 @@ import { PopoutController } from './popoutController.js';
         }
     });
 
+    setSaveButtonState();
+
     // Logo / Home link with confirmation
     const logoHome = $('#logo-home');
     if (logoHome) {
@@ -1301,6 +1376,7 @@ import { PopoutController } from './popoutController.js';
     });
 
     AppState.on('featuresChanged', () => {
+        syncHeaderProFeatureStates();
         syncNewProjectModalByPlan();
         UI.updateMode();
     });
@@ -1410,7 +1486,15 @@ import { PopoutController } from './popoutController.js';
     $('#btn-mode-analyze').addEventListener('click', () => AppState.setMode('analyze'));
     $('#btn-mode-view').addEventListener('click', () => AppState.setMode('view'));
     const btnModeShare = $('#btn-mode-share');
-    if (btnModeShare) btnModeShare.addEventListener('click', () => AppState.setMode('share'));
+    if (btnModeShare) {
+        btnModeShare.addEventListener('click', () => {
+            if (!AppState.hasFeature(FEATURES.SHARE)) {
+                UI.toast(getProFeatureMessage(), 'info');
+                return;
+            }
+            AppState.setMode('share');
+        });
+    }
 
     // Novedades dropdown toggle
     const btnNovedades = $('#btn-novedades');
@@ -1457,8 +1541,16 @@ import { PopoutController } from './popoutController.js';
         const hasImportData = AppState.hasFeature(FEATURES.IMPORT_DATA);
         const localTabBtn = document.querySelector('#modal-new-game .tab-btn[data-tab="local"]');
         const jsonTabBtn = document.querySelector('#modal-new-game .tab-btn[data-tab="json"]');
-        if (localTabBtn) localTabBtn.style.display = hasLocalVideo ? 'inline-flex' : 'none';
-        if (jsonTabBtn) jsonTabBtn.style.display = hasImportData ? 'inline-flex' : 'none';
+        if (localTabBtn) {
+            localTabBtn.style.display = 'inline-flex';
+            localTabBtn.classList.toggle('is-pro-locked', !hasLocalVideo);
+            localTabBtn.title = hasLocalVideo ? 'Video local' : 'Video local — PRO';
+        }
+        if (jsonTabBtn) {
+            jsonTabBtn.style.display = 'inline-flex';
+            jsonTabBtn.classList.toggle('is-pro-locked', !hasImportData);
+            jsonTabBtn.title = hasImportData ? 'Importar JSON' : 'Importar JSON — PRO';
+        }
 
         if ((!hasLocalVideo && activeProjectTab === 'local') || (!hasImportData && activeProjectTab === 'json')) {
             activeProjectTab = 'yt';
@@ -1526,6 +1618,14 @@ import { PopoutController } from './popoutController.js';
     });
     document.querySelectorAll('#modal-new-game .tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+            if (btn.dataset.tab === 'local' && !AppState.hasFeature(FEATURES.LOCAL_VIDEO)) {
+                UI.toast(getProFeatureMessage(), 'info');
+                return;
+            }
+            if (btn.dataset.tab === 'json' && !AppState.hasFeature(FEATURES.IMPORT_DATA)) {
+                UI.toast(getProFeatureMessage(), 'info');
+                return;
+            }
             activeProjectTab = btn.dataset.tab;
             // Update buttons
             document.querySelectorAll('#modal-new-game .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
@@ -1549,7 +1649,7 @@ import { PopoutController } from './popoutController.js';
             if (!ytId) { UI.toast('No se pudo extraer el Video ID de YouTube', 'error'); return; }
 
         } else if (activeProjectTab === 'local') {
-            if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) { UI.toast('Video local requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             title = $('#input-game-title-local').value.trim();
             const localVideoInput = $('#input-local-video').files[0];
             if (!title) { UI.toast('Ingresá un título', 'error'); return; }
@@ -1558,7 +1658,7 @@ import { PopoutController } from './popoutController.js';
             _localVideoFileForCurrentGame = localVideoInput;
 
         } else if (activeProjectTab === 'json') {
-            if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast('Importar datos requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const jsonFile = $('#input-import-json').files[0];
             if (!jsonFile) { UI.toast('Seleccioná un archivo .json', 'error'); return; }
 
@@ -1634,7 +1734,7 @@ import { PopoutController } from './popoutController.js';
     const inputRelink = $('#input-relink-video');
     if (btnRelink && inputRelink) {
         btnRelink.addEventListener('click', () => {
-            if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) { UI.toast('Video local requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             inputRelink.click();
         });
         inputRelink.addEventListener('change', (e) => {
@@ -1737,7 +1837,7 @@ import { PopoutController } from './popoutController.js';
     const btnPlShare = $('#btn-pl-share');
     if (btnPlShare) {
         btnPlShare.addEventListener('click', async () => {
-            if (!AppState.hasFeature(FEATURES.SHARE)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.SHARE)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const playlistId = AppState.get('activePlaylistId');
             if (!playlistId) return;
             let projectId = AppState.get('currentProjectId');
@@ -1757,7 +1857,7 @@ import { PopoutController } from './popoutController.js';
     const btnPlWa = $('#btn-pl-wa');
     if (btnPlWa) {
         btnPlWa.addEventListener('click', () => {
-            if (!AppState.hasFeature(FEATURES.SHARE)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.SHARE)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const playlistId = AppState.get('activePlaylistId');
             if (!playlistId) return;
             const projectId = AppState.get('currentProjectId');
@@ -1995,6 +2095,10 @@ import { PopoutController } from './popoutController.js';
         const btnOpen = $('#btn-open-buttonboards');
         if (btnOpen) {
             btnOpen.addEventListener('click', async () => {
+                if (!AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES)) {
+                    UI.toast(getProFeatureMessage(), 'info');
+                    return;
+                }
                 UI.showModal('modal-buttonboards');
                 _bbCloseEditor();
                 await _bbLoadAndRender();
@@ -2123,7 +2227,7 @@ import { PopoutController } from './popoutController.js';
     });
 
     // ═══ PROJECTS LIST ═══
-    $('#btn-my-projects').addEventListener('click', async () => {
+    async function openProjectsModal() {
         const urlParams = new URLSearchParams(window.location.search);
         const isReadOnly = urlParams.get('mode') === 'view';
         if (isReadOnly) {
@@ -2690,7 +2794,10 @@ import { PopoutController } from './popoutController.js';
                 listShared.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Error al conectar.</p>';
             }
         }
-    });
+    }
+
+    $('#btn-my-projects').addEventListener('click', openProjectsModal);
+    $('#btn-open-projects-header')?.addEventListener('click', openProjectsModal);
 
     $('#btn-close-projects').addEventListener('click', () => {
         UI.hideModal('modal-projects');
@@ -2960,7 +3067,7 @@ import { PopoutController } from './popoutController.js';
     const btnExportXml = $('#btn-export-xml');
     if (btnExportXml) {
         btnExportXml.addEventListener('click', () => {
-            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const xml = AppState.exportXML();
             if (!xml) {
                 UI.toast('No hay datos para exportar o no seleccionaste un partido', 'error');
@@ -2979,7 +3086,7 @@ import { PopoutController } from './popoutController.js';
     const inputImportXml = $('#input-import-xml');
     if (btnImportXml && inputImportXml) {
         btnImportXml.addEventListener('click', () => {
-            if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             if (!AppState.get('currentGameId')) {
                 UI.toast('Primero creá o seleccioná un partido vacío adonde importar', 'error');
                 return;
@@ -3068,8 +3175,7 @@ import { PopoutController } from './popoutController.js';
             }
         }
 
-        btn.disabled = true;
-        btn.textContent = '⏳';
+        setSaveButtonState('saving');
         try {
             const projectId = await AppState.saveToCloud();
             FirebaseData.addProjectLocally(projectId);
@@ -3087,9 +3193,9 @@ import { PopoutController } from './popoutController.js';
         } catch (err) {
             console.error('Save error:', err);
             UI.toast('Error al guardar: ' + err.message, 'error');
+            setSaveButtonState();
         } finally {
-            btn.disabled = false;
-            btn.textContent = '💾';
+            if (btn.classList.contains('is-saving')) setSaveButtonState();
         }
     });
 
@@ -3121,7 +3227,7 @@ import { PopoutController } from './popoutController.js';
     const btnShareExportXml = $('#btn-share-export-xml');
     if (btnShareExportXml) {
         btnShareExportXml.addEventListener('click', async () => {
-            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             UI.hideModal('modal-share-options');
             let xml = null;
             if (_pendingShareProjectId && _pendingShareProjectId === AppState.get('currentProjectId')) {
@@ -3147,7 +3253,7 @@ import { PopoutController } from './popoutController.js';
     const btnShareExportJson = $('#btn-share-export-json');
     if (btnShareExportJson) {
         btnShareExportJson.addEventListener('click', async () => {
-            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             UI.hideModal('modal-share-options');
             const data = AppState.exportProjectData();
             if (data) {
@@ -3188,7 +3294,7 @@ import { PopoutController } from './popoutController.js';
 
     function getShareUrls() {
         if (!AppState.hasFeature(FEATURES.SHARE)) {
-            UI.toast('Esta función requiere el plan PRO', 'error');
+            UI.toast(getProFeatureMessage(), 'info');
             return null;
         }
         const projectId = AppState.get('currentProjectId');
@@ -3292,7 +3398,7 @@ import { PopoutController } from './popoutController.js';
     const sharePanelXml = $('#share-btn-xml');
     if (sharePanelXml) {
         sharePanelXml.addEventListener('click', async () => {
-            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const xml = AppState.exportXML ? AppState.exportXML() : null;
             if (xml) {
                 const game = AppState.getCurrentGame();
@@ -3308,7 +3414,7 @@ import { PopoutController } from './popoutController.js';
     const sharePanelJson = $('#share-btn-json');
     if (sharePanelJson) {
         sharePanelJson.addEventListener('click', () => {
-            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const data = AppState.exportProjectData();
             if (data) {
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -3342,7 +3448,7 @@ import { PopoutController } from './popoutController.js';
     const handlePlaylistShare = async (e) => {
         const shareBtn = e.target.closest('.pl-share-btn');
         if (shareBtn) {
-            if (!AppState.hasFeature(FEATURES.SHARE)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.SHARE)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const playlistId = shareBtn.dataset.playlistId;
             let projectId = AppState.get('currentProjectId');
 
@@ -3378,7 +3484,7 @@ import { PopoutController } from './popoutController.js';
 
         const waBtn = e.target.closest('.pl-wa-btn');
         if (waBtn) {
-            if (!AppState.hasFeature(FEATURES.SHARE)) { UI.toast('Esta función requiere el plan PRO', 'error'); return; }
+            if (!AppState.hasFeature(FEATURES.SHARE)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const playlistId = waBtn.dataset.playlistId;
             let projectId = AppState.get('currentProjectId');
 
@@ -3623,6 +3729,8 @@ import { PopoutController } from './popoutController.js';
         document.body.classList.remove('initial-playlist-lock-loading');
         updateLiveEdgeButton();
         wireAutoSaveLoop();
+        syncAutoSaveMenuState();
+        syncHeaderProFeatureStates();
         setInterval(updateLiveEdgeButton, 1000);
     }
 
