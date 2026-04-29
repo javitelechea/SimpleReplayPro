@@ -11,7 +11,7 @@ import { YTPlayer } from './youtubePlayer.js';
 import { Timeline } from './timeline.js';
 import { DrawingTool } from './drawing.js';
 import { ExportManager } from './export.js';
-import { onAuthChange, loginWithGoogle, logout, waitForAuthReady, getCurrentUser, getUserDoc, setLastProjectForUser } from './auth.js';
+import { onAuthChange, loginWithGoogle, handleRedirectLoginResult, logout, waitForAuthReady, getCurrentUser, getUserDoc, setLastProjectForUser } from './auth.js';
 import { FEATURES, resolveEffectivePlan, resolveFeaturesForUser } from './features.js';
 import { toMillis } from './access.js';
 import { ButtonboardTemplates } from './buttonboardTemplates.js';
@@ -677,9 +677,13 @@ import { PopoutController } from './popoutController.js';
 
         loginBtn?.addEventListener('click', async () => {
             try {
-                await loginWithGoogle();
-                UI.toast('Sesión iniciada', 'success');
-                closeMenu();
+                const user = await loginWithGoogle();
+                if (user) {
+                    UI.toast('Sesión iniciada', 'success');
+                    closeMenu();
+                } else {
+                    UI.toast('Redirigiendo a Google…', 'info');
+                }
             } catch (e) {
                 console.error(e);
                 UI.toast('No se pudo iniciar sesión', 'error');
@@ -3417,6 +3421,7 @@ import { PopoutController } from './popoutController.js';
         // Apply permission-based visibility immediately to avoid PRO UI flicker.
         UI.updateMode();
 
+        await handleRedirectLoginResult().catch((e) => console.warn('Redirect login result failed:', e));
         await waitForAuthReady();
         AppState.setAuthenticatedUser(getCurrentUser());
         updateAuthHeader(getCurrentUser());

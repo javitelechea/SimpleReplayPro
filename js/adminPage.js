@@ -9,7 +9,7 @@ import {
     Timestamp,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { db } from './firebaseClient.js';
-import { loginWithGoogle, logout, onAuthChange, waitForAuthReady } from './auth.js';
+import { loginWithGoogle, handleRedirectLoginResult, logout, onAuthChange, waitForAuthReady } from './auth.js';
 import { toMillis } from './access.js';
 
 /** Reemplazá por tu cuenta de Google que actuará como admin. */
@@ -954,7 +954,7 @@ function wireUi() {
         setStatus('');
         try {
             const result = await loginWithGoogle();
-            console.log("LOGIN OK", result?.user?.email); // 👈 ESTA línea
+            console.log("LOGIN OK", result?.email || 'redirect');
         } catch (e) {
             console.error("LOGIN ERROR", e);
             setStatus(e.message || 'Error al iniciar sesión', true);
@@ -1023,6 +1023,7 @@ function applyAuthState(user) {
 
 async function main() {
     wireUi();
+    await handleRedirectLoginResult().catch((e) => console.warn('Redirect login result failed:', e));
     await waitForAuthReady();
     onAuthChange(applyAuthState);
 }

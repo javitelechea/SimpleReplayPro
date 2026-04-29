@@ -1,4 +1,4 @@
-import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { auth, db } from './firebaseClient.js';
 
@@ -56,9 +56,30 @@ async function ensureUserDoc(user) {
 
 export async function loginWithGoogle() {
     const provider = new GoogleAuthProvider();
-    const { user } = await signInWithPopup(auth, provider);
-    await ensureUserDoc(user);
-    return user;
+    try {
+        const { user } = await signInWithPopup(auth, provider);
+        await ensureUserDoc(user);
+        return user;
+    } catch (e) {
+        if (
+            e?.code === 'auth/popup-blocked' ||
+            e?.code === 'auth/cancelled-popup-request' ||
+            String(e?.message || '').includes('Cross-Origin-Opener-Policy')
+        ) {
+            await signInWithRedirect(auth, provider);
+            return null;
+        }
+        throw e;
+    }
+}
+
+export async function handleRedirectLoginResult() {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+        await ensureUserDoc(result.user);
+        return result.user;
+    }
+    return null;
 }
 
 export function logout() {
