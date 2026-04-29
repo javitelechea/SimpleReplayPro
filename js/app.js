@@ -465,6 +465,17 @@ import { PopoutController } from './popoutController.js';
             : 'Iniciá sesión para activar funciones PRO';
     }
 
+    function isLocalDevHost() {
+        const host = String(window.location.hostname || '').toLowerCase();
+        return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    }
+
+    function getDevProFeatureFlags() {
+        const flags = {};
+        for (const feature of Object.values(FEATURES)) flags[feature] = true;
+        return flags;
+    }
+
     function resetLiveProbe() {
         _liveProbeLastDuration = 0;
         _liveProbeLastTs = 0;
@@ -1208,7 +1219,9 @@ import { PopoutController } from './popoutController.js';
         }
         latestUserDoc = user ? await getUserDoc(user.uid) : null;
         updateAuthHeader(user);
-        AppState.setFeatureFlags(resolveFeaturesForUser(latestUserDoc));
+        AppState.setFeatureFlags(isLocalDevHost()
+            ? getDevProFeatureFlags()
+            : resolveFeaturesForUser(latestUserDoc));
         syncReadOnlyCapabilitiesClass();
         syncHeaderProFeatureStates();
         UI.updateMode();

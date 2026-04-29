@@ -73,8 +73,15 @@ async function loadMedia(payload) {
         return;
     }
 
-    if (payload.kind === 'local' && payload.file instanceof Blob) {
-        const url = URL.createObjectURL(payload.file);
+    const maybeFile = payload && payload.file;
+    const isBlobLike = !!(
+        maybeFile &&
+        typeof maybeFile === 'object' &&
+        typeof maybeFile.arrayBuffer === 'function' &&
+        typeof maybeFile.size === 'number'
+    );
+    if (payload.kind === 'local' && isBlobLike) {
+        const url = URL.createObjectURL(maybeFile);
         _currentObjectUrl = url;
         await player.loadVideo({ type: 'local', url });
         _hasMedia = true;
