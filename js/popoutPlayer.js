@@ -101,12 +101,21 @@ async function applySync(payload) {
         try { player.setPlaybackRate(payload.rate); } catch (_) { /* noop */ }
     }
     if (typeof payload.currentTime === 'number') {
-        try { player.seekTo(payload.currentTime); } catch (_) { /* noop */ }
+        try {
+            const current = player.getCurrentTime();
+            if (Math.abs(current - payload.currentTime) > 0.35) {
+                player.seekTo(payload.currentTime);
+            }
+        } catch (_) { /* noop */ }
     }
-    if (payload.isPlaying) {
-        try { player.play(); } catch (_) { /* noop */ }
-    } else {
-        try { player.pause(); } catch (_) { /* noop */ }
+    if (payload.isPlaying === true) {
+        try {
+            if (!player.isPlaying) player.play();
+        } catch (_) { /* noop */ }
+    } else if (payload.isPlaying === false) {
+        try {
+            if (player.isPlaying) player.pause();
+        } catch (_) { /* noop */ }
     }
     if (typeof payload.volume === 'number' || typeof payload.muted === 'boolean') {
         if (payload.muted === true) player.mute();

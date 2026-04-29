@@ -10,6 +10,7 @@ export const PopoutController = (() => {
     let _channel = null;
     let _popupWindow = null;
     let _watchTimer = null;
+    let _syncTimer = null;
     let _ready = false;
     let _activeListeners = new Set();
     let _lastMedia = null;
@@ -49,8 +50,10 @@ export const PopoutController = (() => {
             if (msg.type === 'ready') {
                 _ready = true;
                 _sendInitialSync();
+                _startContinuousSync();
             } else if (msg.type === 'closing') {
                 _ready = false;
+                _stopContinuousSync();
             } else if (msg.type === 'mirror' && _mirrorHandler) {
                 _mirrorHandler(msg.payload);
             }
@@ -64,6 +67,25 @@ export const PopoutController = (() => {
         if (!snapshot) return;
         _channel.postMessage({ type: 'sync', payload: snapshot });
         _lastMedia = snapshot.media || _lastMedia;
+    }
+
+    function _startContinuousSync() {
+        _stopContinuousSync();
+        _syncTimer = setInterval(() => {
+            if (!_ready || !_channel || !_provider || !isActive()) return;
+            const snapshot = _safe(() => _provider.getSnapshot());
+            if (!snapshot) return;
+            try {
+                _channel.postMessage({ type: 'sync', payload: snapshot });
+            } catch (_) { /* noop */ }
+        }, 700);
+    }
+
+    function _stopContinuousSync() {
+        if (_syncTimer) {
+            clearInterval(_syncTimer);
+            _syncTimer = null;
+        }
     }
 
     function _safe(fn) {
@@ -96,6 +118,7 @@ export const PopoutController = (() => {
             try { _popupWindow.close(); } catch (_) { /* noop */ }
         }
         _stopWatch();
+        _stopContinuousSync();
         _popupWindow = null;
         _ready = false;
         _emitState();
@@ -106,6 +129,7 @@ export const PopoutController = (() => {
         _watchTimer = setInterval(() => {
             if (_popupWindow && _popupWindow.closed) {
                 _stopWatch();
+                _stopContinuousSync();
                 _popupWindow = null;
                 _ready = false;
                 _emitState();
