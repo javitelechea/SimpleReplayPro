@@ -2398,6 +2398,7 @@ export const UI = (() => {
                 row: b.row === 'bottom' ? 'bottom' : 'top',
                 pre_sec: Number.isFinite(parseInt(b.pre_sec, 10)) ? parseInt(b.pre_sec, 10) : 3,
                 post_sec: Number.isFinite(parseInt(b.post_sec, 10)) ? parseInt(b.post_sec, 10) : 8,
+                captureMode: b.captureMode === 'manual' ? 'manual' : 'fixed',
                 hotkey: HOTKEY_OPTIONS.includes(hotkey) ? hotkey : '',
                 order: idx,
             };
@@ -2466,7 +2467,7 @@ export const UI = (() => {
                         <div class="bb-builder-card-title">${btn.label || 'Sin nombre'}</div>
                         <div class="bb-builder-card-meta">
                             <span class="bb-pill">-${btn.pre_sec ?? 3}s</span>
-                            <span class="bb-pill">+${btn.post_sec ?? 8}s</span>
+                            <span class="bb-pill">${btn.captureMode === 'manual' ? 'Manual' : `+${btn.post_sec ?? 8}s`}</span>
                             ${btn.hotkey ? `<span class="bb-pill">[${btn.hotkey}]</span>` : ''}
                         </div>
                     </div>
@@ -2522,6 +2523,7 @@ export const UI = (() => {
                         <span class="bb-editor-col-label">Nombre</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Pre</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Post</span>
+                        <span class="bb-editor-col-label bb-editor-col-label--center">Modo</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Equipo</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Atajo</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Añadir</span>
@@ -2530,10 +2532,16 @@ export const UI = (() => {
                         <input type="text" class="input bb-field-label-new" value="Nuevo" placeholder="Nombre" title="Nombre" />
                         <input type="number" class="input bb-field-pre-new" min="0" max="60" value="3" title="Pre (s)" />
                         <input type="number" class="input bb-field-post-new" min="0" max="60" value="8" title="Post (s)" />
-                        <select class="input bb-field-row-new" title="Equipo">
-                            <option value="top" ${_bbEditorCreateRow === 'top' ? 'selected' : ''}>Propio</option>
-                            <option value="bottom" ${_bbEditorCreateRow === 'bottom' ? 'selected' : ''}>Rival</option>
-                        </select>
+                        <div class="bb-toggle-group" data-target-input="bb-field-mode-new">
+                            <button type="button" class="bb-toggle-btn active" data-value="fixed">Fijo</button>
+                            <button type="button" class="bb-toggle-btn" data-value="manual">Manual</button>
+                        </div>
+                        <div class="bb-toggle-group" data-target-input="bb-field-row-new">
+                            <button type="button" class="bb-toggle-btn ${_bbEditorCreateRow === 'top' ? 'active' : ''}" data-value="top">Propio</button>
+                            <button type="button" class="bb-toggle-btn ${_bbEditorCreateRow === 'bottom' ? 'active' : ''}" data-value="bottom">Rival</button>
+                        </div>
+                        <input type="hidden" class="bb-field-mode-new" value="fixed" />
+                        <input type="hidden" class="bb-field-row-new" value="${_bbEditorCreateRow === 'bottom' ? 'bottom' : 'top'}" />
                         <button type="button" class="btn btn-xs bb-hotkey-capture bb-field-hotkey-new" data-hotkey="" title=""></button>
                         <button class="btn btn-xs btn-primary bb-field-create-inline" id="bb-builder-add-first" title="Crear botón">＋</button>
                     </div>
@@ -2549,18 +2557,48 @@ export const UI = (() => {
                 });
 
                 const addFirstBtn = detail.querySelector('#bb-builder-add-first');
+                const modeNewEl = detail.querySelector('.bb-field-mode-new');
+                const postNewEl = detail.querySelector('.bb-field-post-new');
+                const setToggleValue = (inputClass, value) => {
+                    const hidden = detail.querySelector('.' + inputClass);
+                    if (hidden) hidden.value = value;
+                    const group = detail.querySelector(`.bb-toggle-group[data-target-input="${inputClass}"]`);
+                    if (!group) return;
+                    group.querySelectorAll('.bb-toggle-btn').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.value === value);
+                    });
+                };
+                const syncNewPostEnabled = () => {
+                    if (!postNewEl || !modeNewEl) return;
+                    const isManual = modeNewEl.value === 'manual';
+                    postNewEl.disabled = isManual;
+                    postNewEl.readOnly = isManual;
+                    postNewEl.classList.toggle('is-disabled', isManual);
+                };
+                detail.querySelectorAll('.bb-toggle-group .bb-toggle-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const group = btn.closest('.bb-toggle-group');
+                        const inputClass = group?.dataset?.targetInput;
+                        if (!inputClass) return;
+                        setToggleValue(inputClass, btn.dataset.value || '');
+                        syncNewPostEnabled();
+                    });
+                });
+                syncNewPostEnabled();
                 if (addFirstBtn) {
                     addFirstBtn.addEventListener('click', () => {
                         const labelEl = detail.querySelector('.bb-field-label-new');
                         const preEl = detail.querySelector('.bb-field-pre-new');
                         const postEl = detail.querySelector('.bb-field-post-new');
+                        const modeEl = detail.querySelector('.bb-field-mode-new');
                         const rowEl = detail.querySelector('.bb-field-row-new');
                         const hkBtn = detail.querySelector('.bb-field-hotkey-new');
 
                         const label = (labelEl?.value || 'Nuevo').trim() || 'Nuevo';
                         const row = (rowEl?.value === 'bottom') ? 'bottom' : 'top';
+                        const captureMode = modeEl?.value === 'manual' ? 'manual' : 'fixed';
                         const pre = parseInt(preEl?.value, 10) || 3;
-                        const post = parseInt(postEl?.value, 10) || 8;
+                        const post = captureMode === 'manual' ? 0 : (parseInt(postEl?.value, 10) || 8);
                         const rawHk = String(hkBtn?.dataset.hotkey || '').trim().toUpperCase();
                         const hotkey = /^[A-Z]$/.test(rawHk) ? rawHk : '';
 
@@ -2571,6 +2609,7 @@ export const UI = (() => {
                             row,
                             pre_sec: pre,
                             post_sec: post,
+                            captureMode,
                             hotkey: HOTKEY_OPTIONS.includes(hotkey) ? hotkey : '',
                             order: _bbEditorModelRef.length,
                         });
@@ -2585,6 +2624,7 @@ export const UI = (() => {
                 const selectedLabel = selected.label || '';
                 const selectedPre = selected.pre_sec ?? 3;
                 const selectedPost = selected.post_sec ?? 8;
+                const selectedMode = selected.captureMode === 'manual' ? 'manual' : 'fixed';
                 const selectedRow = selected.row === 'bottom' ? 'bottom' : 'top';
 
                 const basePreviewBtnStyle = [
@@ -2618,6 +2658,7 @@ export const UI = (() => {
                         <span class="bb-editor-col-label">Nombre</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Pre</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Post</span>
+                        <span class="bb-editor-col-label bb-editor-col-label--center">Modo</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Equipo</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center">Atajo</span>
                         <span class="bb-editor-col-label bb-editor-col-label--center" aria-hidden="true"></span>
@@ -2626,10 +2667,16 @@ export const UI = (() => {
                         <input type="text" class="input bb-field-label" value="${selectedLabel}" placeholder="Nombre" title="Nombre" />
                         <input type="number" class="input bb-field-pre" min="0" max="60" value="${selectedPre}" title="Pre (s)" />
                         <input type="number" class="input bb-field-post" min="0" max="60" value="${selectedPost}" title="Post (s)" />
-                        <select class="input bb-field-row" title="Equipo">
-                            <option value="top" ${selectedRow === 'top' ? 'selected' : ''}>Propio</option>
-                            <option value="bottom" ${selectedRow === 'bottom' ? 'selected' : ''}>Rival</option>
-                        </select>
+                        <div class="bb-toggle-group" data-target-input="bb-field-mode">
+                            <button type="button" class="bb-toggle-btn ${selectedMode === 'fixed' ? 'active' : ''}" data-value="fixed">Fijo</button>
+                            <button type="button" class="bb-toggle-btn ${selectedMode === 'manual' ? 'active' : ''}" data-value="manual">Manual</button>
+                        </div>
+                        <div class="bb-toggle-group" data-target-input="bb-field-row">
+                            <button type="button" class="bb-toggle-btn ${selectedRow === 'top' ? 'active' : ''}" data-value="top">Propio</button>
+                            <button type="button" class="bb-toggle-btn ${selectedRow === 'bottom' ? 'active' : ''}" data-value="bottom">Rival</button>
+                        </div>
+                        <input type="hidden" class="bb-field-mode" value="${selectedMode}" />
+                        <input type="hidden" class="bb-field-row" value="${selectedRow}" />
                         <button type="button" class="btn btn-xs bb-hotkey-capture bb-field-hotkey" data-hotkey="" title=""></button>
                         <button type="button" class="btn btn-xs btn-outline bb-field-create-inline bb-field-update-inline" id="bb-builder-apply-edit" title="Actualizar">💾</button>
                     </div>
@@ -2643,9 +2690,26 @@ export const UI = (() => {
                 const inputLabel = detail.querySelector('.bb-field-label');
                 const inputPre = detail.querySelector('.bb-field-pre');
                 const inputPost = detail.querySelector('.bb-field-post');
+                const inputMode = detail.querySelector('.bb-field-mode');
                 const inputRow = detail.querySelector('.bb-field-row');
                 const hkEditBtn = detail.querySelector('.bb-field-hotkey');
                 const applyEditBtn = detail.querySelector('#bb-builder-apply-edit');
+                const syncPostEnabled = () => {
+                    if (!inputPost || !inputMode) return;
+                    const isManual = inputMode.value === 'manual';
+                    inputPost.disabled = isManual;
+                    inputPost.readOnly = isManual;
+                    inputPost.classList.toggle('is-disabled', isManual);
+                };
+                const setToggleValue = (inputClass, value) => {
+                    const hidden = detail.querySelector('.' + inputClass);
+                    if (hidden) hidden.value = value;
+                    const group = detail.querySelector(`.bb-toggle-group[data-target-input="${inputClass}"]`);
+                    if (!group) return;
+                    group.querySelectorAll('.bb-toggle-btn').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.value === value);
+                    });
+                };
 
                 if (inputLabel) {
                     inputLabel.addEventListener('input', () => {
@@ -2666,12 +2730,23 @@ export const UI = (() => {
                         renderBBEditorButtons(_bbEditorModelRef, containerId);
                     });
                 }
-                if (inputRow) {
-                    inputRow.addEventListener('change', () => {
-                        selected.row = inputRow.value === 'bottom' ? 'bottom' : 'top';
+                detail.querySelectorAll('.bb-toggle-group .bb-toggle-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const group = btn.closest('.bb-toggle-group');
+                        const inputClass = group?.dataset?.targetInput;
+                        if (!inputClass) return;
+                        setToggleValue(inputClass, btn.dataset.value || '');
+                        if (inputClass === 'bb-field-mode') {
+                            selected.captureMode = inputMode.value === 'manual' ? 'manual' : 'fixed';
+                            if (selected.captureMode === 'manual') selected.post_sec = 0;
+                            syncPostEnabled();
+                        } else if (inputClass === 'bb-field-row') {
+                            selected.row = inputRow.value === 'bottom' ? 'bottom' : 'top';
+                        }
                         renderBBEditorButtons(_bbEditorModelRef, containerId);
                     });
-                }
+                });
+                syncPostEnabled();
                 bindButtonboardHotkeyCapture(hkEditBtn, {
                     getValue: () => selected.hotkey || '',
                     setValue: (v) => {

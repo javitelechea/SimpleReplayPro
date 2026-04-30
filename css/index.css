@@ -5098,7 +5098,7 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   grid-template-columns: minmax(120px, 2fr) 64px 64px 100px 108px;
 }
 .bb-editor-inline--with-create {
-  grid-template-columns: minmax(120px, 2fr) 64px 64px 100px 108px 34px;
+  grid-template-columns: minmax(120px, 2fr) 64px 64px 90px 100px 108px 34px;
 }
 .bb-editor-column-labels {
   align-items: end;
@@ -5132,6 +5132,40 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
 .bb-editor-inline .bb-field-pre,
 .bb-editor-inline .bb-field-post {
   text-align: center;
+}
+
+.bb-editor-inline .bb-field-post.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.bb-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+  height: 28px;
+}
+.bb-toggle-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0 8px;
+  height: 100%;
+  cursor: pointer;
+}
+.bb-toggle-btn.active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-tertiary) 78%);
+  color: var(--text-primary);
+}
+.bb-toggle-btn.active[data-value="manual"],
+.bb-toggle-btn.active[data-value="bottom"] {
+  background: color-mix(in srgb, var(--danger) 24%, var(--bg-tertiary) 76%);
+  color: #ffd7d7;
 }
 .bb-editor-inline .bb-field-create-inline {
   min-width: 0;
