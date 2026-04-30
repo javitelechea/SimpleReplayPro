@@ -781,6 +781,15 @@ export const AppState = (() => {
     const data = await FirebaseData.loadProject(projectId);
     if (!data) return false;
 
+    // If we were browsing a collection, leave that context before loading a project.
+    // Otherwise the UI can stay in collection-only mode and hide Analyze.
+    const hadActiveCollection = !!state.activeCollection;
+    if (hadActiveCollection) {
+      state.activeCollection = null;
+      state.activeCollectionItemIdx = -1;
+      emit('collectionClosed');
+    }
+
     state.localVideoFile = null;
     state.currentProjectId = projectId;
     state.games = data.games || [];
