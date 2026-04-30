@@ -104,6 +104,12 @@ export const UI = (() => {
         duda: 'Duda',
         importante: 'Importante'
     };
+    const FLAG_SHORTCUTS = {
+        bueno: '1',
+        acorregir: '2',
+        duda: '3',
+        importante: '4'
+    };
 
     // ── Helpers ──
     function formatTime(sec) {
@@ -315,7 +321,7 @@ export const UI = (() => {
                 const currentFlags = AppState.getClipUserFlags(clipId);
                 popover.innerHTML = allFlags.map(flag => {
                     const isActive = currentFlags.includes(flag);
-                    return `<button class="flag-popover-btn${isActive ? ' active' : ''}" data-clip-id="${clipId}" data-flag="${flag}" title="${FLAG_LABELS[flag]}">${FLAG_EMOJI[flag]}</button>`;
+                    return `<button class="flag-popover-btn${isActive ? ' active' : ''}" data-clip-id="${clipId}" data-flag="${flag}" title="${FLAG_LABELS[flag]} [${FLAG_SHORTCUTS[flag]}]">${FLAG_EMOJI[flag]}</button>`;
                 }).join('');
                 btn.parentElement.style.position = 'relative';
                 btn.parentElement.appendChild(popover);
@@ -1305,6 +1311,10 @@ export const UI = (() => {
                 // Initialize flag buttons state
                 const flags = AppState.getClipUserFlags(currentClipId);
                 $$('.flag-btn-mini').forEach(btn => {
+                    const flag = btn.dataset.flag;
+                    if (flag && FLAG_LABELS[flag]) {
+                        btn.title = `${FLAG_LABELS[flag]} [${FLAG_SHORTCUTS[flag] || ''}]`.trim();
+                    }
                     if (flags.includes(btn.dataset.flag)) {
                         btn.classList.add('active');
                     } else {

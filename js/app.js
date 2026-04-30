@@ -3092,6 +3092,19 @@ import { PopoutController } from './popoutController.js';
     // KEYBOARD SHORTCUTS
     // ═══════════════════════════════════════
 
+    // Mouse clicks should not leave buttons focused (prevents Space re-triggering
+    // the last clicked action button, e.g. flags).
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        // detail > 0 => pointer-generated click (mouse/touch), keyboard clicks are usually 0.
+        if (e.detail > 0) {
+            setTimeout(() => {
+                if (document.activeElement === btn) btn.blur();
+            }, 0);
+        }
+    });
+
     document.addEventListener('keydown', (e) => {
         const bbModal = $('#modal-buttonboards');
         const isBBModalOpen = !!(bbModal && !bbModal.classList.contains('hidden'));
