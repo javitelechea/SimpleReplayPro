@@ -478,10 +478,28 @@ export const AppState = (() => {
   }
 
   // ── Collection view (cross-project) ──
-  function openCollection(colData) {
+  /**
+   * @param {object} colData
+   * @param {{ clearProject?: boolean }} [options] — default: clear project and enter view (like opening another context)
+   */
+  function openCollection(colData, options = {}) {
+    const shouldClear = options.clearProject !== false;
+    if (shouldClear) {
+      clearProject();
+      DemoData.clear();
+      state.tagTypes = DemoData.getTagTypes();
+      emit('tagTypesUpdated', state.tagTypes);
+      emit('buttonboardsChanged', state.activeButtonboards);
+      setMode('view');
+    }
     state.activeCollection = colData;
-    state.activeCollectionItemIdx = -1;
+    if (shouldClear) {
+      state.activeCollectionItemIdx = -1;
+    }
     emit('collectionOpened', colData);
+    if (shouldClear && colData.items && colData.items.length > 0) {
+      setCollectionItemIndex(0);
+    }
   }
 
   function closeCollection() {
@@ -609,6 +627,7 @@ export const AppState = (() => {
     state.activePlaylistId = null;
     state.filterFlags = [];
     state.currentProjectId = null;
+    state.editKey = null;
     state.activeButtonboards = [];
     emit('gameChanged', null);
   }

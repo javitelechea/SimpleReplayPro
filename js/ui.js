@@ -1742,7 +1742,12 @@ export const UI = (() => {
 
     // ═══ MODE & PANELS ═══
     function updateMode() {
-        const mode = AppState.get('mode');
+        const inCollection = !!AppState.get('activeCollection');
+        let mode = AppState.get('mode');
+        if (inCollection && mode === 'analyze') {
+            AppState.setMode('view');
+            return;
+        }
         const btnAnalyze = $('#btn-mode-analyze');
         const btnView = $('#btn-mode-view');
         const btnShareTab = $('#btn-mode-share');
@@ -1760,8 +1765,11 @@ export const UI = (() => {
         const navPrev = $('#btn-prev-clip');
         const navNext = $('#btn-next-clip');
 
-        btnAnalyze.classList.toggle('active', mode === 'analyze');
-        btnView.classList.toggle('active', mode === 'view');
+        if (btnAnalyze) {
+            btnAnalyze.style.display = inCollection ? 'none' : '';
+            btnAnalyze.classList.toggle('active', mode === 'analyze');
+        }
+        if (btnView) btnView.classList.toggle('active', mode === 'view');
         if (btnShareTab) {
             btnShareTab.classList.toggle('active', mode === 'share');
             btnShareTab.style.display = 'inline-flex';
@@ -1801,15 +1809,21 @@ export const UI = (() => {
             if (navNext) navNext.style.display = 'none';
             renderSharePanel();
         }
+        document.body.classList.toggle('collection-only-mode', inCollection);
         updateClipEditControls();
 
-        // Slider animation
+        // Slider animation (2 botones: Ver+Compartir, sin Analizar)
         if (slider) {
-            slider.classList.toggle('right', mode === 'view');
-            if (slider.classList) {
-                slider.classList.toggle('right2', mode === 'share');
-                if (mode === 'share') slider.classList.remove('right');
-                if (mode !== 'view' && mode !== 'share') slider.classList.remove('right', 'right2');
+            if (inCollection) {
+                slider.classList.toggle('right', mode === 'share');
+                slider.classList.remove('right2');
+            } else {
+                slider.classList.toggle('right', mode === 'view');
+                if (slider.classList) {
+                    slider.classList.toggle('right2', mode === 'share');
+                    if (mode === 'share') slider.classList.remove('right');
+                    if (mode !== 'view' && mode !== 'share') slider.classList.remove('right', 'right2');
+                }
             }
         }
         // Exit focus when switching to analyze
@@ -1826,7 +1840,9 @@ export const UI = (() => {
             mobileModeTrigger.setAttribute('aria-expanded', 'false');
         }
         if (mobileModeMenu && isReadOnly) mobileModeMenu.hidden = true;
-        if (mobileAnalyzeItem) mobileAnalyzeItem.style.display = isReadOnly ? 'none' : 'block';
+        if (mobileAnalyzeItem) {
+            mobileAnalyzeItem.style.display = (isReadOnly || inCollection) ? 'none' : 'block';
+        }
         if (mobileViewItem) mobileViewItem.style.display = 'block';
         if (mobileShareItem) mobileShareItem.style.display = isReadOnly ? 'none' : 'block';
         if (mobileModeLabel && isReadOnly) {
@@ -1921,7 +1937,8 @@ export const UI = (() => {
     // ═══ OVERLAY (no game) ═══
     function updateNoGameOverlay() {
         const overlay = $('#no-game-overlay');
-        const hasGame = !!AppState.get('currentGameId');
+        const inCollection = !!AppState.get('activeCollection');
+        const hasGame = !!AppState.get('currentGameId') || inCollection;
         overlay.classList.toggle('hidden', hasGame);
         const chrome = $('#player-chrome');
         if (chrome) chrome.classList.toggle('hidden', !hasGame);

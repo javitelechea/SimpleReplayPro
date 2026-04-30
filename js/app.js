@@ -1450,13 +1450,25 @@ import { PopoutController } from './popoutController.js';
 
     // ── Collection events ──
     AppState.on('collectionOpened', () => {
-        AppState.setMode('view');
+        // openCollection() ya fija modo Ver; limpiar URL de proyecto como al cambiar de contexto
+        const u = new URL(window.location.href);
+        u.searchParams.delete('project');
+        u.searchParams.delete('game');
+        u.searchParams.delete('playlist');
+        u.searchParams.delete('editKey');
+        u.searchParams.set('mode', 'view');
+        const qs = u.searchParams.toString();
+        history.replaceState({}, '', u.pathname + (qs ? `?${qs}` : '') + u.hash);
         UI.updateCollectionBar();
+        UI.updateNoGameOverlay();
+        UI.updateMode();
         UI.renderViewClips();
     });
 
     AppState.on('collectionClosed', () => {
         UI.updateCollectionBar();
+        UI.updateNoGameOverlay();
+        UI.updateMode();
         UI.renderViewClips();
     });
 
@@ -1527,7 +1539,10 @@ import { PopoutController } from './popoutController.js';
     // ═══════════════════════════════════════
 
     // Mode toggle
-    $('#btn-mode-analyze').addEventListener('click', () => AppState.setMode('analyze'));
+    $('#btn-mode-analyze')?.addEventListener('click', () => {
+        if (AppState.get('activeCollection')) return;
+        AppState.setMode('analyze');
+    });
     $('#btn-mode-view').addEventListener('click', () => AppState.setMode('view'));
     const btnModeShare = $('#btn-mode-share');
     if (btnModeShare) {
@@ -2918,8 +2933,8 @@ import { PopoutController } from './popoutController.js';
         const name = prompt('Nuevo nombre:', col.name);
         if (!name?.trim()) return;
         const updated = { ...col, name: name.trim() };
-        AppState.openCollection(updated);
         await FirebaseData.saveCollection(col.id, updated);
+        AppState.openCollection(updated, { clearProject: false });
         UI.toast('Colección renombrada', 'success');
     });
 

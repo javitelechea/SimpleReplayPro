@@ -1066,6 +1066,18 @@ select {
   transform: translateX(200%);
 }
 
+/* Colección activa: solo Ver + Compartir (Analizar oculto) */
+body.collection-only-mode .mode-toggle {
+  min-width: 180px;
+}
+body.collection-only-mode .mode-btn#btn-mode-view,
+body.collection-only-mode .mode-btn#btn-mode-share {
+  width: 50%;
+}
+body.collection-only-mode .mode-slider {
+  width: calc(50% - 3px);
+}
+
 .mode-icon {
   font-size: 0.9rem;
 }
