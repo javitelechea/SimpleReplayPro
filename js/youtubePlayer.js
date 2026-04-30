@@ -15,10 +15,16 @@ export const YTPlayer = (() => {
     let _clipAutoPaused = false;
     let _lastMedia = null;
     let _commandListener = null;
+    let _suppressMirrorEchoUntil = 0;
 
     function _emit(type, payload) {
         if (!_commandListener) return;
+        if (Date.now() < _suppressMirrorEchoUntil) return;
         try { _commandListener(type, payload); } catch (_) { /* noop */ }
+    }
+
+    function _armMirrorEchoSuppression(ms = 650) {
+        _suppressMirrorEchoUntil = Math.max(_suppressMirrorEchoUntil, Date.now() + ms);
     }
 
     function setCommandListener(fn) {
@@ -253,6 +259,9 @@ export const YTPlayer = (() => {
     /** Apply play/pause/seek from the popout window (bypasses duplicate _emit). */
     function mirrorRemotePlayback(payload) {
         if (!_ready || !_videoPlayer || !payload || !payload.action) return;
+        if (payload.action === 'play' || payload.action === 'pause' || payload.action === 'seek') {
+            _armMirrorEchoSuppression(800);
+        }
         const apply = () => {
             if (payload.action === 'seek' && typeof payload.time === 'number') {
                 _videoPlayer.seekTo(payload.time);

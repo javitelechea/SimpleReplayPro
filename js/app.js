@@ -3728,7 +3728,7 @@ import { PopoutController } from './popoutController.js';
             if (xml) {
                 const game = AppState.getCurrentGame();
                 const title = game && game.title ? game.title : 'SimpleReplay';
-                const filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_SportCode.xml`;
+                const filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.xml`;
                 ExportManager.download(xml, filename);
             } else {
                 UI.toast('No hay proyecto activo para exportar', 'error');
