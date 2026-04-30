@@ -247,6 +247,7 @@ export const DemoData = (() => {
             row: data.row || 'top',
             pre_sec: data.pre_sec || 3,
             post_sec: data.post_sec || 8,
+            captureMode: data.captureMode === 'manual' ? 'manual' : 'fixed',
             order: data.order || maxOrder + 1
         };
         tagTypes.push(tag);

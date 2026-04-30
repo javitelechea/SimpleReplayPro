@@ -314,10 +314,17 @@
             <input id="edit-tag-pre" type="number" class="input-sm tag-edit-num" min="0" max="30" />
             <label class="editor-lbl">Post</label>
             <input id="edit-tag-post" type="number" class="input-sm tag-edit-num" min="0" max="30" />
-            <select id="edit-tag-row" class="input-sm tag-edit-row-select">
-              <option value="top">Propio</option>
-              <option value="bottom">Rival</option>
-            </select>
+            <label class="editor-lbl">Modo</label>
+            <div class="tag-editor-toggle-group" data-target-input="edit-tag-capture-mode" role="group" aria-label="Modo de captura">
+              <button type="button" class="tag-editor-toggle-btn active" data-value="fixed">Fijo</button>
+              <button type="button" class="tag-editor-toggle-btn" data-value="manual">Manual</button>
+            </div>
+            <div class="tag-editor-toggle-group" data-target-input="edit-tag-row" role="group" aria-label="Equipo">
+              <button type="button" class="tag-editor-toggle-btn active" data-value="top">Propio</button>
+              <button type="button" class="tag-editor-toggle-btn" data-value="bottom">Rival</button>
+            </div>
+            <input id="edit-tag-capture-mode" type="hidden" value="fixed" />
+            <input id="edit-tag-row" type="hidden" value="top" />
             <button id="btn-save-tag" class="btn btn-xs btn-primary">Guardar</button>
             <button id="btn-delete-tag" class="btn btn-xs btn-danger">🗑️</button>
             <button id="btn-cancel-tag-edit" class="btn btn-xs btn-ghost">✕</button>

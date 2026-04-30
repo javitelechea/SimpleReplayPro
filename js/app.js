@@ -3154,6 +3154,15 @@ import { PopoutController } from './popoutController.js';
                 return;
             }
         }
+        if (e.key === 'Escape' && AppState.get('mode') === 'analyze' && typeof AppState.cancelOpenManualClips === 'function') {
+            const cancelled = AppState.cancelOpenManualClips();
+            if (cancelled > 0) {
+                e.preventDefault();
+                UI.toast(`${cancelled} evento${cancelled > 1 ? 's' : ''} manual${cancelled > 1 ? 'es' : ''} cancelado${cancelled > 1 ? 's' : ''}`, 'info');
+                if (typeof UI.renderTagButtons === 'function') UI.renderTagButtons();
+                return;
+            }
+        }
         // Mientras el editor/modal de ventanas de código está abierto, no ejecutar atajos globales.
         if (isBBModalOpen) return;
 

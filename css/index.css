@@ -1872,9 +1872,45 @@ body.collection-only-mode .mode-slider {
   text-align: center;
 }
 
+.tag-edit-num.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .tag-edit-row-select {
   padding: 3px 4px;
   font-size: 0.75rem;
+}
+
+.tag-editor-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+
+.tag-editor-toggle-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.tag-editor-toggle-btn.active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-tertiary) 78%);
+  color: var(--text-primary);
+}
+
+.tag-editor-toggle-btn.active[data-value="manual"],
+.tag-editor-toggle-btn.active[data-value="bottom"] {
+  background: color-mix(in srgb, var(--danger) 24%, var(--bg-tertiary) 76%);
+  color: #ffd7d7;
 }
 
 .clip-edit-group {
@@ -2230,6 +2266,33 @@ body.collection-only-mode .mode-slider {
 
 .tag-btn.tag-flash {
   animation: tagFlash 0.5s ease;
+}
+
+.tag-btn-manual {
+  padding-right: 20px;
+}
+
+.tag-manual-dot {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-muted) 72%, transparent);
+  opacity: 0.95;
+}
+
+.tag-btn-manual-open {
+  background: color-mix(in srgb, var(--accent) 28%, var(--bg-tertiary) 72%);
+  border-color: color-mix(in srgb, var(--accent) 66%, var(--border) 34%);
+  color: #ffffff;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent), 0 8px 20px rgba(0, 0, 0, 0.26);
+}
+
+.tag-btn-manual-open .tag-manual-dot {
+  background: #ff5f7f;
+  box-shadow: 0 0 0 4px rgba(255, 95, 127, 0.18);
 }
 
 @keyframes tagFlash {

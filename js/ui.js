@@ -148,10 +148,32 @@ export const UI = (() => {
     let _tagEditMode = false;
     let _editingTagId = null;
 
+    function _setTagEditorToggleValue(inputId, value) {
+        const input = $('#' + inputId);
+        if (!input) return;
+        input.value = value;
+        const group = document.querySelector(`.tag-editor-toggle-group[data-target-input="${inputId}"]`);
+        if (!group) return;
+        group.querySelectorAll('.tag-editor-toggle-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === value);
+        });
+    }
+
+    function _syncTagEditorFieldState() {
+        const mode = $('#edit-tag-capture-mode')?.value || 'fixed';
+        const postInput = $('#edit-tag-post');
+        if (!postInput) return;
+        const isManual = mode === 'manual';
+        postInput.disabled = isManual;
+        postInput.classList.toggle('is-disabled', isManual);
+        postInput.title = isManual ? 'En modo manual, el evento se cierra tocando el botón de nuevo' : '';
+    }
+
     function renderTagButtons() {
         const containerTop = $('#tag-buttons-a');
         const containerBottom = $('#tag-buttons-b');
         const tags = AppState.get('tagTypes');
+        const openManualTagIds = new Set(AppState.getOpenManualTagIds ? AppState.getOpenManualTagIds() : []);
         containerTop.innerHTML = '';
         containerBottom.innerHTML = '';
 
@@ -164,6 +186,8 @@ export const UI = (() => {
         function createTagBtn(tag) {
             const btn = document.createElement('button');
             const isRival = tag.row === 'bottom';
+            const captureMode = tag.captureMode === 'manual' ? 'manual' : 'fixed';
+            const isManualOpen = captureMode === 'manual' && openManualTagIds.has(tag.id);
             let hotkey = '';
             const customHotkey = String(tag.hotkey || '').trim().toUpperCase();
 
@@ -181,19 +205,28 @@ export const UI = (() => {
             btn.className = 'tag-btn' + (isRival ? ' tag-btn-rival' : '') +
                 (tag.id === 'tag-start' ? ' tag-btn-small' : '') +
                 (_tagEditMode ? ' tag-edit-mode' : '') +
-                (_editingTagId === tag.id ? ' tag-editing' : '');
+                (_editingTagId === tag.id ? ' tag-editing' : '') +
+                (captureMode === 'manual' ? ' tag-btn-manual' : '') +
+                (isManualOpen ? ' tag-btn-manual-open' : '');
             btn.dataset.tagId = tag.id;
+            btn.dataset.captureMode = captureMode;
 
             if (hotkey) {
-                btn.innerHTML = `<span>${tag.label}</span><span class="tag-hotkey-hint" style="font-size:0.65rem; opacity:0.6; margin-left:4px;">[${hotkey}]</span>`;
+                btn.innerHTML = `<span class="tag-label-main">${tag.label}</span><span class="tag-hotkey-hint" style="font-size:0.65rem; opacity:0.6; margin-left:4px;">[${hotkey}]</span>`;
                 btn.dataset.hotkey = hotkey.toLowerCase();
             } else {
-                btn.textContent = tag.label;
+                btn.innerHTML = `<span class="tag-label-main">${tag.label}</span>`;
+            }
+            if (captureMode === 'manual') {
+                const dot = document.createElement('span');
+                dot.className = 'tag-manual-dot';
+                dot.setAttribute('aria-hidden', 'true');
+                btn.appendChild(dot);
             }
 
             btn.title = _tagEditMode
                 ? `Click para editar "${tag.label}"`
-                : `${tag.label} — Pre: ${tag.pre_sec}s | Post: ${tag.post_sec}s${hotkey ? ` | Hotkey: ${hotkey}` : ''}`;
+                : `${tag.label} — ${captureMode === 'manual' ? 'Modo Manual' : 'Modo Fijo'} — Pre: ${tag.pre_sec}s | Post: ${tag.post_sec}s${hotkey ? ` | Hotkey: ${hotkey}` : ''}`;
 
             btn.addEventListener('click', () => {
                 if (_tagEditMode) {
@@ -206,6 +239,19 @@ export const UI = (() => {
                     return;
                 }
                 const tSec = Math.round(YTPlayer.getCurrentTime());
+                if (captureMode === 'manual') {
+                    const result = AppState.toggleManualClip ? AppState.toggleManualClip(tag.id, tSec) : null;
+                    if (!result?.clip) return;
+                    btn.classList.add('tag-flash');
+                    setTimeout(() => btn.classList.remove('tag-flash'), 300);
+                    if (result.action === 'opened') {
+                        toast(`Manual iniciado: ${tag.label} @ ${formatTime(tSec)}`, 'success');
+                    } else {
+                        toast(`Manual cerrado: ${tag.label} @ ${formatTime(tSec)}`, 'success');
+                    }
+                    renderTagButtons();
+                    return;
+                }
                 const clip = AppState.addClip(tag.id, tSec);
                 if (clip) {
                     btn.classList.add('tag-flash');
@@ -2052,7 +2098,9 @@ export const UI = (() => {
         $('#edit-tag-label').value = tag ? tag.label : '';
         $('#edit-tag-pre').value = tag ? tag.pre_sec : 3;
         $('#edit-tag-post').value = tag ? tag.post_sec : 8;
-        $('#edit-tag-row').value = tag ? tag.row : (defaultRow || 'top');
+        _setTagEditorToggleValue('edit-tag-capture-mode', (tag && tag.captureMode === 'manual') ? 'manual' : 'fixed');
+        _setTagEditorToggleValue('edit-tag-row', tag ? tag.row : (defaultRow || 'top'));
+        _syncTagEditorFieldState();
 
         // Show/hide delete button
         $('#btn-delete-tag').style.display = isNewTag ? 'none' : 'inline-flex';
@@ -2076,15 +2124,17 @@ export const UI = (() => {
         const label = $('#edit-tag-label').value.trim();
         if (!label) { toast('Ingresá un nombre', 'error'); return; }
         const pre_sec = parseInt($('#edit-tag-pre').value, 10) || 3;
-        const post_sec = parseInt($('#edit-tag-post').value, 10) || 8;
+        const rawPost = parseInt($('#edit-tag-post').value, 10) || 8;
+        const captureMode = $('#edit-tag-capture-mode').value === 'manual' ? 'manual' : 'fixed';
+        const post_sec = captureMode === 'manual' ? 0 : rawPost;
         const row = $('#edit-tag-row').value;
 
         if (_editingTagId === '__new__') {
             const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-            AppState.addTagType({ key, label, row, pre_sec, post_sec });
+            AppState.addTagType({ key, label, row, pre_sec, post_sec, captureMode });
             toast(`Tag creado: ${label}`, 'success');
         } else {
-            AppState.updateTagType(_editingTagId, { label, pre_sec, post_sec, row });
+            AppState.updateTagType(_editingTagId, { label, pre_sec, post_sec, row, captureMode });
             toast(`Tag actualizado: ${label}`, 'success');
         }
         closeTagInlineEditor();
@@ -2098,6 +2148,17 @@ export const UI = (() => {
         }
         closeTagInlineEditor();
     }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tag-editor-toggle-btn');
+        if (!btn) return;
+        const group = btn.closest('.tag-editor-toggle-group');
+        if (!group) return;
+        const inputId = group.dataset.targetInput;
+        if (!inputId) return;
+        _setTagEditorToggleValue(inputId, btn.dataset.value || '');
+        if (inputId === 'edit-tag-capture-mode') _syncTagEditorFieldState();
+    });
 
     // ═══ CLIP VIEW TOOLBAR BUTTONS ═══
     document.addEventListener('click', (e) => {

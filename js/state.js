@@ -244,6 +244,73 @@ export const AppState = (() => {
     return clip;
   }
 
+  function getOpenManualClips() {
+    return (state.clips || []).filter(c => c && c.is_manual === true && c.is_open === true);
+  }
+
+  function getOpenManualTagIds() {
+    return getOpenManualClips().map(c => c.tag_type_id);
+  }
+
+  function toggleManualClip(tagTypeId, tSec) {
+    const tag = getTagType(tagTypeId);
+    if (!tag) return null;
+    const nowSec = Math.max(0, Number.isFinite(tSec) ? tSec : 0);
+    const openClip = (state.clips || []).find(c =>
+      c &&
+      c.tag_type_id === tagTypeId &&
+      c.is_manual === true &&
+      c.is_open === true
+    );
+    if (openClip) {
+      const closeSec = Math.max(nowSec, openClip.start_sec + 0.1);
+      DemoData.updateClip(openClip.id, {
+        t_sec: closeSec,
+        end_sec: closeSec,
+        is_open: false,
+        is_draft_manual: false,
+      });
+      openClip.t_sec = closeSec;
+      openClip.end_sec = closeSec;
+      openClip.is_open = false;
+      openClip.is_draft_manual = false;
+      emit('clipsUpdated', state.clips);
+      return { action: 'closed', clip: openClip };
+    }
+    const startSec = Math.max(0, nowSec - (Number(tag.pre_sec) || 0));
+    const draftEndSec = Math.max(startSec + 0.1, nowSec);
+    const clip = DemoData.createClip(state.currentGameId, tagTypeId, nowSec, startSec, draftEndSec, state.userId);
+    clip.is_manual = true;
+    clip.is_open = true;
+    clip.is_draft_manual = true;
+    DemoData.updateClip(clip.id, {
+      is_manual: true,
+      is_open: true,
+      is_draft_manual: true,
+    });
+    state.clips = DemoData.getClipsForGame(state.currentGameId);
+    state.clipFlags[clip.id] = [];
+    emit('clipsUpdated', state.clips);
+    return { action: 'opened', clip };
+  }
+
+  function cancelOpenManualClips() {
+    const openClips = getOpenManualClips();
+    if (!openClips.length) return 0;
+    openClips.forEach(c => {
+      DemoData.deleteClip(c.id);
+      delete state.clipFlags[c.id];
+    });
+    state.clips = DemoData.getClipsForGame(state.currentGameId);
+    if (state.currentClipId && !state.clips.find(c => c.id === state.currentClipId)) {
+      state.currentClipId = null;
+      state.currentClipIndex = -1;
+    }
+    emit('clipsUpdated', state.clips);
+    emit('clipChanged', getCurrentClip());
+    return openClips.length;
+  }
+
   function updateClipBounds(clipId, field, delta) {
     const clip = state.clips.find(c => c.id === clipId);
     if (!clip) return;
@@ -1117,7 +1184,7 @@ export const AppState = (() => {
     on, off, get, set: (k, v) => { state[k] = v; },
     getCurrentGame, getLocalVideoFile, setLocalVideoFile, getCurrentClip, getTagType, getTagTypesForFilter, getFilteredClips, getClipUserFlags,
     setMode, setCurrentGame, setCurrentClip,
-    addGame, addClip, updateClipBounds, updateClipAbsoluteBounds, deleteClip,
+    addGame, addClip, toggleManualClip, cancelOpenManualClips, getOpenManualTagIds, updateClipBounds, updateClipAbsoluteBounds, deleteClip,
     addPlaylist, addClipToPlaylist, removeClipFromPlaylist, renamePlaylist, deletePlaylist, reorderPlaylist,
     toggleFlag, toggleTagFilter, removeTagFilter, clearTagFilters, clearAllFilters,
     setPlaylistFilter, clearPlaylistFilter, toggleFilterFlag, clearFilterFlags,
