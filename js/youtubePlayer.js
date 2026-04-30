@@ -253,19 +253,28 @@ export const YTPlayer = (() => {
     /** Apply play/pause/seek from the popout window (bypasses duplicate _emit). */
     function mirrorRemotePlayback(payload) {
         if (!_ready || !_videoPlayer || !payload || !payload.action) return;
-        if (payload.action === 'seek' && typeof payload.time === 'number') {
-            _videoPlayer.seekTo(payload.time);
-        } else if (payload.action === 'play') {
-            _videoPlayer.play();
-        } else if (payload.action === 'pause') {
-            _videoPlayer.pause();
-        } else if (payload.action === 'volume') {
-            if (payload.muted === true) _videoPlayer.mute();
-            else if (payload.muted === false) _videoPlayer.unMute();
-            if (typeof payload.volume === 'number') {
-                _videoPlayer.setVolume(payload.volume);
-                if (payload.volume > 0 && _videoPlayer.isMuted()) _videoPlayer.unMute();
+        const apply = () => {
+            if (payload.action === 'seek' && typeof payload.time === 'number') {
+                _videoPlayer.seekTo(payload.time);
+            } else if (payload.action === 'play') {
+                _videoPlayer.play();
+            } else if (payload.action === 'pause') {
+                _videoPlayer.pause();
+            } else if (payload.action === 'volume') {
+                if (payload.muted === true) _videoPlayer.mute();
+                else if (payload.muted === false) _videoPlayer.unMute();
+                if (typeof payload.volume === 'number') {
+                    _videoPlayer.setVolume(payload.volume);
+                    if (payload.volume > 0 && _videoPlayer.isMuted()) _videoPlayer.unMute();
+                }
             }
+        };
+        // Prevent main<->popout feedback loop:
+        // remote playback commands should not emit playback activity back to popout.
+        if (typeof _videoPlayer.playbackSilenced === 'function') {
+            _videoPlayer.playbackSilenced(async () => { apply(); });
+        } else {
+            apply();
         }
     }
 
