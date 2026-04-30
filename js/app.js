@@ -1450,13 +1450,14 @@ import { PopoutController } from './popoutController.js';
 
     // ── Collection events ──
     AppState.on('collectionOpened', () => {
-        // openCollection() ya fija modo Ver; limpiar URL de proyecto como al cambiar de contexto
+        // openCollection() ya fija modo Ver en AppState. No usar ?mode=view en la URL: se confunde
+        // con enlaces de solo lectura (modal proyectos, etc.); el modo real va solo en estado.
         const u = new URL(window.location.href);
         u.searchParams.delete('project');
         u.searchParams.delete('game');
         u.searchParams.delete('playlist');
         u.searchParams.delete('editKey');
-        u.searchParams.set('mode', 'view');
+        u.searchParams.delete('mode');
         const qs = u.searchParams.toString();
         history.replaceState({}, '', u.pathname + (qs ? `?${qs}` : '') + u.hash);
         UI.updateCollectionBar();
@@ -2288,7 +2289,8 @@ import { PopoutController } from './popoutController.js';
     // ═══ PROJECTS LIST ═══
     async function openProjectsModal() {
         const urlParams = new URLSearchParams(window.location.search);
-        const isReadOnly = urlParams.get('mode') === 'view';
+        // Solo bloqueo de lectura: enlaces compartidos (típ. ?project=...&mode=view), no la vista Ver normal ni colección
+        const isReadOnly = urlParams.get('mode') === 'view' && (!!urlParams.get('project') || !!urlParams.get('playlist'));
         if (isReadOnly) {
             UI.toast('El explorador de proyectos no está disponible en modo lectura', 'info');
             return;
