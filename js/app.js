@@ -1464,6 +1464,7 @@ import { PopoutController } from './popoutController.js';
         UI.updateNoGameOverlay();
         UI.updateMode();
         UI.renderViewClips();
+        if (AppState.get('mode') === 'share') UI.renderSharePanel();
     });
 
     AppState.on('collectionClosed', () => {
@@ -1471,6 +1472,7 @@ import { PopoutController } from './popoutController.js';
         UI.updateNoGameOverlay();
         UI.updateMode();
         UI.renderViewClips();
+        if (AppState.get('mode') === 'share') UI.renderSharePanel();
     });
 
     AppState.on('collectionItemsChanged', () => {
@@ -3618,6 +3620,52 @@ import { PopoutController } from './popoutController.js';
         });
     }
 
+    async function ensureCollectionShareAndGetViewUrl() {
+        if (!AppState.hasFeature(FEATURES.SHARE)) {
+            UI.toast(getProFeatureMessage(), 'info');
+            return null;
+        }
+        const col = AppState.get('activeCollection');
+        if (!col?.id) {
+            UI.toast('Guardá la colección primero', 'error');
+            return null;
+        }
+        let toShare = col;
+        if (!col.isPublic) {
+            try {
+                const updated = { ...col, isPublic: true };
+                await FirebaseData.saveCollection(col.id, updated);
+                AppState.openCollection(updated, { clearProject: false });
+                toShare = updated;
+            } catch (e) {
+                UI.toast('No se pudo activar el enlace: ' + (e.message || String(e)), 'error');
+                return null;
+            }
+        }
+        return FirebaseData.getCollectionShareUrl(toShare.id);
+    }
+
+    const shareCopyCollection = $('#share-copy-collection');
+    if (shareCopyCollection) {
+        shareCopyCollection.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const url = await ensureCollectionShareAndGetViewUrl();
+            if (!url) return;
+            navigator.clipboard.writeText(url).then(() => {
+                UI.toast('🔗 Enlace de colección copiado', 'success');
+            }).catch(() => prompt('Copiá este link:', url));
+        });
+    }
+
+    const shareWaCollection = $('#share-wa-collection');
+    if (shareWaCollection) {
+        shareWaCollection.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const url = await ensureCollectionShareAndGetViewUrl();
+            if (!url) return;
+            openWhatsApp(url, 'Colección SimpleReplay:');
+        });
+    }
 
     const sharePanelXml = $('#share-btn-xml');
     if (sharePanelXml) {
@@ -3785,6 +3833,11 @@ import { PopoutController } from './popoutController.js';
             }
         }
 
+        const collectionIdFromUrl = FirebaseData.getCollectionIdFromUrl();
+        if (collectionIdFromUrl && !projectIdFromUrl) {
+            projectIdToLoad = null;
+        }
+
         if (projectIdToLoad) {
             // No cargamos los clips demo si vamos a intentar abrir un proyecto cloud.
             DemoData.clear();
@@ -3938,6 +3991,27 @@ import { PopoutController } from './popoutController.js';
             const games = AppState.get('games');
             if (games.length > 0) {
                 AppState.setCurrentGame(games[0].id);
+            }
+        }
+
+        if (collectionIdFromUrl && !projectIdFromUrl) {
+            UI.toast('Cargando colección...', '');
+            const colData = await FirebaseData.loadCollection(collectionIdFromUrl);
+            if (colData) {
+                AppState.openCollection(colData);
+                const u = getCurrentUser();
+                const isOwner = !!(u?.uid && colData.ownerUid && colData.ownerUid === u.uid);
+                if (!isOwner) {
+                    document.body.classList.add('read-only-mode');
+                    syncReadOnlyCapabilitiesClass();
+                    AppState.setMode('view');
+                    UI.updateMode();
+                } else {
+                    document.body.classList.remove('read-only-mode', 'read-only-pro');
+                }
+                UI.toast('Colección cargada ✅', 'success');
+            } else {
+                UI.toast('No se pudo cargar la colección. Si es tuya, iniciá sesión; si la compartieron, el dueño debe generar el enlace.', 'error');
             }
         }
 

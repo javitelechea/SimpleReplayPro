@@ -1897,11 +1897,14 @@ export const UI = (() => {
     // ═══ SHARE PANEL RENDERER ═══
     function renderSharePanel() {
         const projectId = AppState.get('currentProjectId');
+        const activeCol = AppState.get('activeCollection');
+        const hasProject = !!projectId;
+        const hasCollection = !!(activeCol && activeCol.id);
         const noProjectEl = $('#share-no-project');
         const actionsEl = $('#share-actions');
         if (!noProjectEl || !actionsEl) return;
 
-        if (!projectId) {
+        if (!hasProject && !hasCollection) {
             noProjectEl.style.display = 'block';
             actionsEl.style.display = 'none';
             return;
@@ -1910,9 +1913,14 @@ export const UI = (() => {
         noProjectEl.style.display = 'none';
         actionsEl.style.display = 'block';
 
+        const projectBlock = $('#share-project-block');
+        const collectionBlock = $('#share-collection-block');
+        if (projectBlock) projectBlock.style.display = hasProject ? 'block' : 'none';
+        if (collectionBlock) collectionBlock.style.display = hasCollection ? 'block' : 'none';
+
         // Populate playlist select
         const sel = $('#share-panel-playlist-select');
-        if (sel) {
+        if (sel && hasProject) {
             const playlists = AppState.get('playlists');
             if (playlists.length === 0) {
                 sel.innerHTML = '<option value="">(Sin playlists)</option>';

@@ -116,6 +116,20 @@ export const FirebaseData = (() => {
         return params.get('project') || null;
     }
 
+    function getCollectionIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('collection') || null;
+    }
+
+    /** Enlace de solo lectura: quien tenga el link puede abrir la colección si en Firestore `isPublic: true` (o es el dueño). */
+    function getCollectionShareUrl(collectionId) {
+        const baseUrl = window.location.href.split('?')[0].split('#')[0];
+        const params = new URLSearchParams();
+        params.set('collection', collectionId);
+        params.set('mode', 'view');
+        return baseUrl + '?' + params.toString();
+    }
+
     function getEditKeyFromUrl() {
         const params = new URLSearchParams(window.location.search);
         return params.get('editKey') || null;
@@ -277,6 +291,9 @@ export const FirebaseData = (() => {
             items: data.items || [],
             updatedAt: serverTimestamp(),
         };
+        if (typeof data.isPublic === 'boolean') {
+            payload.isPublic = data.isPublic;
+        }
         if (colId) {
             await setDoc(doc(db, 'collections', colId), payload, { merge: true });
             return colId;
@@ -324,6 +341,8 @@ export const FirebaseData = (() => {
         listProjects,
         getShareUrl,
         getProjectIdFromUrl,
+        getCollectionIdFromUrl,
+        getCollectionShareUrl,
         getEditKeyFromUrl,
         getGameIdFromUrl,
         getPlaylistIdFromUrl,
