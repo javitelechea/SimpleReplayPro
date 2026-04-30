@@ -917,6 +917,7 @@ export const AppState = (() => {
   // ── XML Import / Export ──
   function importXML(xmlString, offset = 0) {
     try {
+      if (!state.currentGameId) return false;
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(xmlString, "application/xml");
 
@@ -926,6 +927,30 @@ export const AppState = (() => {
         return false;
       }
 
+      // Build a merged snapshot and restore DemoData once (single source of truth).
+      // This prevents imported clips from living only in state and disappearing later.
+      const mergedTagTypes = [...state.tagTypes];
+      const mergedClips = [...state.clips];
+      const makeId = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const ensureTagForCode = (code) => {
+        let existingTag = mergedTagTypes.find(t => t.label === code);
+        if (!existingTag) {
+          existingTag = {
+            id: makeId('tag'),
+            key: code.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || makeId('tagkey'),
+            label: code,
+            pre_sec: 5,
+            post_sec: 5,
+            row: 'top',
+            isHidden: true,
+            captureMode: 'fixed',
+            order: mergedTagTypes.length,
+          };
+          mergedTagTypes.push(existingTag);
+        }
+        return existingTag;
+      };
+
       // 1. Extract Rows (Tag Colors/Names)
       const rows = xmlDoc.querySelectorAll("ROWS > row");
       const codeToTagMap = {};
@@ -934,22 +959,8 @@ export const AppState = (() => {
         const codeEl = row.querySelector("code");
         if (!codeEl) return;
         const code = codeEl.textContent.trim();
-
-        let existingTag = state.tagTypes.find(t => t.label === code);
-        if (!existingTag) {
-          existingTag = {
-            id: 'tag_' + Date.now() + Math.random().toString(36).substring(2, 9),
-            label: code,
-            pre_sec: 5,
-            post_sec: 5,
-            row: 'top', // default
-            isHidden: true
-          };
-          // Rough heuristic for rival vs top based on name (e.g., LEUV vs DARI)
-          // But since we can't be sure, default top. 
-          state.tagTypes.push(existingTag);
-        }
-        codeToTagMap[code] = existingTag.id;
+        const ensured = ensureTagForCode(code);
+        codeToTagMap[code] = ensured.id;
       });
 
       // 2. Extract Instances (Clips)
@@ -968,36 +979,49 @@ export const AppState = (() => {
 
         // If instance has a code not defined in rows, create tag dynamically
         if (!tagId) {
-          let existingTag = state.tagTypes.find(t => t.label === code);
-          if (!existingTag) {
-            existingTag = {
-              id: 'tag_' + Date.now() + Math.random().toString(36).substring(2, 9),
-              label: code,
-              pre_sec: 5,
-              post_sec: 5,
-              row: 'top',
-              isHidden: true
-            };
-            state.tagTypes.push(existingTag);
-          }
-          codeToTagMap[code] = existingTag.id;
-          tagId = existingTag.id;
+          const ensured = ensureTagForCode(code);
+          codeToTagMap[code] = ensured.id;
+          tagId = ensured.id;
         }
 
         const startSec = (parseFloat(startEl.textContent) || 0) + offset;
         const endSec = (parseFloat(endEl.textContent) || 0) + offset;
+        const normalizedEnd = Math.max(endSec, startSec + 0.1);
 
-        // Add clip
-        const clip = {
-          id: 'clip_' + Date.now() + Math.random().toString(36).substring(2, 9),
+        mergedClips.push({
+          id: makeId('clip'),
           game_id: state.currentGameId,
           tag_type_id: tagId,
           t_sec: startSec,
           start_sec: startSec,
-          end_sec: endSec
-        };
-        state.clips.push(clip);
+          end_sec: normalizedEnd,
+          created_by: state.userId,
+          created_at: new Date().toISOString(),
+        });
         clipCount++;
+      });
+
+      const mergedProject = {
+        games: [...state.games],
+        clips: mergedClips,
+        playlists: [...state.playlists],
+        playlistItems: { ...state.playlistItems },
+        clipFlags: { ...state.clipFlags },
+        tagTypes: mergedTagTypes,
+      };
+      DemoData.restore(mergedProject);
+      DemoData.restoreTagTypes(mergedTagTypes);
+
+      state.tagTypes = mergedTagTypes;
+      state.clips = DemoData.getClipsForGame(state.currentGameId);
+      state.playlists = DemoData.getPlaylistsForGame(state.currentGameId);
+      state.playlistItems = {};
+      state.playlists.forEach(pl => {
+        state.playlistItems[pl.id] = DemoData.getPlaylistItems(pl.id);
+      });
+      state.clipFlags = {};
+      state.clips.forEach(c => {
+        state.clipFlags[c.id] = DemoData.getClipFlags(c.id);
       });
 
       emit('tagTypesUpdated');
