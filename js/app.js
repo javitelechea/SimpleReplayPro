@@ -993,10 +993,12 @@ import { PopoutController } from './popoutController.js';
         const canHandleSurfaceGesture = (evTarget) => {
             if (!AppState.get('currentGameId')) return false;
             if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return false;
+            if (typeof YTPlayer.getSourceType === 'function' && YTPlayer.getSourceType() === 'local') return false;
             if (!evTarget) return false;
             if (evTarget.closest('#player-chrome')) return false;
             if (evTarget.closest('#clip-view-toolbar')) return false;
             if (evTarget.closest('#drawing-toolbar')) return false;
+            if (evTarget.closest('video')) return false;
             if (evTarget.closest('button, a, input, textarea, select, [role="button"]')) return false;
             if (typeof DrawingTool !== 'undefined' && typeof DrawingTool.isActive === 'function' && DrawingTool.isActive()) return false;
             return true;
@@ -3168,6 +3170,10 @@ import { PopoutController } from './popoutController.js';
 
         // Don't handle shortcuts when typing in inputs
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+        // Avoid double-toggle: when a button/control has focus, Space may trigger native click.
+        if (matchesShortcut(e, 'playPause') && e.target && typeof e.target.closest === 'function') {
+            if (e.target.closest('button, a, [role="button"], summary, video')) return;
+        }
 
         // Play/Pause shortcut
         if (matchesShortcut(e, 'playPause')) {
