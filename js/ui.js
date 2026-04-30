@@ -780,16 +780,22 @@ export const UI = (() => {
         }
         list.innerHTML = '';
         collections.forEach(col => {
+            const count = Number(col.itemCount || 0);
             const row = document.createElement('div');
-            row.className = 'project-row';
+            row.className = 'project-item';
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.justifyContent = 'space-between';
+            row.style.padding = '10px';
+            row.style.gap = '8px';
             row.innerHTML = `
-                <div class="project-row-info" style="cursor:pointer;">
-                    <span class="project-row-title">🗂️ ${col.name}</span>
-                    <span class="project-row-meta">${col.itemCount} clip${col.itemCount !== 1 ? 's' : ''}</span>
+                <div class="project-info">
+                    <div class="project-title" style="font-weight:500;font-size:0.9rem;">🗂️ ${col.name}</div>
+                    <div class="project-date" style="font-size:0.75rem;color:var(--text-muted);">${count} clip${count !== 1 ? 's' : ''}</div>
                 </div>
-                <div class="project-row-actions">
-                    <button class="btn btn-xs btn-primary col-open-btn" data-col-id="${col.id}">Abrir</button>
-                    <button class="btn btn-xs btn-ghost col-delete-btn" data-col-id="${col.id}" data-col-name="${col.name}">🗑️</button>
+                <div class="project-actions" style="display:flex;gap:4px;flex-shrink:0;">
+                    <button class="btn btn-xs btn-ghost col-open-btn" data-col-id="${col.id}" title="Abrir colección">▶️</button>
+                    <button class="btn btn-xs btn-ghost col-delete-btn" data-col-id="${col.id}" data-col-name="${col.name}" title="Eliminar colección">🗑️</button>
                 </div>`;
             list.appendChild(row);
         });

@@ -727,6 +727,19 @@ select {
   flex-shrink: 0;
 }
 
+.collections-tab-header {
+  margin: 0 0 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.collections-create-row {
+  margin-bottom: 12px;
+}
+
 #modal-projects #collection-list {
   flex: 1 1 auto;
   min-height: 120px;
