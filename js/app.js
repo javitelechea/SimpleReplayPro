@@ -2303,14 +2303,35 @@ import { PopoutController } from './popoutController.js';
         const listShared = $('#shared-project-list');
         const foldersSummary = $('#project-folders-summary');
         const currentUser = getCurrentUser();
+        const folderUserId = currentUser?.uid || AppState.get('userId');
         const hasShareFeature = AppState.hasFeature(FEATURES.SHARE);
-        const canUseFolders = !!currentUser?.uid;
+        const canUseFolders = !!folderUserId && folderUserId !== 'anonymous';
         const sharedTitle = listShared ? listShared.previousElementSibling : null;
+        const sharedCountEl = $('#shared-projects-count');
+        const sharedChevronEl = $('#shared-projects-chevron');
+        let sharedSectionExpanded = false;
+        let sharedProjectsCount = 0;
         let folderState = { folders: [], projectMap: {} };
         let ownedProjectsCache = [];
 
-        if (listShared) listShared.style.display = hasShareFeature ? '' : 'none';
-        if (sharedTitle) sharedTitle.style.display = hasShareFeature ? '' : 'none';
+        const updateSharedSectionUI = () => {
+            if (!hasShareFeature) {
+                if (listShared) listShared.style.display = 'none';
+                if (sharedTitle) sharedTitle.style.display = 'none';
+                return;
+            }
+            if (sharedTitle) sharedTitle.style.display = '';
+            if (sharedCountEl) sharedCountEl.textContent = String(sharedProjectsCount);
+            if (sharedChevronEl) sharedChevronEl.textContent = sharedSectionExpanded ? '▾' : '▸';
+            if (listShared) listShared.style.display = sharedSectionExpanded ? '' : 'none';
+        };
+        if (sharedTitle) {
+            sharedTitle.onclick = () => {
+                sharedSectionExpanded = !sharedSectionExpanded;
+                updateSharedSectionUI();
+            };
+        }
+        updateSharedSectionUI();
 
         listOwned.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Cargando...</p>';
         if (listShared) {
@@ -2348,7 +2369,7 @@ import { PopoutController } from './popoutController.js';
                 }
                 _folderSaveInFlight = true;
                 try {
-                    await FirebaseData.saveUserProjectFolders(currentUser?.uid, folderState);
+                    await FirebaseData.saveUserProjectFolders(folderUserId, folderState);
                 } catch (e) {
                     console.error('Save folder state error:', e);
                     UI.toast('No se pudo guardar carpetas', 'error');
@@ -2431,6 +2452,16 @@ import { PopoutController } from './popoutController.js';
                 container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">No hay proyectos</p>';
                 return;
             }
+
+            const actionIcons = {
+                share: '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M15 7a3 3 0 1 0-.07-1.97l-6.2 3.1a3 3 0 0 0 0 1.74l6.2 3.1A3 3 0 1 0 15 11l-6.2-3.1L15 4.8V7Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+                duplicate: '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><rect x="9" y="9" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="5" y="5" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/></svg>',
+                rename: '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M4 20h4l9.7-9.7a1.9 1.9 0 0 0 0-2.6l-1.4-1.4a1.9 1.9 0 0 0-2.6 0L4 16v4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m12.7 7.3 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+                open: '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="m9 6 8 6-8 6V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+                view: '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.8" stroke="currentColor" stroke-width="1.8"/></svg>',
+                delete: '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M4 7h16M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7m-8 0 1 12a2 2 0 0 0 2 1.8h5a2 2 0 0 0 2-1.8l1-12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+                move: '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h4a2 2 0 0 1 1.4.6l.8.8a2 2 0 0 0 1.4.6h7.4A1.5 1.5 0 0 1 21 10.5V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 12v5M9.5 14.5h5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>'
+            };
 
             const renderProjectRow = (p) => {
                 const el = document.createElement('div');
@@ -2517,7 +2548,7 @@ import { PopoutController } from './popoutController.js';
                 // Share btn — opens share modal for this specific project
                 const shareBtn = document.createElement('button');
                 shareBtn.className = 'btn btn-xs btn-ghost project-share-btn';
-                shareBtn.innerHTML = '🔗';
+                shareBtn.innerHTML = actionIcons.share;
                 shareBtn.title = 'Compartir';
                 shareBtn.addEventListener('click', () => {
                     _pendingShareProjectId = p.id;
@@ -2529,7 +2560,7 @@ import { PopoutController } from './popoutController.js';
                 // Duplicate btn
                 const dupBtn = document.createElement('button');
                 dupBtn.className = 'btn btn-xs btn-ghost project-dup-btn';
-                dupBtn.innerHTML = '📋';
+                dupBtn.innerHTML = actionIcons.duplicate;
                 dupBtn.title = 'Duplicar proyecto';
                 dupBtn.addEventListener('click', async () => {
                     UI.toast('Duplicando...', '');
@@ -2545,7 +2576,10 @@ import { PopoutController } from './popoutController.js';
                         const projects2 = await FirebaseData.listProjects(currentUser?.uid);
                         ownedProjectsCache = sortAlpha(projects2.filter(x => !x.isShared), 'title');
                         renderOwnedWithFolders();
-                        renderList(listShared, projects2.filter(x => x.isShared));
+                        const refreshedSharedProjects = projects2.filter(x => x.isShared);
+                        sharedProjectsCount = refreshedSharedProjects.length;
+                        renderList(listShared, refreshedSharedProjects);
+                        updateSharedSectionUI();
                     } catch(e) {
                         UI.toast('Error al duplicar', 'error');
                     }
@@ -2554,7 +2588,7 @@ import { PopoutController } from './popoutController.js';
                 // Rename btn
                 const renameBtn = document.createElement('button');
                 renameBtn.className = 'btn btn-xs btn-ghost project-rename-btn';
-                renameBtn.innerHTML = '✏️';
+                renameBtn.innerHTML = actionIcons.rename;
                 renameBtn.title = 'Renombrar proyecto';
                 renameBtn.addEventListener('click', async () => {
                     const newName = prompt('Nuevo nombre del proyecto:', p.title);
@@ -2575,7 +2609,7 @@ import { PopoutController } from './popoutController.js';
                 // Open btn
                 const loadBtn = document.createElement('button');
                 loadBtn.className = 'btn btn-xs btn-ghost project-load-btn';
-                loadBtn.innerHTML = p.isShared ? '👁️' : '▶️';
+                loadBtn.innerHTML = p.isShared ? actionIcons.view : actionIcons.open;
                 loadBtn.title = 'Abrir proyecto';
                 const openProject = async () => {
                     UI.hideModal('modal-projects');
@@ -2615,7 +2649,7 @@ import { PopoutController } from './popoutController.js';
                 // Delete btn
                 const delBtn = document.createElement('button');
                 delBtn.className = 'btn btn-xs btn-danger project-delete-btn';
-                delBtn.innerHTML = '🗑️';
+                delBtn.innerHTML = actionIcons.delete;
                 delBtn.title = p.isShared ? 'Remover de la lista' : 'Quitar local o borrar de nube';
                 delBtn.addEventListener('click', async () => {
                     if (p.isShared) {
@@ -2665,7 +2699,7 @@ import { PopoutController } from './popoutController.js';
                 if (withFolders && canUseFolders) {
                     const moveBtn = document.createElement('button');
                     moveBtn.className = 'btn btn-xs btn-ghost project-move-btn';
-                    moveBtn.innerHTML = '📁';
+                    moveBtn.innerHTML = actionIcons.move;
                     moveBtn.title = 'Mover a carpeta';
                     moveBtn.addEventListener('click', async () => {
                         document.querySelectorAll('.project-folder-picker-wrap').forEach((el2) => {
@@ -2826,7 +2860,7 @@ import { PopoutController } from './popoutController.js';
                 foldersSummary.innerHTML = [
                     chip('', 'Todos', !activeFolderFilterId),
                     chip(RECENT_FILTER_KEY, 'Recientes', activeFolderFilterId === RECENT_FILTER_KEY),
-                    ...folders.map((f) => chip(f.id, `📁 ${f.name}`, activeFolderFilterId === f.id)),
+                    ...folders.map((f) => chip(f.id, f.name, activeFolderFilterId === f.id)),
                 ].join('');
                 foldersSummary.querySelectorAll('[data-folder-chip]').forEach((btn) => {
                     btn.addEventListener('click', () => {
@@ -2842,7 +2876,7 @@ import { PopoutController } from './popoutController.js';
             ensureProjectsSearchUI();
             const projects = await FirebaseData.listProjects(currentUser?.uid);
             if (canUseFolders) {
-                folderState = await FirebaseData.loadUserProjectFolders(currentUser.uid);
+                folderState = await FirebaseData.loadUserProjectFolders(folderUserId);
             } else {
                 folderState = { folders: [], projectMap: {} };
             }
@@ -2850,7 +2884,11 @@ import { PopoutController } from './popoutController.js';
             const sharedProjects = projects.filter(p => p.isShared);
             ownedProjectsCache = sortAlpha(ownedProjects, 'title');
             renderOwnedWithFolders();
-            if (hasShareFeature) renderList(listShared, sharedProjects);
+            if (hasShareFeature) {
+                sharedProjectsCount = sharedProjects.length;
+                renderList(listShared, sharedProjects);
+                updateSharedSectionUI();
+            }
         } catch (err) {
             console.error('[openProjectsModal] error:', err);
             listOwned.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Error al conectar.</p>';

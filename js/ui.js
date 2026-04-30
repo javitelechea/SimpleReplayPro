@@ -774,6 +774,15 @@ export const UI = (() => {
     function renderCollectionsTab(collections) {
         const list = $('#collection-list');
         if (!list) return;
+        const iconOpen = '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="m9 6 8 6-8 6V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+        const iconDelete = '<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true"><path d="M4 7h16M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7m-8 0 1 12a2 2 0 0 0 2 1.8h5a2 2 0 0 0 2-1.8l1-12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        const collectionIcon = `
+            <span style="display:inline-flex; width:14px; height:14px; margin-right:6px; vertical-align:-2px;" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" width="14" height="14">
+                    <rect x="4" y="5" width="16" height="5.2" rx="1.4" stroke="currentColor" stroke-width="1.8"/>
+                    <rect x="4" y="12.1" width="16" height="6.9" rx="1.4" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+            </span>`;
         if (!collections || !collections.length) {
             list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">No tenés colecciones todavía.</p>';
             return;
@@ -790,12 +799,12 @@ export const UI = (() => {
             row.style.gap = '8px';
             row.innerHTML = `
                 <div class="project-info">
-                    <div class="project-title" style="font-weight:500;font-size:0.9rem;">🗂️ ${col.name}</div>
+                    <div class="project-title" style="font-weight:500;font-size:0.9rem;">${collectionIcon}${col.name}</div>
                     <div class="project-date" style="font-size:0.75rem;color:var(--text-muted);">${count} clip${count !== 1 ? 's' : ''}</div>
                 </div>
                 <div class="project-actions" style="display:flex;gap:4px;flex-shrink:0;">
-                    <button class="btn btn-xs btn-ghost col-open-btn" data-col-id="${col.id}" title="Abrir colección">▶️</button>
-                    <button class="btn btn-xs btn-ghost col-delete-btn" data-col-id="${col.id}" data-col-name="${col.name}" title="Eliminar colección">🗑️</button>
+                    <button class="btn btn-xs btn-ghost col-open-btn" data-col-id="${col.id}" title="Abrir colección">${iconOpen}</button>
+                    <button class="btn btn-xs btn-ghost col-delete-btn" data-col-id="${col.id}" data-col-name="${col.name}" title="Eliminar colección">${iconDelete}</button>
                 </div>`;
             list.appendChild(row);
         });
@@ -814,7 +823,7 @@ export const UI = (() => {
             btn.className = 'playlist-select-item';
             btn.dataset.colId = col.id;
             btn.dataset.colName = col.name;
-            btn.textContent = `🗂️ ${col.name} (${col.itemCount} clips)`;
+            btn.textContent = `${col.name} (${col.itemCount} clips)`;
             list.appendChild(btn);
         });
     }
