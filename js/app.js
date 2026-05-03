@@ -17,6 +17,23 @@ import { toMillis } from './access.js';
 import { ButtonboardTemplates } from './buttonboardTemplates.js';
 import { createSessionGuard } from './sessionGuard.js';
 import { PopoutController } from './popoutController.js';
+import { LiveCaptureFacade } from './livecapture/LiveCaptureFacade.js';
+import {
+    startLiveRecording,
+    startLivePreview,
+    stopLivePreview,
+    isLivePreviewActive,
+    stopLiveRecording,
+    pauseLiveRecording,
+    resumeLiveRecording,
+    isLiveRecordingActive,
+    isLiveRecordingPaused,
+    getLastStoppedSession,
+    listVideoInputs,
+} from './livecapture/liveRecordingController.js';
+import { promoteStoppedSessionToLocal } from './livecapture/sessionConsolidate.js';
+import { canRunLiveCapture } from './livecapture/index.js';
+import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
 (function () {
     'use strict';
@@ -26,6 +43,12 @@ import { PopoutController } from './popoutController.js';
     let authMenuWired = false;
     let _localVideoFileForCurrentGame = null;
     let _mainAudioBeforePopout = null;
+    /** Ref para crear proyecto «Captura» antes de que existan otros puntos de entrada. */
+    /** @type {import('./livecapture/LiveCaptureFacade.js').LiveCaptureFacade|null} */
+    let _liveCaptureFacadeRef = null;
+    /** Ref desde `wireLiveCaptureAnalyzeTab`: cambiar pestaña Clips / Captura en vivo. */
+    /** @type {((which: 'clips' | 'livecapture') => void) | null} */
+    let _switchAnalyzeTabRef = null;
     let _liveProbeLastDuration = 0;
     let _liveProbeLastTs = 0;
     let _liveDurationGrowthHits = 0;
@@ -740,6 +763,7 @@ import { PopoutController } from './popoutController.js';
             if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
             switch (type) {
                 case 'mediaLoaded':
+                    if (payload?.kind === 'liveCapture') break;
                     if (payload && payload.kind === 'youtube') {
                         PopoutController.notifyMediaLoaded({ kind: 'youtube', id: payload.id });
                     } else if (payload && payload.kind === 'local' && payload.file) {
@@ -825,11 +849,42 @@ import { PopoutController } from './popoutController.js';
         }
     }
 
+    async function consolidateStoppedCaptureToProject() {
+        const meta = getLastStoppedSession();
+        if (!meta) {
+            UI.toast('No hay grabación para consolidar.', 'error');
+            return;
+        }
+        try {
+            const out = await promoteStoppedSessionToLocal(YTPlayer, meta, { download: true });
+            if (out?.file && out.objectUrl) {
+                _localVideoFileForCurrentGame = out.file;
+                AppState.setLocalVideoFile(out.file);
+                const game = AppState.getCurrentGame();
+                if (game) {
+                    game.local_video_url = out.objectUrl;
+                    // Deja de ser «proyecto solo captura»: al guardar no se persiste el blob; si sigue
+                    // video_source=liveCapture, al reabrir se carga una sesión vacía y el play no va al archivo.
+                    if (game.video_source === 'liveCapture') {
+                        delete game.video_source;
+                    }
+                }
+                UI.toast('Video listo: descarga iniciada y cargado en el partido.', 'success');
+                UI.refreshAll();
+                syncAnalyzeLiveCaptureTabVisibility();
+            }
+        } catch (e) {
+            UI.toast(e?.message || 'No se pudo consolidar', 'error');
+        }
+    }
+
     function syncPlayerChromeUi() {
         const chrome = $('#player-chrome');
         if (!chrome || chrome.classList.contains('hidden')) return;
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
 
+        const playGroup = $('#player-chrome-play-group');
+        playGroup?.classList.remove('hidden');
         const playBtn = $('#player-chrome-play');
         if (playBtn) {
             const playing = YTPlayer.isPlaying();
@@ -912,6 +967,278 @@ import { PopoutController } from './popoutController.js';
         YTPlayer.playClip(clip.start_sec, clip.end_sec);
         const plId = AppState.get('activePlaylistId');
         if (plId && typeof DrawingTool !== 'undefined') DrawingTool.startPlaybackWatch(plId, clip.id);
+    }
+
+    /**
+     * Pestaña «Captura en vivo» en el panel Analizar (LiveCapture).
+     * @param {import('./livecapture/LiveCaptureFacade.js').LiveCaptureFacade|null} facade
+     */
+    function wireLiveCaptureAnalyzeTab(facade) {
+        const $ = UI.$;
+        const tabClips = $('#tab-analyze-clips');
+        const tabLc = $('#tab-analyze-livecapture');
+        const paneClips = $('#analyze-tab-clips');
+        const paneLc = $('#analyze-tab-livecapture');
+        const unavailableEl = $('#livecapture-unavailable');
+        const controlsEl = $('#livecapture-controls');
+        const statusEl = $('#livecapture-status');
+        const selRes = $('#livecapture-resolution');
+        const selDevice = $('#livecapture-device');
+        const btnSetupDevices = $('#btn-livecapture-setup-devices');
+        const btnRec = $('#btn-livecapture-rec');
+        const btnPause = $('#btn-livecapture-pause');
+        const btnStop = $('#btn-livecapture-stop');
+        const btnBackLive = $('#btn-livecapture-back-live');
+        const btnDownload = $('#btn-livecapture-download');
+
+        if (!paneLc || !facade) return;
+
+        function downloadLocalCaptureFile(file) {
+            if (!file || typeof document === 'undefined') return;
+            const url = URL.createObjectURL(file);
+            try {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name || 'captura.webm';
+                a.rel = 'noopener';
+                a.click();
+            } catch (_) {
+                /* noop */
+            }
+            setTimeout(() => {
+                try {
+                    URL.revokeObjectURL(url);
+                } catch (_) {
+                    /* noop */
+                }
+            }, 2500);
+        }
+
+        const envOk = typeof canRunLiveCapture === 'function' && canRunLiveCapture();
+        if (!envOk && unavailableEl && controlsEl) {
+            unavailableEl.textContent =
+                'La captura desde cámara no está disponible aquí (probá HTTPS en localhost o Chrome actualizado).';
+            unavailableEl.classList.remove('hidden');
+            controlsEl.classList.add('hidden');
+        }
+
+        function ensureCaptureSessionId() {
+            if (facade.getSessionId?.()) return;
+            const gid = AppState.get('currentGameId');
+            if (!gid) return;
+            const sid = `lc-${gid}-${Date.now()}`;
+            YTPlayer.loadLiveCapture?.({ sessionId: sid });
+        }
+
+        let _previewDebounce = null;
+        function scheduleLivePreviewRefresh() {
+            clearTimeout(_previewDebounce);
+            _previewDebounce = setTimeout(() => {
+                refreshLivePreviewNow();
+            }, 200);
+        }
+
+        async function refreshLivePreviewNow() {
+            if (!envOk || isLiveRecordingActive()) return;
+            const game = AppState.getCurrentGame?.();
+            if (game?.video_source !== 'liveCapture') return;
+            try {
+                ensureCaptureSessionId();
+                if (!facade.getSessionId?.()) return;
+                const deviceId = ($('#livecapture-device')?.value || '').trim() || undefined;
+                const resolution = selRes?.value === '1080' ? '1080' : '720';
+                await startLivePreview({ facade, deviceId, resolution });
+            } catch (e) {
+                console.warn('[LiveCapture] vista previa:', e?.message || e);
+            }
+            refreshLiveCapturePanelState();
+        }
+
+        function switchAnalyzeTab(which) {
+            const isClips = which === 'clips';
+            if (tabClips) {
+                tabClips.classList.toggle('active', isClips);
+                tabClips.setAttribute('aria-selected', isClips ? 'true' : 'false');
+            }
+            if (tabLc) {
+                tabLc.classList.toggle('active', !isClips);
+                tabLc.setAttribute('aria-selected', !isClips ? 'true' : 'false');
+            }
+            if (paneClips) paneClips.classList.toggle('hidden', !isClips);
+            if (paneLc) paneLc.classList.toggle('hidden', isClips);
+            if (!isClips) {
+                refreshLiveCapturePanelState();
+                scheduleLivePreviewRefresh();
+            }
+        }
+
+        _switchAnalyzeTabRef = switchAnalyzeTab;
+
+        document.querySelectorAll('[data-analyze-tab]').forEach((btn) => {
+            btn.addEventListener('click', () => switchAnalyzeTab(btn.getAttribute('data-analyze-tab')));
+        });
+
+        function syncLiveCaptureToolbar() {
+            const recording = isLiveRecordingActive();
+            const previewActive =
+                typeof isLivePreviewActive === 'function' && isLivePreviewActive();
+            const previewOnly = !recording && previewActive;
+            const mode = facade.getMode?.() ?? 'live';
+            const inReview = recording && mode === 'review';
+            const gidTb = AppState.get('currentGameId');
+            const gameTb = gidTb ? AppState.getCurrentGame?.() : null;
+            const isCaptureProjectTb = gameTb?.video_source === 'liveCapture';
+            const block = !envOk || !facade || !isCaptureProjectTb;
+
+            if (btnRec) {
+                btnRec.disabled = block || !previewOnly;
+                const recOn = recording && !block;
+                const recPaused = recOn && isLiveRecordingPaused();
+                btnRec.classList.toggle('livecapture-rec--recording', recOn && !recPaused);
+                btnRec.classList.toggle('livecapture-rec--recording-paused', recOn && recPaused);
+            }
+            if (btnPause && btnStop) {
+                btnPause.disabled = block || !recording;
+                btnStop.disabled = block || !recording;
+                btnPause.classList.toggle('player-chrome__btn--primary', !!recording);
+                const paused = recording && isLiveRecordingPaused();
+                btnPause.innerHTML = paused
+                    ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>'
+                    : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h4v12H7zM13 6h4v12h-4z" fill="currentColor"/></svg>';
+                btnPause.setAttribute('aria-label', paused ? 'Reanudar grabación' : 'Pausar grabación');
+                btnPause.title = paused ? 'Reanudar grabación' : 'Pausar grabación';
+            }
+            if (btnBackLive) {
+                btnBackLive.disabled = block || !inReview;
+                btnBackLive.classList.toggle('livecapture-live-return--away', !!(!block && inReview));
+                btnBackLive.title =
+                    inReview && !block ? 'Volver al vivo' : 'Disponible cuando estés revisando el replay';
+            }
+        }
+
+        function refreshLiveCapturePanelState() {
+            const recording = isLiveRecordingActive();
+            const mode = facade.getMode?.() ?? 'live';
+            const gid = AppState.get('currentGameId');
+            const game = gid ? AppState.getCurrentGame?.() : null;
+            const isCaptureProject = game?.video_source === 'liveCapture';
+
+            if (selRes) selRes.disabled = !!recording;
+            if (selDevice) selDevice.disabled = !!recording;
+            if (btnSetupDevices) btnSetupDevices.disabled = !!recording || !envOk;
+
+            if (btnDownload) {
+                btnDownload.disabled = !AppState.getLocalVideoFile?.();
+            }
+
+            syncLiveCaptureToolbar();
+
+            const lines = [];
+            if (!envOk) {
+                lines.push('Captura no disponible aquí.');
+            } else if (!isCaptureProject) {
+                lines.push('No es proyecto de captura.');
+            } else if (recording) {
+                lines.push(mode === 'review' ? 'Grabando · revisión' : 'Grabando');
+            }
+            if (statusEl) statusEl.innerHTML = lines.length ? lines.join('<br/>') : '';
+        }
+
+        btnSetupDevices?.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                stream.getTracks().forEach((t) => t.stop());
+                const devices = await listVideoInputs();
+                const sel = $('#livecapture-device');
+                const prev = sel?.value || '';
+                if (sel) {
+                    sel.innerHTML = '<option value="">Predeterminada del sistema</option>';
+                    devices.forEach((d) => {
+                        const opt = document.createElement('option');
+                        opt.value = d.deviceId;
+                        opt.textContent = d.label || 'Cámara';
+                        sel.appendChild(opt);
+                    });
+                    if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+                }
+                UI.toast('Cámaras detectadas', 'success');
+                scheduleLivePreviewRefresh();
+            } catch (e) {
+                UI.toast(e?.message || 'No se pudo acceder a la cámara', 'error');
+            }
+        });
+
+        selDevice?.addEventListener('change', () => scheduleLivePreviewRefresh());
+        selRes?.addEventListener('change', () => scheduleLivePreviewRefresh());
+
+        btnRec?.addEventListener('click', async () => {
+            if (typeof isLiveRecordingActive === 'function' && isLiveRecordingActive()) return;
+            if (typeof isLivePreviewActive !== 'function' || !isLivePreviewActive()) {
+                UI.toast('Elegí cámara y resolución arriba.', 'info');
+                return;
+            }
+            if (!facade) return;
+            const sid = facade.getSessionId?.();
+            if (!sid) {
+                UI.toast('Sesión de captura no lista.', 'error');
+                return;
+            }
+            const deviceId = ($('#livecapture-device')?.value || '').trim() || undefined;
+            const resolution = $('#livecapture-resolution')?.value === '1080' ? '1080' : '720';
+            try {
+                await startLiveRecording({
+                    facade,
+                    sessionId: sid,
+                    deviceId,
+                    resolution,
+                });
+                UI.toast('Grabando', 'success');
+            } catch (e) {
+                UI.toast(e?.message || 'No se pudo iniciar la grabación', 'error');
+            }
+            refreshLiveCapturePanelState();
+        });
+
+        btnPause?.addEventListener('click', () => {
+            if (!isLiveRecordingActive()) return;
+            if (isLiveRecordingPaused()) resumeLiveRecording();
+            else pauseLiveRecording();
+            refreshLiveCapturePanelState();
+            queueMicrotask(() => refreshLiveCapturePanelState());
+        });
+
+        btnStop?.addEventListener('click', async () => {
+            if (!isLiveRecordingActive()) return;
+            const ok = window.confirm(
+                '¿Finalizar la grabación y consolidar el video?\n\nSe descargará una copia .webm y quedará cargada en este partido.'
+            );
+            if (!ok) return;
+            try {
+                await stopLiveRecording();
+                await consolidateStoppedCaptureToProject();
+            } catch (e) {
+                UI.toast(e?.message || 'Error al finalizar la grabación', 'error');
+            }
+            refreshLiveCapturePanelState();
+        });
+
+        btnBackLive?.addEventListener('click', () => {
+            facade.goLive?.();
+            refreshLiveCapturePanelState();
+        });
+
+        btnDownload?.addEventListener('click', () => {
+            const f = AppState.getLocalVideoFile?.();
+            if (!f) {
+                UI.toast('No hay video local para descargar (detené la grabación antes).', 'info');
+                return;
+            }
+            downloadLocalCaptureFile(f);
+            UI.toast('Descarga iniciada', 'success');
+        });
+
+        setInterval(refreshLiveCapturePanelState, 1000);
+        refreshLiveCapturePanelState();
     }
 
     function wirePlayerChrome() {
@@ -1249,6 +1576,29 @@ import { PopoutController } from './popoutController.js';
         document.body.classList.toggle('read-only-pro', !!canUseProNav);
     }
 
+    /**
+     * Tras `clearProject` + borrador local nuevo: quita solo lectura / playlist-only de la shell,
+     * limpia query params del enlace compartido y vuelve a modo Analizar.
+     */
+    function resetShellForNewLocalDraft() {
+        document.body.classList.remove('read-only-mode', 'read-only-pro', 'playlist-only-mode');
+        if (AppState.get('activeCollection')) {
+            AppState.closeCollection();
+        }
+        const u = new URL(window.location.href);
+        u.searchParams.delete('mode');
+        u.searchParams.delete('playlist');
+        u.searchParams.delete('project');
+        u.searchParams.delete('game');
+        u.searchParams.delete('editKey');
+        u.searchParams.delete('collection');
+        const qs = u.searchParams.toString();
+        history.replaceState({}, '', u.pathname + (qs ? `?${qs}` : '') + u.hash);
+        AppState.setMode('analyze');
+        syncReadOnlyCapabilitiesClass();
+        UI.updateMode();
+    }
+
     function syncHeaderProFeatureStates() {
         const btnBB = $('#btn-open-buttonboards');
         if (btnBB) {
@@ -1392,6 +1742,7 @@ import { PopoutController } from './popoutController.js';
         }
         UI.updateMode();
         updateLiveEdgeButton();
+        syncLiveCaptureAnalyzeDock();
     });
 
     AppState.on('featuresChanged', () => {
@@ -1411,8 +1762,83 @@ import { PopoutController } from './popoutController.js';
         });
     }
 
+    function syncAnalyzeSubtabsToClips() {
+        const tabClips = $('#tab-analyze-clips');
+        const tabLc = $('#tab-analyze-livecapture');
+        const paneClips = $('#analyze-tab-clips');
+        const paneLc = $('#analyze-tab-livecapture');
+        if (tabClips) {
+            tabClips.classList.add('active');
+            tabClips.setAttribute('aria-selected', 'true');
+        }
+        if (tabLc) {
+            tabLc.classList.remove('active');
+            tabLc.setAttribute('aria-selected', 'false');
+        }
+        if (paneClips) paneClips.classList.remove('hidden');
+        if (paneLc) paneLc.classList.add('hidden');
+    }
+
+    /** Solo partidos creados como captura en vivo (`video_source === 'liveCapture'`). */
+    function syncAnalyzeLiveCaptureTabVisibility() {
+        const game = AppState.getCurrentGame?.();
+        const showLc = !!(game && game.video_source === 'liveCapture');
+        const panelAnalyze = $('#panel-analyze');
+        panelAnalyze?.classList.toggle('panel-analyze--livecapture', !!showLc);
+        const tabLcBtn = $('#tab-analyze-livecapture');
+        if (tabLcBtn) {
+            tabLcBtn.classList.toggle('hidden', !showLc);
+            if (!showLc) {
+                syncAnalyzeSubtabsToClips();
+            }
+        }
+        syncLiveCaptureAnalyzeDock();
+    }
+
+    /** Bloque «Exportar» en pestaña Captura en vivo (debajo de la configuración); mismo criterio que el dock. */
+    function syncLiveCaptureExportStrip() {
+        const strip = $('#livecapture-export-strip');
+        const game = AppState.getCurrentGame?.();
+        const mode = AppState.get('mode');
+        const isCapture = !!(game && game.video_source === 'liveCapture');
+        const show = isCapture && mode === 'analyze';
+        strip?.classList.toggle('hidden', !show);
+    }
+
+    /** Dock de captura (estado + botonera) visible en Analizar para proyectos liveCapture; oculta playlists en Clips. */
+    function syncLiveCaptureAnalyzeDock() {
+        const dock = $('#livecapture-analyze-dock');
+        const playlistsSec = $('#analyze-playlists-section');
+        const game = AppState.getCurrentGame?.();
+        const mode = AppState.get('mode');
+        const isCapture = !!(game && game.video_source === 'liveCapture');
+        const showDock = isCapture && mode === 'analyze';
+        dock?.classList.toggle('hidden', !showDock);
+        playlistsSec?.classList.toggle('hidden', !!showDock);
+        syncLiveCaptureExportStrip();
+    }
+
+    AppState.on('liveRecordingBlockedNavigation', () => {
+        UI.toast(
+            'Hay una grabación en vivo activa. Detené la grabación antes de abrir otro proyecto o sincronizar.',
+            'error'
+        );
+    });
+
     AppState.on('gameChanged', (game) => {
         resetLiveProbe();
+        try {
+            stopLivePreview();
+        } catch (_) {
+            /* noop */
+        }
+        if (!isLiveRecordingActive()) {
+            try {
+                YTPlayer.leaveLiveCapture?.();
+            } catch (_) {
+                /* noop */
+            }
+        }
         UI.updateNoGameOverlay();
         UI.updateProjectTitle();
         UI.renderAnalyzeClips();
@@ -1420,14 +1846,19 @@ import { PopoutController } from './popoutController.js';
         UI.renderViewClips();
         UI.renderViewSources();
         UI.updateClipEditControls();
+        syncAnalyzeLiveCaptureTabVisibility();
         if (game) {
             if (game.local_video_url) {
                 YTPlayer.loadLocalVideo(game.local_video_url);
             } else if (game.youtube_video_id) {
                 YTPlayer.loadVideo(game.youtube_video_id);
+            } else if (game.video_source === 'liveCapture') {
+                const sid = `lc-${game.id}-${Date.now()}`;
+                YTPlayer.loadLiveCapture?.({ sessionId: sid });
             }
         }
         setTimeout(updateLiveEdgeButton, 400);
+        setTimeout(syncPlayerChromeUi, 0);
     });
 
     AppState.on('clipChanged', (clip) => {
@@ -1593,38 +2024,66 @@ import { PopoutController } from './popoutController.js';
         });
     }
 
-    // ── New Project Modal: Tab Logic ──
-    let activeProjectTab = 'yt';
-    /** Ventana de código: visible en YouTube y Local; oculta en Importar JSON (el .json trae la suya). */
+    // ── New Project Modal: Crear proyecto (fuente interna) vs Importar JSON ──
+    let activeMainTab = 'create';
+    /** Fuente dentro de «Crear proyecto»: youtube | local | capture */
+    let activeCreateSource = 'yt';
+
+    /** Ventana de código: solo en «Crear proyecto». */
     function updateNewProjectButtonboardRowVisibility() {
         const row = $('#new-project-buttonboard-row');
-        if (row) row.classList.toggle('hidden', activeProjectTab === 'json');
+        if (row) row.classList.toggle('hidden', activeMainTab !== 'create');
     }
+
+    function syncNewProjectPrimaryButton() {
+        const btn = $('#btn-save-game');
+        if (!btn) return;
+        btn.textContent = activeMainTab === 'json' ? 'Importar proyecto' : 'Crear proyecto';
+    }
+
     function syncNewProjectModalByPlan() {
         const hasLocalVideo = AppState.hasFeature(FEATURES.LOCAL_VIDEO);
         const hasImportData = AppState.hasFeature(FEATURES.IMPORT_DATA);
-        const localTabBtn = document.querySelector('#modal-new-game .tab-btn[data-tab="local"]');
-        const jsonTabBtn = document.querySelector('#modal-new-game .tab-btn[data-tab="json"]');
-        if (localTabBtn) {
-            localTabBtn.style.display = 'inline-flex';
-            localTabBtn.classList.toggle('is-pro-locked', !hasLocalVideo);
-            localTabBtn.title = hasLocalVideo ? 'Video local' : 'Video local — PRO';
-        }
-        if (jsonTabBtn) {
-            jsonTabBtn.style.display = 'inline-flex';
-            jsonTabBtn.classList.toggle('is-pro-locked', !hasImportData);
-            jsonTabBtn.title = hasImportData ? 'Importar JSON' : 'Importar JSON — PRO';
+        const captureEnvOk = typeof canRunLiveCapture === 'function' && canRunLiveCapture();
+
+        const jsonMainBtn = document.querySelector('#modal-new-game .tab-btn[data-main-tab="json"]');
+        if (jsonMainBtn) {
+            jsonMainBtn.classList.toggle('is-pro-locked', !hasImportData);
+            jsonMainBtn.title = hasImportData ? 'Importar JSON' : 'Importar JSON — PRO';
         }
 
-        if ((!hasLocalVideo && activeProjectTab === 'local') || (!hasImportData && activeProjectTab === 'json')) {
-            activeProjectTab = 'yt';
-            const ytBtn = document.querySelector('#modal-new-game .tab-btn[data-tab="yt"]');
-            document.querySelectorAll('#modal-new-game .tab-btn').forEach(b => b.classList.toggle('active', b === ytBtn));
-            document.querySelectorAll('#modal-new-game .tab-content').forEach(c => {
-                c.classList.toggle('hidden', c.id !== 'tab-content-yt');
-            });
+        if (!hasImportData && activeMainTab === 'json') {
+            activeMainTab = 'create';
         }
+        if (!hasLocalVideo && activeCreateSource === 'local') {
+            activeCreateSource = 'yt';
+        }
+        if (!captureEnvOk && activeCreateSource === 'capture') {
+            activeCreateSource = 'yt';
+        }
+
+        document.querySelectorAll('#modal-new-game .tab-btn[data-main-tab]').forEach((b) => {
+            b.classList.toggle('active', b.dataset.mainTab === activeMainTab);
+        });
+        const paneCreate = $('#tab-content-create');
+        const paneJson = $('#tab-content-json');
+        if (paneCreate) paneCreate.classList.toggle('hidden', activeMainTab !== 'create');
+        if (paneJson) paneJson.classList.toggle('hidden', activeMainTab !== 'json');
+
+        document.querySelectorAll('#modal-new-game .new-project-source-chip').forEach((chip) => {
+            const src = chip.dataset.createSource;
+            chip.classList.toggle('active', src === activeCreateSource);
+            if (src === 'local') chip.classList.toggle('is-pro-locked', !hasLocalVideo);
+            if (src === 'capture') chip.classList.toggle('is-pro-locked', !captureEnvOk);
+        });
+
+        document.querySelectorAll('#modal-new-game .new-project-source-block').forEach((block) => {
+            const key = block.dataset.sourceBlock;
+            block.classList.toggle('hidden', activeMainTab !== 'create' || key !== activeCreateSource);
+        });
+
         updateNewProjectButtonboardRowVisibility();
+        syncNewProjectPrimaryButton();
     }
 
     // New project modal
@@ -1633,7 +2092,7 @@ import { PopoutController } from './popoutController.js';
     $('#btn-new-game').addEventListener('click', async () => {
         syncNewProjectModalByPlan();
         $('#modal-new-game').classList.remove('hidden');
-        ($('#input-game-title-yt') || {}).focus && $('#input-game-title-yt').focus();
+        ($('#input-game-title') || {}).focus?.();
 
         const hasTemplateChoice = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES);
         const sel = $('#select-new-project-buttonboard');
@@ -1664,6 +2123,7 @@ import { PopoutController } from './popoutController.js';
             _newProjectTemplates = [ButtonboardTemplates.BUILTIN_DEFAULT];
         }
         updateNewProjectButtonboardRowVisibility();
+        syncNewProjectPrimaryButton();
     });
 
     $('#btn-cancel-game').addEventListener('click', () => {
@@ -1680,48 +2140,48 @@ import { PopoutController } from './popoutController.js';
             modal.classList.add('hidden');
         });
     });
-    document.querySelectorAll('#modal-new-game .tab-btn').forEach(btn => {
+
+    document.querySelectorAll('#modal-new-game .tab-btn[data-main-tab]').forEach((btn) => {
         btn.addEventListener('click', () => {
-            if (btn.dataset.tab === 'local' && !AppState.hasFeature(FEATURES.LOCAL_VIDEO)) {
+            if (btn.dataset.mainTab === 'json' && !AppState.hasFeature(FEATURES.IMPORT_DATA)) {
                 UI.toast(getProFeatureMessage(), 'info');
                 return;
             }
-            if (btn.dataset.tab === 'json' && !AppState.hasFeature(FEATURES.IMPORT_DATA)) {
-                UI.toast(getProFeatureMessage(), 'info');
-                return;
-            }
-            activeProjectTab = btn.dataset.tab;
-            // Update buttons
-            document.querySelectorAll('#modal-new-game .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-            // Update content
-            document.querySelectorAll('#modal-new-game .tab-content').forEach(c => {
-                c.classList.toggle('hidden', c.id !== `tab-content-${activeProjectTab}`);
+            activeMainTab = btn.dataset.mainTab;
+            document.querySelectorAll('#modal-new-game .tab-btn[data-main-tab]').forEach((b) => {
+                b.classList.toggle('active', b === btn);
             });
+            $('#tab-content-create')?.classList.toggle('hidden', activeMainTab !== 'create');
+            $('#tab-content-json')?.classList.toggle('hidden', activeMainTab !== 'json');
             updateNewProjectButtonboardRowVisibility();
+            syncNewProjectPrimaryButton();
+            if (activeMainTab === 'create') $('#input-game-title')?.focus?.();
+        });
+    });
+
+    document.querySelectorAll('#modal-new-game .new-project-source-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+            const src = chip.dataset.createSource;
+            if (src === 'local' && !AppState.hasFeature(FEATURES.LOCAL_VIDEO)) {
+                UI.toast(getProFeatureMessage(), 'info');
+                return;
+            }
+            if (src === 'capture' && (typeof canRunLiveCapture !== 'function' || !canRunLiveCapture())) {
+                UI.toast('La captura no está disponible en este entorno (HTTPS, navegador compatible).', 'info');
+                return;
+            }
+            activeCreateSource = src;
+            document.querySelectorAll('#modal-new-game .new-project-source-chip').forEach((c) => {
+                c.classList.toggle('active', c.dataset.createSource === activeCreateSource);
+            });
+            document.querySelectorAll('#modal-new-game .new-project-source-block').forEach((block) => {
+                block.classList.toggle('hidden', block.dataset.sourceBlock !== activeCreateSource);
+            });
         });
     });
 
     $('#btn-save-game').addEventListener('click', async () => {
-        let title, ytId = null, localVideoUrl = null;
-
-        if (activeProjectTab === 'yt') {
-            title = $('#input-game-title-yt').value.trim();
-            const rawYtInput = $('#input-youtube-id').value.trim();
-            if (!title) { UI.toast('Ingresá un título', 'error'); return; }
-            if (!rawYtInput) { UI.toast('Ingresá un link de YouTube', 'error'); return; }
-            ytId = extractYouTubeId(rawYtInput);
-            if (!ytId) { UI.toast('No se pudo extraer el Video ID de YouTube', 'error'); return; }
-
-        } else if (activeProjectTab === 'local') {
-            if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) { UI.toast(getProFeatureMessage(), 'info'); return; }
-            title = $('#input-game-title-local').value.trim();
-            const localVideoInput = $('#input-local-video').files[0];
-            if (!title) { UI.toast('Ingresá un título', 'error'); return; }
-            if (!localVideoInput) { UI.toast('Seleccioná un video local', 'error'); return; }
-            localVideoUrl = URL.createObjectURL(localVideoInput);
-            _localVideoFileForCurrentGame = localVideoInput;
-
-        } else if (activeProjectTab === 'json') {
+        if (activeMainTab === 'json') {
             if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const jsonFile = $('#input-import-json').files[0];
             if (!jsonFile) { UI.toast('Seleccioná un archivo .json', 'error'); return; }
@@ -1731,12 +2191,11 @@ import { PopoutController } from './popoutController.js';
                 try {
                     const data = JSON.parse(e.target.result);
                     const game = AppState.importProjectData(data);
-                    
+
                     UI.hideModal('modal-new-game');
                     UI.toast(`Proyecto importado: ${game.title}`, 'success');
                     UI.refreshAll();
-                    
-                    // If it used to be a local project, show the link button
+
                     if (!game.youtube_video_id) {
                         UI.toast('Recordá vincular el archivo de video local si es necesario', 'info');
                     }
@@ -1746,17 +2205,81 @@ import { PopoutController } from './popoutController.js';
                 }
             };
             reader.readAsText(jsonFile);
-            return; // Import logic handles the rest
+            return;
         }
 
-        // Standard creation (YouTube or Local)
+        const title = ($('#input-game-title')?.value || '').trim();
+        let ytId = null;
+        let localVideoUrl = null;
+
+        if (activeCreateSource === 'yt') {
+            const rawYtInput = ($('#input-youtube-id')?.value || '').trim();
+            if (!title) { UI.toast('Ingresá un título', 'error'); return; }
+            if (!rawYtInput) { UI.toast('Ingresá un link de YouTube', 'error'); return; }
+            ytId = extractYouTubeId(rawYtInput);
+            if (!ytId) { UI.toast('No se pudo extraer el Video ID de YouTube', 'error'); return; }
+
+        } else if (activeCreateSource === 'local') {
+            if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) { UI.toast(getProFeatureMessage(), 'info'); return; }
+            const localVideoInput = $('#input-local-video')?.files?.[0];
+            if (!title) { UI.toast('Ingresá un título', 'error'); return; }
+            if (!localVideoInput) { UI.toast('Seleccioná un video local', 'error'); return; }
+            localVideoUrl = URL.createObjectURL(localVideoInput);
+            _localVideoFileForCurrentGame = localVideoInput;
+
+        } else if (activeCreateSource === 'capture') {
+            if (typeof canRunLiveCapture !== 'function' || !canRunLiveCapture()) {
+                UI.toast('La captura no está disponible en este entorno.', 'info');
+                return;
+            }
+            if (!title) { UI.toast('Ingresá un título', 'error'); return; }
+
+            AppState.clearProject();
+            DemoData.clear();
+            resetShellForNewLocalDraft();
+
+            const game = AppState.addGame(title, '', null, { video_source: 'liveCapture' });
+            AppState.setCurrentGame(game.id);
+
+            try {
+                const hasTemplateChoice = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES);
+                const sel = $('#select-new-project-buttonboard');
+                const selectedId = hasTemplateChoice && sel ? sel.value : ButtonboardTemplates.BUILTIN_DEFAULT.id;
+                const selectedTemplate = selectedId
+                    ? _newProjectTemplates.find(t => t.id === selectedId)
+                    : null;
+                const fallbackTemplate = selectedTemplate || ButtonboardTemplates.BUILTIN_DEFAULT;
+                if (fallbackTemplate) {
+                    const copy = ButtonboardTemplates.cloneTemplateForProject(fallbackTemplate);
+                    AppState.setActiveButtonboards([copy]);
+                }
+            } catch (e) {
+                console.warn('Could not apply buttonboard template:', e);
+            }
+
+            UI.hideModal('modal-new-game');
+            $('#input-game-title').value = '';
+            $('#input-youtube-id').value = '';
+            $('#input-local-video').value = '';
+            $('#input-import-json').value = '';
+
+            UI.toast(`Proyecto creado: ${title}`, 'success');
+            UI.refreshAll();
+            try {
+                _switchAnalyzeTabRef?.('livecapture');
+            } catch (_) {
+                /* noop */
+            }
+            return;
+        }
+
         AppState.clearProject();
         DemoData.clear();
+        resetShellForNewLocalDraft();
 
         const game = AppState.addGame(title, ytId, localVideoUrl);
         AppState.setCurrentGame(game.id);
 
-        // Apply buttonboard template: PRO can choose, FREE is fixed default
         try {
             const hasTemplateChoice = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES);
             const sel = $('#select-new-project-buttonboard');
@@ -1775,9 +2298,7 @@ import { PopoutController } from './popoutController.js';
 
         UI.hideModal('modal-new-game');
 
-        // Reset inputs
-        $('#input-game-title-yt').value = '';
-        $('#input-game-title-local').value = '';
+        $('#input-game-title').value = '';
         $('#input-youtube-id').value = '';
         $('#input-local-video').value = '';
         $('#input-import-json').value = '';
@@ -1808,10 +2329,14 @@ import { PopoutController } from './popoutController.js';
             const game = AppState.getCurrentGame();
             if (game) {
                 game.local_video_url = url;
+                if (game.video_source === 'liveCapture') {
+                    delete game.video_source;
+                }
                 _localVideoFileForCurrentGame = file;
                 AppState.setLocalVideoFile(file);
                 YTPlayer.loadLocalVideo(url, file);
                 UI.toast('Video re-vinculado ✅', 'success');
+                syncAnalyzeLiveCaptureTabVisibility();
             }
         });
     }
@@ -2299,6 +2824,13 @@ import { PopoutController } from './popoutController.js';
             UI.toast('El explorador de proyectos no está disponible en modo lectura', 'info');
             return;
         }
+        if (isLiveRecordingActive()) {
+            UI.toast(
+                'Hay una grabación en vivo activa. Detené la grabación antes de abrir otro proyecto.',
+                'error'
+            );
+            return;
+        }
 
         UI.showModal('modal-projects');
         const listOwned = $('#project-list');
@@ -2475,14 +3007,21 @@ import { PopoutController } from './popoutController.js';
                 el.style.gap = '8px';
 
                 const dateStr = p.updatedAt ? p.updatedAt.toLocaleDateString() : '';
+                const sourceLabel =
+                    p.youtubeVideoId && String(p.youtubeVideoId).trim() ? 'YouTube' : 'Local';
+                const datePart = dateStr
+                    ? `<span class="project-date__when">${dateStr}</span><span class="project-meta-sep" aria-hidden="true">·</span>`
+                    : '';
                 const info = document.createElement('div');
                 info.className = 'project-info';
                 info.style.flex = '1';
                 info.style.cursor = 'pointer';
                 info.style.position = 'relative';
                 info.innerHTML = `
-                    <div class="project-title" style="font-weight:500;font-size:0.9rem;">${p.title}</div>
-                    <div class="project-date" style="font-size:0.75rem;color:var(--text-muted);">${dateStr}</div>
+                    <div class="project-title">${p.title}</div>
+                    <div class="project-meta-line">
+                        ${datePart}<span class="project-source-label">${sourceLabel}</span>
+                    </div>
                 `;
 
                 const actions = document.createElement('div');
@@ -3296,6 +3835,26 @@ import { PopoutController } from './popoutController.js';
         // Space: play/pause handled by YouTube player naturally
     });
 
+    /**
+     * Con `<video>` enfocado (archivo local / WebM tras captura), el navegador aplica seek nativo
+     * con flechas sin modificadores — compite con «salto normal» (p. ej. 5 s) en Analizar y con
+     * anterior/siguiente clip en Ver. Shift+flecha no suele tener ese default, por eso el salto
+     * rápido parecía funcionar y el normal no. Evitamos el default en fase capture.
+     */
+    document.addEventListener(
+        'keydown',
+        (e) => {
+            const mode = AppState.get('mode');
+            if (mode !== 'analyze' && mode !== 'view') return;
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+            if (!e.target?.closest?.('video')) return;
+            e.preventDefault();
+        },
+        true
+    );
+
     // ═══ FLAG FILTER BAR ═══
     document.querySelectorAll('#flag-filter-bar .flag-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -3861,6 +4420,29 @@ import { PopoutController } from './popoutController.js';
         // Apply permission-based visibility immediately to avoid PRO UI flicker.
         UI.updateMode();
 
+        // ── Player + LiveCapture + __SIMPLE_REPLAY_DEV__ ANTES de auth/Firestore ──
+        // Así la consola puede probar loadLiveCapture sin esperar getUserDoc ni proyectos.
+        try {
+            await YTPlayer.init();
+        } catch (e) {
+            console.warn('YouTube Player no se pudo iniciar inmediatamente (común en file://).', e);
+        }
+
+        /** @type {import('./livecapture/LiveCaptureFacade.js').LiveCaptureFacade|null} */
+        let liveCaptureFacade = null;
+        try {
+            liveCaptureFacade = new LiveCaptureFacade();
+            liveCaptureFacade.initFromDom();
+            if (typeof YTPlayer.setLiveFacade === 'function') {
+                YTPlayer.setLiveFacade(liveCaptureFacade);
+            }
+        } catch (e) {
+            console.warn('LiveCapture facade no se pudo inicializar:', e);
+        }
+        _liveCaptureFacadeRef = liveCaptureFacade;
+
+        attachSimpleReplayDevApi({ YTPlayer, liveFacade: liveCaptureFacade, AppState });
+
         await waitForAuthReady();
         AppState.setAuthenticatedUser(getCurrentUser());
         updateAuthHeader(getCurrentUser());
@@ -3909,13 +4491,6 @@ import { PopoutController } from './popoutController.js';
             DemoData.clear();
         }
 
-        // Init YouTube Player safely (handles file:// origin errors cleanly)
-        try {
-            await YTPlayer.init();
-        } catch (e) {
-            console.warn('YouTube Player no se pudo iniciar inmediatamente (común en file://).', e);
-        }
-
         // Wire popout controller to the player commands
         try {
             wirePopout();
@@ -3935,6 +4510,12 @@ import { PopoutController } from './popoutController.js';
 
         // Init state (loads whatever is in DemoData)
         AppState.init();
+
+        try {
+            wireLiveCaptureAnalyzeTab(liveCaptureFacade);
+        } catch (e) {
+            console.warn('Captura en vivo (panel):', e);
+        }
 
         // Init timeline
         if (typeof Timeline !== 'undefined') {

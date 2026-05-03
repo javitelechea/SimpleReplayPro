@@ -38,26 +38,34 @@ export const Timeline = (() => {
     }
 
     // Helper to get the start and end seconds of the currently "visible" timeline.
-    // If a clip is selected, we zoom into [clipStart - 4s, clipEnd + 4s].
-    // If no clip is selected, we show the full duration [0, duration].
+    // If a clip is selected, we zoom into [clipStart - 5s, clipEnd + 5s] (clamped al medio disponible).
+    // Si no clip: [0, duration].
     function getTimelineBounds() {
         let duration = 0;
         if (typeof YTPlayer !== 'undefined' && YTPlayer.isReady()) {
             duration = YTPlayer.getDuration();
         }
+        const durSafe = Number.isFinite(duration) && duration > 0 ? duration : 0;
 
         const currentClipId = AppState.get('currentClipId');
-        // Focus View: clip bounds + 5s margin
-        if (currentClipId && duration > 0) {
-            const clip = AppState.get('clips').find(c => c.id === currentClipId);
+        // Vista centrada en el clip: la duración del player puede ir por detrás del clip (vivo,
+        // WebM sin metadata aún). Antes: zoomEnd = min(duration, end+5) achicaba la ventana y
+        // el segmento del clip superaba el 100 % del ancho.
+        if (currentClipId) {
+            const clip = AppState.get('clips').find((c) => c.id === currentClipId);
             if (clip) {
-                const zoomStart = Math.max(0, clip.start_sec - 5);
-                const zoomEnd = Math.min(duration, clip.end_sec + 5);
-                return { start: zoomStart, end: zoomEnd, duration: zoomEnd - zoomStart };
+                const pad = 5;
+                const zoomStart = Math.max(0, clip.start_sec - pad);
+                const zoomEndIdeal = clip.end_sec + pad;
+                const zoomEnd = Math.max(zoomEndIdeal, Math.min(durSafe, zoomEndIdeal));
+                const span = zoomEnd - zoomStart;
+                if (span > 0) {
+                    return { start: zoomStart, end: zoomEnd, duration: span };
+                }
             }
         }
 
-        return { start: 0, end: duration, duration: duration };
+        return { start: 0, end: durSafe, duration: durSafe };
     }
 
     function formatTime(sec) {

@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════ */
 
 import { AppState } from './state.js';
+import { isLiveRecordingActive } from './livecapture/liveRecordingController.js';
 import { YTPlayer } from './youtubePlayer.js';
 import { DrawingTool } from './drawing.js';
 import { FirebaseData } from './firebaseData.js';
@@ -1746,7 +1747,7 @@ export const UI = (() => {
                 if (success) {
                     toast('Novedades actualizadas \u2705', 'success');
                     renderNotifications();
-                } else {
+                } else if (!isLiveRecordingActive()) {
                     toast('Error al sincronizar', 'error');
                 }
             });

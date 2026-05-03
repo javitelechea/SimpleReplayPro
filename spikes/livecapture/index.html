@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>LiveCapture Spike — SimpleReplayPro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #181b22;
+      --border: #262a33;
+      --fg: #e8ecf1;
+      --muted: #8a93a3;
+      --accent: #4ea1ff;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+    body { padding: 16px; max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 1.3rem; margin: 0 0 6px; }
+    h2 { font-size: 0.95rem; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .hint { color: var(--muted); font-size: 0.85rem; margin: 0 0 16px; }
+    .hint code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
+    section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .col-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    label { display: inline-flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--muted); }
+    select, button { background: #20242d; color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; font-size: 0.88rem; cursor: pointer; }
+    button { font-weight: 500; }
+    button:hover:not(:disabled) { border-color: var(--accent); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background: var(--accent); color: #0b1120; border-color: var(--accent); }
+    button.danger { background: #2a1f23; border-color: #5b2b35; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; font-size: 0.88rem; }
+    .stat-grid > div { padding: 6px 0; border-bottom: 1px dashed var(--border); }
+    .stat-grid b { color: var(--fg); font-weight: 500; }
+    .mono { font-family: var(--mono); font-size: 0.85rem; }
+    video { width: 100%; max-height: 360px; background: #000; border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-family: var(--mono); }
+    th, td { padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; }
+    .scroll { max-height: 280px; overflow-y: auto; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-family: var(--mono); }
+    .badge.ok { background: #103a25; color: var(--ok); }
+    .badge.warn { background: #3a2e10; color: var(--warn); }
+    .badge.err { background: #3a1010; color: var(--err); }
+    .badge.muted { background: #20242d; color: var(--muted); }
+    a.dl { display: inline-block; padding: 7px 12px; background: #20242d; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); text-decoration: none; font-size: 0.88rem; }
+    a.dl:hover { border-color: var(--accent); }
+    .delta { font-family: var(--mono); font-size: 0.85rem; }
+    #download-row { display: none; gap: 12px; align-items: center; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>LiveCapture Spike</h1>
+  <p class="hint">
+    Validación aislada del pipeline DVR (ADR-001). Necesita <code>http://localhost</code> + Chrome.
+    Servir desde la raíz del repo: <code>./start.sh</code> → <code>http://localhost:8080/spikes/livecapture/</code>.
+  </p>
+
+  <section>
+    <h2>Configuración</h2>
+    <div class="row">
+      <label>Dispositivo
+        <select id="device-select"><option value="">— pedir permiso primero —</option></select>
+      </label>
+      <label>Resolución
+        <select id="resolution">
+          <option value="720">1280x720 @ 30</option>
+          <option value="1080">1920x1080 @ 30</option>
+          <option value="any" selected>Default del dispositivo</option>
+        </select>
+      </label>
+      <label>Codec
+        <select id="codec"></select>
+      </label>
+      <label>Timeslice
+        <select id="timeslice">
+          <option value="2000">2 s</option>
+          <option value="4000" selected>4 s</option>
+        </select>
+      </label>
+      <label>Almacenamiento
+        <select id="storage">
+          <option value="opfs" selected>OPFS</option>
+          <option value="memory">Memoria (Blob[])</option>
+        </select>
+      </label>
+      <label>&nbsp;
+        <button id="btn-permission">1) Pedir permiso cámara</button>
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Controles</h2>
+    <div class="row">
+      <button id="btn-start" class="primary" disabled>2) Iniciar captura</button>
+      <button id="btn-stop" disabled>3) Detener</button>
+      <button id="btn-consolidate" disabled>4) Consolidar a WebM único</button>
+      <button id="btn-clear" class="danger">Limpiar sesión (borra OPFS)</button>
+      <span id="state-badge" class="badge muted">idle</span>
+    </div>
+  </section>
+
+  <div class="col-2">
+    <section>
+      <h2>Preview en vivo (<code>#live-preview-video</code>)</h2>
+      <video id="live-preview-video" autoplay muted playsinline></video>
+      <div class="stat-grid" style="margin-top:10px;">
+        <div>Stream: <b id="stream-state">—</b></div>
+        <div>Recorder: <b id="recorder-state">—</b></div>
+        <div>Reloj sesión: <b id="session-clock" class="mono">0.000</b> s</div>
+        <div>Segmentos: <b id="segment-count">0</b></div>
+        <div>Total: <b id="total-bytes">0</b></div>
+        <div>Último seg.: <b id="last-segment" class="mono">—</b></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Replay consolidado (<code>#live-replay-video</code>)</h2>
+      <video id="live-replay-video" controls></video>
+      <div class="stat-grid" style="margin-top:10px;">
+        <div>Tamaño final: <b id="final-size">—</b></div>
+        <div>Duración reportada: <b id="final-duration" class="mono">—</b></div>
+        <div>Duración real: <b id="final-real-duration" class="mono">—</b></div>
+        <div>Sesión grabada: <b id="session-elapsed" class="mono">—</b></div>
+        <div>Δ sesión vs duración: <b id="duration-delta" class="delta">—</b></div>
+        <div>Estado seek: <b id="seek-state" class="mono">—</b></div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="seek-25" disabled>Seek 25%</button>
+        <button id="seek-50" disabled>Seek 50%</button>
+        <button id="seek-75" disabled>Seek 75%</button>
+        <button id="seek-end" disabled>Seek 99%</button>
+        <button id="seek-back" disabled>Volver al 0</button>
+      </div>
+      <div id="download-row">
+        <a id="btn-download" class="dl" download="livecapture.webm">↓ Descargar archivo final</a>
+        <span id="download-info" class="mono" style="color:var(--muted);"></span>
+      </div>
+    </section>
+  </div>
+
+  <section>
+    <h2>Marcas durante captura (test de sincronía)</h2>
+    <div class="row">
+      <button id="btn-mark" disabled>Crear marca @ reloj actual</button>
+      <span class="hint" style="margin:0;">Crea una marca con t_session. Luego “Saltar a” busca ese tiempo en el video consolidado.</span>
+    </div>
+    <table id="marks-table" style="margin-top:10px;">
+      <thead><tr><th>#</th><th>t_session (s)</th><th>nota</th><th>seek final (s)</th><th>Δ (s)</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Log de segmentos</h2>
+    <div class="scroll">
+      <table id="segments-table">
+        <thead><tr><th>#</th><th>t_arrival (s)</th><th>Δt (s)</th><th>tamaño</th><th>tipo</th><th>storage</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Diagnóstico</h2>
+    <pre id="diag" class="mono" style="margin:0; white-space:pre-wrap; color:var(--muted); font-size:0.78rem;"></pre>
+  </section>
+
+  <script type="module" src="./spike.js"></script>
+</body>
+</html>

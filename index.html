@@ -133,14 +133,19 @@
     <section id="video-area">
       <div id="player-container">
         <div id="youtube-player"></div>
+        <!-- LiveCapture (Fase 2+): no comparte contenedor con YouTube/archivo local -->
+        <video id="live-preview-video" class="hidden" autoplay muted playsinline></video>
+        <video id="live-replay-video" class="hidden" controls playsinline></video>
         <div id="player-chrome" class="player-chrome hidden" aria-label="Controles del reproductor">
           <div class="player-chrome__bar">
             <button type="button" id="player-chrome-seek-back" class="player-chrome__btn" title="Retroceder (paso de preferencias)" aria-label="Retroceder en el video">
               <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7l-6 5 6 5V7Zm8 0-6 5 6 5V7Z" fill="currentColor"/></svg>
             </button>
-            <button type="button" id="player-chrome-play" class="player-chrome__btn player-chrome__btn--primary" title="Reproducir o pausa" aria-label="Reproducir o pausa">
-              <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>
-            </button>
+            <div id="player-chrome-play-group" class="player-chrome__group">
+              <button type="button" id="player-chrome-play" class="player-chrome__btn player-chrome__btn--primary" title="Reproducir o pausa" aria-label="Reproducir o pausa">
+                <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>
+              </button>
+            </div>
             <button type="button" id="player-chrome-seek-fwd" class="player-chrome__btn" title="Avanzar (paso de preferencias)" aria-label="Avanzar en el video">
               <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 7v10l6-5-6-5ZM5 7v10l6-5-6-5Z" fill="currentColor"/></svg>
             </button>
@@ -341,22 +346,112 @@
 
       <!-- ═══ ANALYZE MODE PANEL ═══ -->
       <div id="panel-analyze" class="panel-content">
-        <div class="panel-section flex-grow">
-          <h3 class="section-title">
-            Clips del partido
-            <span id="clip-count" class="badge">0</span>
-            <button id="btn-live-edge" class="btn-live-edge hidden" type="button" title="Volver al vivo">↩ Volver al vivo</button>
-          </h3>
-          <div id="analyze-clip-list" class="clip-list"></div>
+        <div class="modal-tabs analyze-subtabs" role="tablist" aria-label="Panel analizar">
+          <button type="button" class="modal-tab active" data-analyze-tab="clips" role="tab" aria-selected="true"
+            id="tab-analyze-clips">Clips</button>
+          <button type="button" class="modal-tab hidden" data-analyze-tab="livecapture" role="tab" aria-selected="false"
+            id="tab-analyze-livecapture">Captura en vivo</button>
         </div>
-        <div class="panel-section panel-section-fixed"
-          style="border-top: 1px solid var(--border); padding-top: var(--sp-sm);">
-          <h3 class="section-title">Playlists</h3>
-          <div class="playlist-create-row">
-            <input id="new-playlist-name" type="text" placeholder="Nombre de playlist…" class="input-sm" />
-            <button id="btn-create-playlist" class="btn btn-sm btn-primary">+</button>
+
+        <div id="analyze-tab-clips" class="analyze-tab-pane analyze-tab-pane--clips">
+          <div class="panel-section flex-grow">
+            <h3 class="section-title">
+              Clips del partido
+              <span id="clip-count" class="badge">0</span>
+              <button id="btn-live-edge" class="player-chrome__btn player-chrome__btn--live-return hidden" type="button" title="Volver al vivo">↩ Volver al vivo</button>
+            </h3>
+            <div id="analyze-clip-list" class="clip-list"></div>
           </div>
-          <div id="analyze-playlists" class="playlist-list" style="max-height: 25vh; overflow-y: auto;"></div>
+          <div id="analyze-playlists-section" class="analyze-playlists-section">
+            <div class="panel-section panel-section-fixed"
+              style="border-top: 1px solid var(--border); padding-top: var(--sp-sm);">
+              <h3 class="section-title">Playlists</h3>
+              <div class="playlist-create-row">
+                <input id="new-playlist-name" type="text" placeholder="Nombre de playlist…" class="input-sm" />
+                <button id="btn-create-playlist" class="btn btn-sm btn-primary">+</button>
+              </div>
+              <div id="analyze-playlists" class="playlist-list" style="max-height: 25vh; overflow-y: auto;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="analyze-tab-livecapture" class="analyze-tab-pane livecapture-tab-pane hidden" role="tabpanel"
+          aria-labelledby="tab-analyze-livecapture">
+          <p id="livecapture-unavailable" class="livecapture-unavailable hidden"></p>
+          <div id="livecapture-controls" class="livecapture-controls">
+            <div class="livecapture-setup" aria-label="Configuración de captura">
+              <div class="livecapture-setup__step">
+                <span class="livecapture-setup__badge" aria-hidden="true">1</span>
+                <div class="livecapture-setup__content">
+                  <span class="livecapture-setup__heading">Detectar cámaras</span>
+                  <button type="button" id="btn-livecapture-setup-devices" class="btn btn-sm btn-outline livecapture-btn-detect">Detectar cámaras</button>
+                </div>
+              </div>
+
+              <div class="livecapture-setup__step">
+                <span class="livecapture-setup__badge" aria-hidden="true">2</span>
+                <div class="livecapture-setup__content">
+                  <div class="livecapture-field">
+                    <label for="livecapture-device">Cámara</label>
+                    <select id="livecapture-device" class="input-sm">
+                      <option value="">Predeterminada del sistema</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="livecapture-setup__step">
+                <span class="livecapture-setup__badge" aria-hidden="true">3</span>
+                <div class="livecapture-setup__content">
+                  <div class="livecapture-field">
+                    <label for="livecapture-resolution">Resolución</label>
+                    <select id="livecapture-resolution" class="input-sm">
+                      <option value="720" selected>720p</option>
+                      <option value="1080">1080p</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div id="livecapture-export-strip" class="livecapture-export-strip hidden" role="toolbar" aria-label="Exportar captura">
+              <span class="livecapture-export-strip__label">Exportar</span>
+              <div class="livecapture-bubble__tools">
+                <button type="button" id="btn-livecapture-download" class="player-chrome__btn" disabled title="Descargar .webm al disco" aria-label="Descargar .webm al disco">
+                  <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></svg>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div id="livecapture-analyze-dock" class="livecapture-analyze-dock hidden" aria-label="Controles de captura">
+          <p id="livecapture-status" class="livecapture-status" aria-live="polite"></p>
+
+          <div class="livecapture-controls-footer">
+            <div class="livecapture-bubbles livecapture-bubbles--dock">
+              <div class="livecapture-bubble livecapture-bubble--capture" role="toolbar" aria-label="Captura">
+                <span class="livecapture-bubble__label">Captura</span>
+                <div class="livecapture-bubble__tools">
+                  <button type="button" id="btn-livecapture-rec" class="player-chrome__btn player-chrome__btn--arm-rec" title="Iniciar grabación" aria-label="Iniciar grabación">
+                    <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg>
+                  </button>
+                  <button type="button" id="btn-livecapture-pause" class="player-chrome__btn player-chrome__btn--primary" title="Pausar grabación" aria-label="Pausar grabación">
+                    <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h4v12H7zM13 6h4v12h-4z" fill="currentColor"/></svg>
+                  </button>
+                  <button type="button" id="btn-livecapture-stop" class="player-chrome__btn player-chrome__btn--stop" title="Detener y finalizar" aria-label="Detener grabación">
+                    <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z" fill="currentColor"/></svg>
+                  </button>
+                  <button type="button" id="btn-livecapture-back-live" class="player-chrome__btn player-chrome__btn--live-return livecapture-btn--labeled" title="Volver al vivo" aria-label="Volver al vivo" disabled>
+                    <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" fill="currentColor"/></svg>
+                    <span class="livecapture-btn-label">Live</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -547,56 +642,67 @@
     <div class="modal-box">
       <h2>Nuevo Proyecto</h2>
 
-      <!-- Tab Navigation -->
+      <!-- Dos pestañas principales: crear vs importar -->
       <div class="modal-tabs">
-        <button class="tab-btn active" data-tab="yt">
-          <span class="tab-icon">📺</span> YouTube
+        <button type="button" class="tab-btn active" data-main-tab="create">
+          <span class="tab-icon">✚</span> Crear proyecto
         </button>
-        <button class="tab-btn" data-tab="local">
-          <span class="tab-icon">📂</span> Local
-        </button>
-        <button class="tab-btn" data-tab="json">
+        <button type="button" class="tab-btn" data-main-tab="json">
           <span class="tab-icon">📥</span> Importar JSON
         </button>
       </div>
 
-      <!-- Tab Content: YouTube -->
-      <div id="tab-content-yt" class="tab-content">
+      <!-- Crear proyecto: título, fuente (chips), bloques dinámicos, botonera -->
+      <div id="tab-content-create" class="tab-content">
         <label class="form-label">
-          Título del Proyecto
-          <input id="input-game-title-yt" type="text" class="input" placeholder="Ej: vs River Plate — Fecha 12" />
+          Título del proyecto
+          <input id="input-game-title" type="text" class="input" placeholder="Ej: vs River Plate — Fecha 12" />
         </label>
-        <label class="form-label" style="margin-top: 15px;">
-          Enlace de YouTube
-          <input id="input-youtube-id" type="text" class="input" placeholder="Pegá el link de YouTube acá" />
-          <span class="form-hint">Podés pegar el link completo o solo el ID del video</span>
-        </label>
-      </div>
 
-      <!-- Tab Content: Local Video -->
-      <div id="tab-content-local" class="tab-content hidden">
-        <label class="form-label">
-          Título del Proyecto
-          <input id="input-game-title-local" type="text" class="input" placeholder="Ej: Entrenamiento Táctico" />
-        </label>
-        <label class="form-label" style="margin-top: 15px;">
-          Seleccionar Video Local
-          <input id="input-local-video" type="file" class="input" accept="video/*" />
-        </label>
-      </div>
+        <div class="form-label" style="margin-top: 18px;">
+          <span class="new-project-source-label">Fuente del video</span>
+          <div class="new-project-source-picker" role="group" aria-label="Fuente del video">
+            <button type="button" class="new-project-source-chip active" data-create-source="yt">
+              <span class="new-project-source-chip__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none"/>
+                </svg>
+              </span>
+              <span class="new-project-source-chip__text">YouTube</span>
+            </button>
+            <button type="button" class="new-project-source-chip" data-create-source="local">
+              <span class="new-project-source-chip__icon" aria-hidden="true">📂</span>
+              <span class="new-project-source-chip__text">Archivo local</span>
+            </button>
+            <button type="button" class="new-project-source-chip" data-create-source="capture">
+              <span class="new-project-source-chip__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+              <span class="new-project-source-chip__text">Captura en vivo</span>
+            </button>
+          </div>
+        </div>
 
-      <!-- Tab Content: JSON Import -->
-      <div id="tab-content-json" class="tab-content hidden">
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
-          Cargá un archivo .json exportado previamente para restaurar todos los clips, etiquetas y playlists.
-        </p>
-        <label class="form-label">
-          Archivo del Proyecto (.json)
-          <input id="input-import-json" type="file" class="input" accept=".json" />
-        </label>
-      </div>
+        <div id="new-project-block-yt" class="new-project-source-block" data-source-block="yt">
+          <label class="form-label" style="margin-top: 15px;">
+            Enlace de YouTube
+            <input id="input-youtube-id" type="text" class="input" placeholder="Pegá el link de YouTube acá" />
+            <span class="form-hint">Podés pegar el link completo o solo el ID del video</span>
+          </label>
+        </div>
 
-      <!-- YouTube + Local: misma elección de botonera (no aplica a importar JSON) -->
+        <div id="new-project-block-local" class="new-project-source-block hidden" data-source-block="local">
+          <label class="form-label" style="margin-top: 15px;">
+            Video local
+            <input id="input-local-video" type="file" class="input" accept="video/*" />
+          </label>
+        </div>
+
+        <div id="new-project-block-capture" class="new-project-source-block hidden" data-source-block="capture">
+          <p class="new-project-capture-info">
+            Se creará el proyecto sin video. Configurá cámara y calidad en <strong>Analizar → Captura en vivo</strong> cuando entres al partido.
+          </p>
+        </div>
+
       <div id="new-project-buttonboard-row" class="form-label" style="margin-top: 15px;">
         Ventana de código inicial
         <select id="select-new-project-buttonboard" class="input hidden">
@@ -606,10 +712,22 @@
         <span id="hint-new-project-buttonboard-pro" class="form-hint hidden">Se copia al proyecto — podés editarla después</span>
         <span id="hint-new-project-buttonboard-free" class="form-hint">Fija por defecto en Free (podés editarla después)</span>
       </div>
+      </div>
+
+      <!-- Importar JSON (solo archivo + importar) -->
+      <div id="tab-content-json" class="tab-content hidden">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+          Cargá un archivo .json exportado previamente para restaurar todos los clips, etiquetas y playlists.
+        </p>
+        <label class="form-label">
+          Archivo del proyecto (.json)
+          <input id="input-import-json" type="file" class="input" accept=".json" />
+        </label>
+      </div>
 
       <div class="modal-actions" style="margin-top: 20px;">
         <button id="btn-cancel-game" class="btn btn-ghost">Cancelar</button>
-        <button id="btn-save-game" class="btn btn-primary">Crear proyecto</button>
+        <button id="btn-save-game" type="button" class="btn btn-primary">Crear proyecto</button>
       </div>
     </div>
   </div>

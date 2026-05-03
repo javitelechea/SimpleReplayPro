@@ -96,7 +96,10 @@ export const DemoData = (() => {
 
     function getGames() { return [...games]; }
 
-    function createGame(title, youtubeVideoId, localVideoUrl = null, createdBy) {
+    /**
+     * @param {{ video_source?: string }} [opts] — p.ej. `{ video_source: 'liveCapture' }` sin video aún.
+     */
+    function createGame(title, youtubeVideoId, localVideoUrl = null, createdBy, opts = null) {
         const g = {
             id: uuid(),
             title,
@@ -105,6 +108,9 @@ export const DemoData = (() => {
             created_by: createdBy,
             created_at: new Date().toISOString()
         };
+        if (opts && typeof opts.video_source === 'string' && opts.video_source) {
+            g.video_source = opts.video_source;
+        }
         games.push(g);
         return g;
     }
