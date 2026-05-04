@@ -59,6 +59,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     const SEEK_STEP_SHIFT_KEY = 'sr_seek_step_shift_sec';
     const DEFAULT_SEEK_STEP = 5;
     const DEFAULT_SEEK_STEP_SHIFT = 1;
+    /** ~1 frame a 30 fps; el API de YouTube a veces cae en keyframe cercano. */
+    const FRAME_SEEK_STEP_SEC = 1 / 30;
     const AUTO_SAVE_ENABLED_KEY = 'sr_auto_save_enabled';
     const AUTO_SAVE_INTERVAL_MS = 60000;
     const DEFAULT_SHORTCUTS = {
@@ -392,6 +394,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
     function matchesShortcut(e, action) {
         return eventToShortcut(e) === getShortcut(action);
+    }
+
+    /** Cmd (Mac) o Ctrl (Win/Linux) + flecha: un fotograma. Sin Shift/Alt (esos quedan para saltos de tiempo y clip). */
+    function isFrameStepShortcut(e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return false;
+        if (e.shiftKey || e.altKey) return false;
+        return !!(e.metaKey || e.ctrlKey);
     }
 
     function openPreferencesModal() {
@@ -938,7 +947,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
     }
 
-    function showPlayerSeekFeedback(dir, seconds, sideHint = null) {
+    function showPlayerSeekFeedback(dir, seconds, sideHint = null, opts = null) {
         const container = $('#player-container');
         if (!container) return;
         let badge = container.querySelector('.player-surface-seek-feedback');
@@ -949,7 +958,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
         const effectiveDir = dir < 0 ? -1 : 1;
         const side = sideHint || (effectiveDir > 0 ? 'right' : 'left');
-        badge.textContent = `${effectiveDir > 0 ? '+' : '-'}${Math.max(1, Math.round(Number(seconds) || 0))}`;
+        if (opts && opts.frame) {
+            badge.textContent = effectiveDir > 0 ? '+1f' : '-1f';
+        } else {
+            badge.textContent = `${effectiveDir > 0 ? '+' : '-'}${Math.max(1, Math.round(Number(seconds) || 0))}`;
+        }
         badge.classList.remove('left', 'right', 'show');
         badge.classList.add(side === 'left' ? 'left' : 'right');
         void badge.offsetWidth; // restart animation
@@ -3998,6 +4011,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         // Don't handle shortcuts when typing in inputs
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+        if (e.target && e.target.isContentEditable) return;
         // Avoid double-toggle: when a button/control has focus, Space may trigger native click.
         if (matchesShortcut(e, 'playPause') && e.target && typeof e.target.closest === 'function') {
             if (e.target.closest('button, a, [role="button"], summary, video')) return;
@@ -4020,6 +4034,21 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         // Arrow keys: seek video (Analyze mode)
         if (mode === 'analyze') {
+            if (isFrameStepShortcut(e) && typeof YTPlayer !== 'undefined' && YTPlayer.seekTo) {
+                e.preventDefault();
+                const t = YTPlayer.getCurrentTime();
+                const step = FRAME_SEEK_STEP_SEC;
+                const dur = (YTPlayer.getDuration && YTPlayer.getDuration()) || 0;
+                if (e.key === 'ArrowLeft') {
+                    YTPlayer.seekTo(Math.max(0, t - step));
+                    showPlayerSeekFeedback(-1, step, null, { frame: true });
+                } else {
+                    const next = dur > 0 ? Math.min(dur, t + step) : t + step;
+                    YTPlayer.seekTo(next);
+                    showPlayerSeekFeedback(1, step, null, { frame: true });
+                }
+                return;
+            }
             if (matchesShortcut(e, 'seekLeft') || matchesShortcut(e, 'seekLeftFast')) {
                 e.preventDefault();
                 const t = YTPlayer.getCurrentTime();
@@ -4050,6 +4079,21 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         // Arrow keys: navigate clips (View mode). Flechas solas = clip anterior/siguiente;
         // Shift+flecha (u otros atajos de seekLeftFast/seekRightFast) = salto de tiempo como en Análisis.
         if (mode === 'view') {
+            if (isFrameStepShortcut(e) && typeof YTPlayer !== 'undefined' && YTPlayer.seekTo) {
+                e.preventDefault();
+                const t = YTPlayer.getCurrentTime();
+                const step = FRAME_SEEK_STEP_SEC;
+                const dur = (YTPlayer.getDuration && YTPlayer.getDuration()) || 0;
+                if (e.key === 'ArrowLeft') {
+                    YTPlayer.seekTo(Math.max(0, t - step));
+                    showPlayerSeekFeedback(-1, step, null, { frame: true });
+                } else {
+                    const next = dur > 0 ? Math.min(dur, t + step) : t + step;
+                    YTPlayer.seekTo(next);
+                    showPlayerSeekFeedback(1, step, null, { frame: true });
+                }
+                return;
+            }
             if (matchesShortcut(e, 'seekLeftFast')) {
                 e.preventDefault();
                 const t = YTPlayer.getCurrentTime();
@@ -4123,6 +4167,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const mode = AppState.get('mode');
             if (mode !== 'analyze' && mode !== 'view') return;
             if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+            if (e.target?.isContentEditable) return;
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
             if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
             if (!e.target?.closest?.('video')) return;
