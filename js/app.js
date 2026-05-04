@@ -2893,6 +2893,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         let activeFolderFilterId = '';
         const RECENT_FILTER_KEY = '__recent__';
         const NO_FOLDER_FILTER_KEY = '__none__';
+        const FOLDER_COLOR_PALETTE = ['#9ca3af', '#ffffff', '#ef4444', '#3b82f6', '#22c55e', '#facc15', '#f97316', '#38bdf8'];
+        const DEFAULT_FOLDER_COLOR = '';
         const queueFolderStateSave = () => {
             if (!canUseFolders) return;
             if (_folderSaveTimer) clearTimeout(_folderSaveTimer);
@@ -2932,6 +2934,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (typeof p?.updated_at === 'number') return p.updated_at;
             return 0;
         };
+        const getFolderColor = (folder) => {
+            const c = String(folder?.color || '').trim();
+            return /^#[0-9a-fA-F]{6}$/.test(c) ? c : '';
+        };
 
         const createFolderFromInline = async (rawName) => {
             if (!canUseFolders) return null;
@@ -2943,7 +2949,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 return folderState.folders.find((f) => String(f.name).toLowerCase() === name.toLowerCase())?.id || null;
             }
             const folderId = `fld_${Date.now().toString(36)}`;
-            folderState.folders.push({ id: folderId, name });
+            folderState.folders.push({ id: folderId, name, color: DEFAULT_FOLDER_COLOR });
             folderState.folders = sortAlpha(folderState.folders, 'name');
             queueFolderStateSave();
             return folderId;
@@ -2985,6 +2991,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             renderOwnedWithFolders();
             ensureProjectsSearchUI();
             UI.toast('Carpeta renombrada', 'success');
+        };
+
+        const setFolderColor = (folderId, color) => {
+            const folder = (folderState.folders || []).find((x) => x.id === folderId);
+            if (!folder) return;
+            if (!/^#[0-9a-fA-F]{6}$/.test(String(color || ''))) return;
+            folder.color = color;
+            queueFolderStateSave();
+            renderOwnedWithFolders();
+            ensureProjectsSearchUI();
         };
 
         const deleteFolderWithStrategy = async (folderId) => {
@@ -3097,8 +3113,42 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 btnDelete.className = 'btn btn-xs btn-danger';
                 btnDelete.textContent = 'Eliminar';
                 btnDelete.addEventListener('click', () => deleteFolderWithStrategy(folder.id));
+                const colorMenuWrap = document.createElement('div');
+                colorMenuWrap.style.cssText = 'position:relative;';
+                const btnColor = document.createElement('button');
+                btnColor.type = 'button';
+                btnColor.className = 'btn btn-xs btn-ghost';
+                btnColor.textContent = 'Color';
+                const currentColor = getFolderColor(folder);
+                btnColor.style.borderColor = currentColor || 'var(--border)';
+                const colorMenu = document.createElement('div');
+                colorMenu.style.cssText = 'position:absolute;right:0;top:calc(100% + 6px);display:none;grid-template-columns:repeat(4, 18px);gap:6px;padding:6px;border:1px solid var(--border);border-radius:8px;background:rgba(18,20,26,.98);box-shadow:0 8px 20px rgba(0,0,0,.35);z-index:35;';
+                FOLDER_COLOR_PALETTE.forEach((c) => {
+                    const colorBtn = document.createElement('button');
+                    colorBtn.type = 'button';
+                    colorBtn.className = 'btn btn-xs btn-ghost';
+                    colorBtn.title = `Color ${c}`;
+                    colorBtn.style.cssText = `width:16px;height:16px;min-width:16px;padding:0;border-radius:999px;border:2px solid ${currentColor === c ? 'var(--text)' : 'transparent'};background:${c};`;
+                    colorBtn.addEventListener('click', () => {
+                        setFolderColor(folder.id, c);
+                        colorMenu.style.display = 'none';
+                    });
+                    colorMenu.appendChild(colorBtn);
+                });
+                btnColor.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    const open = colorMenu.style.display !== 'none';
+                    document.querySelectorAll('[data-folder-color-menu]').forEach((menuEl) => {
+                        menuEl.style.display = 'none';
+                    });
+                    colorMenu.style.display = open ? 'none' : 'grid';
+                });
+                colorMenu.dataset.folderColorMenu = '1';
+                colorMenuWrap.appendChild(btnColor);
+                colorMenuWrap.appendChild(colorMenu);
                 actions.appendChild(btnRename);
                 actions.appendChild(btnDelete);
+                actions.appendChild(colorMenuWrap);
                 row.appendChild(name);
                 row.appendChild(actions);
                 list.appendChild(row);
@@ -3155,6 +3205,14 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 btnCloseManage.addEventListener('click', () => {
                     const panel = $('#project-folder-admin-panel');
                     if (panel) panel.classList.add('hidden');
+                });
+            }
+            if (!document.body.dataset.wiredFolderColorMenusClose) {
+                document.body.dataset.wiredFolderColorMenusClose = '1';
+                document.addEventListener('click', () => {
+                    document.querySelectorAll('[data-folder-color-menu]').forEach((menuEl) => {
+                        menuEl.style.display = 'none';
+                    });
                 });
             }
         };
@@ -3596,12 +3654,15 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const renderOwnedWithFolders = () => {
             if (foldersSummary) {
                 const folders = sortedFolders();
-                const chip = (id, label, active = false) => `<button type="button" class="project-folder-chip${active ? ' is-active' : ''}" data-folder-chip="${id}" style="display:inline-flex;align-items:center;gap:4px;border:1px solid ${active ? 'var(--accent)' : 'var(--border)'};border-radius:999px;padding:2px 8px;margin:0 6px 6px 0;font-size:.72rem;color:${active ? 'var(--text)' : 'var(--text-muted)'};background:${active ? 'var(--accent-glow)' : 'transparent'};cursor:pointer;">${label}</button>`;
+                const chip = (id, label, active = false, color = '') => {
+                    const borderColor = color || (active ? 'var(--accent)' : 'var(--border)');
+                    return `<button type="button" class="project-folder-chip${active ? ' is-active' : ''}" data-folder-chip="${id}" style="display:inline-flex;align-items:center;gap:5px;border:1px solid ${borderColor};border-radius:999px;padding:2px 8px;margin:0 6px 6px 0;font-size:.72rem;color:${active ? 'var(--text)' : 'var(--text-muted)'};background:${active ? 'var(--accent-glow)' : 'transparent'};cursor:pointer;">${label}</button>`;
+                };
                 foldersSummary.innerHTML = [
                     chip('', 'Todos', !activeFolderFilterId),
                     chip(RECENT_FILTER_KEY, 'Recientes', activeFolderFilterId === RECENT_FILTER_KEY),
                     chip(NO_FOLDER_FILTER_KEY, 'Sin carpeta', activeFolderFilterId === NO_FOLDER_FILTER_KEY),
-                    ...folders.map((f) => chip(f.id, f.name, activeFolderFilterId === f.id)),
+                    ...folders.map((f) => chip(f.id, f.name, activeFolderFilterId === f.id, getFolderColor(f))),
                 ].join('');
                 foldersSummary.querySelectorAll('[data-folder-chip]').forEach((btn) => {
                     btn.addEventListener('click', () => {
