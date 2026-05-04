@@ -2892,6 +2892,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         let _folderSaveQueuedWhileBusy = false;
         let activeFolderFilterId = '';
         const RECENT_FILTER_KEY = '__recent__';
+        const NO_FOLDER_FILTER_KEY = '__none__';
         const queueFolderStateSave = () => {
             if (!canUseFolders) return;
             if (_folderSaveTimer) clearTimeout(_folderSaveTimer);
@@ -2948,6 +2949,162 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             return folderId;
         };
 
+        const getOwnedProjectsInFolder = (folderId) =>
+            ownedProjectsCache.filter((p) => getProjectFolderIds(p.id).includes(folderId));
+
+        const removeFolderEverywhere = (folderId, targetFolderId = null) => {
+            Object.keys(folderState.projectMap || {}).forEach((projectId) => {
+                const current = getProjectFolderIds(projectId);
+                if (!current.includes(folderId)) return;
+                const stripped = current.filter((id) => id !== folderId);
+                const merged = targetFolderId ? Array.from(new Set([...stripped, targetFolderId])) : stripped;
+                setProjectFolderIds(projectId, merged);
+            });
+            folderState.folders = (folderState.folders || []).filter((f) => f.id !== folderId);
+            if (activeFolderFilterId === folderId) activeFolderFilterId = '';
+            collapsedFolderKeys.delete(folderId);
+        };
+
+        const renameFolder = async (folderId) => {
+            const f = (folderState.folders || []).find((x) => x.id === folderId);
+            if (!f) return;
+            const nextName = prompt('Nuevo nombre de la carpeta:', f.name);
+            if (!nextName) return;
+            const clean = String(nextName).trim();
+            if (!clean || clean === f.name) return;
+            const duplicated = (folderState.folders || []).some((x) =>
+                x.id !== folderId && String(x.name || '').toLowerCase() === clean.toLowerCase()
+            );
+            if (duplicated) {
+                UI.toast('Ya existe una carpeta con ese nombre', 'error');
+                return;
+            }
+            f.name = clean;
+            folderState.folders = sortAlpha(folderState.folders, 'name');
+            queueFolderStateSave();
+            renderOwnedWithFolders();
+            ensureProjectsSearchUI();
+            UI.toast('Carpeta renombrada', 'success');
+        };
+
+        const deleteFolderWithStrategy = async (folderId) => {
+            const folder = (folderState.folders || []).find((f) => f.id === folderId);
+            if (!folder) return;
+            const projectsInFolder = getOwnedProjectsInFolder(folderId);
+            const count = projectsInFolder.length;
+            const option = prompt(
+                `Eliminar carpeta "${folder.name}" (${count} proyecto${count === 1 ? '' : 's'}).\n\n` +
+                `1 = Dejar proyectos sin carpeta\n` +
+                `2 = Transferir proyectos a otra carpeta\n` +
+                `3 = Eliminar todos los proyectos de esta carpeta\n\n` +
+                `Escribí 1, 2 o 3`
+            );
+            if (!option) return;
+            const choice = option.trim();
+            if (!['1', '2', '3'].includes(choice)) {
+                UI.toast('Opción inválida. Escribí 1, 2 o 3.', 'error');
+                return;
+            }
+
+            if (choice === '1') {
+                removeFolderEverywhere(folderId, null);
+                queueFolderStateSave();
+                renderOwnedWithFolders();
+                ensureProjectsSearchUI();
+                UI.toast('Carpeta eliminada. Proyectos movidos a "Sin carpeta".', 'success');
+                return;
+            }
+
+            if (choice === '2') {
+                const candidates = (folderState.folders || []).filter((f) => f.id !== folderId);
+                if (!candidates.length) {
+                    UI.toast('No hay otra carpeta para transferir. Creá una primero.', 'info');
+                    return;
+                }
+                const numbered = candidates.map((f, i) => `${i + 1} = ${f.name}`).join('\n');
+                const targetAnswer = prompt(
+                    `Elegí carpeta destino para "${folder.name}":\n\n${numbered}\n\nEscribí el número`
+                );
+                if (!targetAnswer) return;
+                const idx = Number(targetAnswer) - 1;
+                if (!Number.isInteger(idx) || idx < 0 || idx >= candidates.length) {
+                    UI.toast('Destino inválido.', 'error');
+                    return;
+                }
+                const target = candidates[idx];
+                removeFolderEverywhere(folderId, target.id);
+                queueFolderStateSave();
+                renderOwnedWithFolders();
+                ensureProjectsSearchUI();
+                UI.toast(`Carpeta eliminada. Proyectos transferidos a "${target.name}".`, 'success');
+                return;
+            }
+
+            const confirmDelete = confirm(
+                `⚠️ Esto eliminará ${count} proyecto${count === 1 ? '' : 's'} de la nube y no se puede deshacer.\n\n¿Continuar?`
+            );
+            if (!confirmDelete) return;
+            try {
+                for (const p of projectsInFolder) {
+                    await FirebaseData.deleteProjectCloud(p.id);
+                }
+                ownedProjectsCache = ownedProjectsCache.filter((p) => !projectsInFolder.some((x) => x.id === p.id));
+                removeFolderEverywhere(folderId, null);
+                queueFolderStateSave();
+                renderOwnedWithFolders();
+                ensureProjectsSearchUI();
+                UI.toast(
+                    `Carpeta eliminada. ${count} proyecto${count === 1 ? '' : 's'} eliminado${count === 1 ? '' : 's'}.`,
+                    'success'
+                );
+            } catch (e) {
+                console.error('deleteFolderWithStrategy:', e);
+                UI.toast(`No se pudo eliminar carpeta/proyectos: ${e?.message || e}`, 'error');
+            }
+        };
+
+        const renderFolderAdminPanel = () => {
+            const panel = $('#project-folder-admin-panel');
+            const list = $('#project-folder-admin-list');
+            if (!panel || !list) return;
+            if (panel.classList.contains('hidden')) return;
+            if (!canUseFolders) {
+                list.innerHTML = '<p style="color:var(--text-muted);font-size:.78rem;">Iniciá sesión para administrar carpetas y guardarlas en la nube.</p>';
+                return;
+            }
+            const folders = sortedFolders();
+            list.innerHTML = '';
+            if (!folders.length) {
+                list.innerHTML = '<p style="color:var(--text-muted);font-size:.78rem;">No hay carpetas creadas todavía.</p>';
+                return;
+            }
+            folders.forEach((folder) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;';
+                const count = getOwnedProjectsInFolder(folder.id).length;
+                const name = document.createElement('div');
+                name.style.cssText = 'font-size:.78rem;color:var(--text);';
+                name.textContent = `${folder.name} (${count})`;
+                const actions = document.createElement('div');
+                actions.style.cssText = 'display:flex;gap:6px;';
+                const btnRename = document.createElement('button');
+                btnRename.type = 'button';
+                btnRename.className = 'btn btn-xs btn-ghost';
+                btnRename.textContent = 'Renombrar';
+                btnRename.addEventListener('click', () => renameFolder(folder.id));
+                const btnDelete = document.createElement('button');
+                btnDelete.type = 'button';
+                btnDelete.className = 'btn btn-xs btn-danger';
+                btnDelete.textContent = 'Eliminar';
+                btnDelete.addEventListener('click', () => deleteFolderWithStrategy(folder.id));
+                actions.appendChild(btnRename);
+                actions.appendChild(btnDelete);
+                row.appendChild(name);
+                row.appendChild(actions);
+                list.appendChild(row);
+            });
+        };
+
         const ensureProjectsSearchUI = () => {
             const modalBox = listOwned?.closest('.modal-box');
             if (!modalBox) return;
@@ -2957,7 +3114,17 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 wrap.id = 'project-search-wrap';
                 wrap.className = 'project-search-wrap';
                 wrap.innerHTML = `
-                    <input id="project-search-input" type="text" class="input-sm project-search-input" placeholder="Buscar proyecto..." />
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input id="project-search-input" type="text" class="input-sm project-search-input" placeholder="Buscar proyecto..." />
+                        <button id="btn-manage-folders" type="button" class="btn btn-xs btn-ghost" style="white-space:nowrap;">Administrar carpetas</button>
+                    </div>
+                    <div id="project-folder-admin-panel" class="hidden" style="margin-top:8px;padding:8px;border:1px solid var(--border);border-radius:10px;background:rgba(18,20,26,.75);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+                            <strong style="font-size:.76rem;color:var(--text-muted);">Carpetas</strong>
+                            <button id="btn-close-manage-folders" type="button" class="btn btn-xs btn-ghost">Cerrar</button>
+                        </div>
+                        <div id="project-folder-admin-list"></div>
+                    </div>
                 `;
                 listOwned.parentNode.insertBefore(wrap, listOwned);
             }
@@ -2970,6 +3137,26 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 });
             }
             if (input) input.value = projectSearchQuery;
+
+            const btnManage = $('#btn-manage-folders');
+            if (btnManage && !btnManage.dataset.wiredManageFolders) {
+                btnManage.dataset.wiredManageFolders = '1';
+                btnManage.addEventListener('click', () => {
+                    const panel = $('#project-folder-admin-panel');
+                    if (!panel) return;
+                    panel.classList.toggle('hidden');
+                    if (!panel.classList.contains('hidden')) renderFolderAdminPanel();
+                });
+            }
+            if (btnManage) btnManage.style.display = '';
+            const btnCloseManage = $('#btn-close-manage-folders');
+            if (btnCloseManage && !btnCloseManage.dataset.wiredCloseManageFolders) {
+                btnCloseManage.dataset.wiredCloseManageFolders = '1';
+                btnCloseManage.addEventListener('click', () => {
+                    const panel = $('#project-folder-admin-panel');
+                    if (panel) panel.classList.add('hidden');
+                });
+            }
         };
 
         const setActiveFolderFilter = (folderId = '') => {
@@ -3321,25 +3508,37 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 .sort((a, b) => getUpdatedMs(b) - getUpdatedMs(a))
                 .slice(0, 8);
 
-            if (activeFolderFilterId === RECENT_FILTER_KEY) {
+            const renderRecentSection = () => {
                 if (!recentRows.length) {
-                    container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">No hay recientes</p>';
-                    return;
+                    if (activeFolderFilterId === RECENT_FILTER_KEY) {
+                        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">No hay recientes</p>';
+                        return true;
+                    }
+                    return false;
                 }
+                const isCollapsed = collapsedFolderKeys.has(RECENT_FILTER_KEY);
                 const recentTitle = document.createElement('div');
-                recentTitle.className = 'project-group-title';
-                recentTitle.textContent = 'Recientes';
+                recentTitle.className = 'project-group-title project-group-title--clickable';
+                recentTitle.innerHTML = `<span>${isCollapsed ? '▸' : '▾'} Recientes</span><span class="project-group-count">${recentRows.length}</span>`;
+                recentTitle.addEventListener('click', () => {
+                    if (collapsedFolderKeys.has(RECENT_FILTER_KEY)) collapsedFolderKeys.delete(RECENT_FILTER_KEY);
+                    else collapsedFolderKeys.add(RECENT_FILTER_KEY);
+                    renderOwnedWithFolders();
+                });
                 container.appendChild(recentTitle);
-                recentRows.forEach((p) => container.appendChild(renderProjectRow(p)));
+                if (!isCollapsed) {
+                    recentRows.forEach((p) => container.appendChild(renderProjectRow(p)));
+                }
+                return true;
+            };
+
+            if (activeFolderFilterId === RECENT_FILTER_KEY) {
+                renderRecentSection();
                 return;
             }
 
-            if (!activeFolderFilterId && recentRows.length) {
-                const recentTitle = document.createElement('div');
-                recentTitle.className = 'project-group-title';
-                recentTitle.textContent = 'Recientes';
-                container.appendChild(recentTitle);
-                recentRows.forEach((p) => container.appendChild(renderProjectRow(p)));
+            if (!activeFolderFilterId) {
+                renderRecentSection();
             }
 
             filtered.forEach((p) => {
@@ -3401,6 +3600,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 foldersSummary.innerHTML = [
                     chip('', 'Todos', !activeFolderFilterId),
                     chip(RECENT_FILTER_KEY, 'Recientes', activeFolderFilterId === RECENT_FILTER_KEY),
+                    chip(NO_FOLDER_FILTER_KEY, 'Sin carpeta', activeFolderFilterId === NO_FOLDER_FILTER_KEY),
                     ...folders.map((f) => chip(f.id, f.name, activeFolderFilterId === f.id)),
                 ].join('');
                 foldersSummary.querySelectorAll('[data-folder-chip]').forEach((btn) => {
@@ -3410,6 +3610,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     });
                 });
             }
+            renderFolderAdminPanel();
             renderList(listOwned, ownedProjectsCache, { withFolders: true });
         };
 
