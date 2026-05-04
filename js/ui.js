@@ -479,6 +479,7 @@ export const UI = (() => {
             panel.querySelectorAll('.chat-message[data-drawing-ts]').forEach(row => {
                 row.style.cursor = 'pointer';
                 row.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     if (e.target.closest('.drawing-delete-btn')) return;
                     const ts = row.getAttribute('data-drawing-ts');
                     const comments = AppState.getComments(playlistId, clipId);
@@ -581,6 +582,7 @@ export const UI = (() => {
         panel.querySelectorAll('.chat-message[data-drawing-ts]').forEach(row => {
             row.style.cursor = 'pointer';
             row.addEventListener('click', (e) => {
+                e.stopPropagation();
                 if (e.target.closest('.drawing-delete-btn')) return;
                 const ts = row.getAttribute('data-drawing-ts');
                 const comments = AppState.getComments(playlistId, clipId);
@@ -1276,13 +1278,19 @@ export const UI = (() => {
                 if (typeof DrawingTool.dismissPlaybackOverlays === 'function') {
                     DrawingTool.dismissPlaybackOverlays();
                 }
+                if (typeof DrawingTool.dismissDrawingPreview === 'function') {
+                    DrawingTool.dismissDrawingPreview();
+                }
                 if (!currentClipId && typeof DrawingTool.stopPlaybackWatch === 'function') {
                     DrawingTool.stopPlaybackWatch();
                 }
             }
-            const preview = document.getElementById('drawing-preview-overlay');
-            if (preview) preview.classList.remove('active');
         };
+
+        if (!toolbarEl) {
+            clearDrawingOverlays();
+            return;
+        }
 
         if (toolbarEl) {
             const restartBtn = $('#btn-clip-restart');

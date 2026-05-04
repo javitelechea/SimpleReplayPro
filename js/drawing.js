@@ -203,10 +203,8 @@ export const DrawingTool = (() => {
 
         // Always exit drawing mode right after a successful save.
         close();
-        // Ensure no stale drawing overlays remain visible.
         dismissPlaybackOverlays();
-        const preview = document.getElementById('drawing-preview-overlay');
-        if (preview) preview.classList.remove('active');
+        dismissDrawingPreview();
         UI.toast('Dibujo guardado y cerrado ✅', 'success');
     }
 
@@ -421,34 +419,58 @@ export const DrawingTool = (() => {
         if (sizeSlider) sizeSlider.value = _lineWidth;
     }
 
+    /** Cierra el preview manual desde chat. Llamar al cambiar de clip / partido. */
+    function dismissDrawingPreview() {
+        const overlay = document.getElementById('drawing-preview-overlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+            overlay.onclick = null;
+            overlay.hidden = true;
+        }
+        document.getElementById('drawing-embed-blocker')?.remove();
+    }
+
     // ── Show a saved drawing overlay on the video ──
     function showDrawingOverlay(dataUrl, videoTimeSec) {
         // Seek to the exact moment the drawing was made
         if (videoTimeSec !== undefined && videoTimeSec !== null) {
             YTPlayer.seekTo(videoTimeSec);
-            YTPlayer.pause();
         }
+        // Always freeze playback when opening a drawing preview.
+        // (Some legacy comments have no timestamp; also guard against seek/play races.)
+        YTPlayer.pause();
+        setTimeout(() => {
+            try { YTPlayer.pause(); } catch (_) { /* noop */ }
+        }, 40);
 
-        // Create or reuse overlay
+        const pc = document.getElementById('player-container');
+        if (!pc) return;
+
         let overlay = document.getElementById('drawing-preview-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'drawing-preview-overlay';
             overlay.className = 'drawing-preview-overlay';
-            document.getElementById('player-container').appendChild(overlay);
+            pc.appendChild(overlay);
         }
+        document.getElementById('drawing-embed-blocker')?.remove();
+        overlay.hidden = false;
+
+        const closePreview = () => {
+            dismissDrawingPreview();
+        };
 
         overlay.innerHTML = `<img src="${dataUrl}" alt="Dibujo" /><button class="drawing-preview-close" title="Cerrar">✕</button>`;
         overlay.classList.add('active');
 
         overlay.querySelector('.drawing-preview-close').addEventListener('click', () => {
-            overlay.classList.remove('active');
+            closePreview();
         });
 
-        // Click outside drawing to close
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) overlay.classList.remove('active');
-        });
+        // Click outside drawing to close (single handler; overlay is reused each open)
+        overlay.onclick = (e) => {
+            if (e.target === overlay) closePreview();
+        };
     }
 
     function isActive() { return _active; }
@@ -490,6 +512,7 @@ export const DrawingTool = (() => {
         _watchPlaylistId = null;
         _watchClipId = null;
         _watchShownIds = new Set();
+        dismissDrawingPreview();
     }
 
     function hasPlaybackOverlays() {
@@ -529,5 +552,6 @@ export const DrawingTool = (() => {
     }
 
     return { init, open, close, save, isActive, showDrawingOverlay,
-             startPlaybackWatch, stopPlaybackWatch, hasPlaybackOverlays, dismissPlaybackOverlays };
+             startPlaybackWatch, stopPlaybackWatch, hasPlaybackOverlays, dismissPlaybackOverlays,
+             dismissDrawingPreview };
 })();

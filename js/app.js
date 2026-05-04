@@ -1325,6 +1325,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (evTarget.closest('#player-chrome')) return false;
             if (evTarget.closest('#clip-view-toolbar')) return false;
             if (evTarget.closest('#drawing-toolbar')) return false;
+            // Chat y previews de dibujo viven dentro de #player-container: no deben disparar play/pause del tap.
+            if (evTarget.closest('#video-chat-panel')) return false;
+            if (evTarget.closest('#drawing-preview-overlay')) return false;
+            if (evTarget.closest('.drawing-auto-overlay')) return false;
             if (evTarget.closest('video')) return false;
             if (evTarget.closest('button, a, input, textarea, select, [role="button"]')) return false;
             if (typeof DrawingTool !== 'undefined' && typeof DrawingTool.isActive === 'function' && DrawingTool.isActive()) return false;
@@ -1828,6 +1832,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     AppState.on('gameChanged', (game) => {
         resetLiveProbe();
         try {
+            DrawingTool.dismissDrawingPreview?.();
+        } catch (_) {
+            /* noop */
+        }
+        try {
             stopLivePreview();
         } catch (_) {
             /* noop */
@@ -1862,6 +1871,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     });
 
     AppState.on('clipChanged', (clip) => {
+        try {
+            DrawingTool.dismissDrawingPreview?.();
+        } catch (_) {
+            /* noop */
+        }
         UI.renderAnalyzeClips();
         UI.renderViewClips();
         UI.updateClipEditControls();

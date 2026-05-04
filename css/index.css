@@ -4420,11 +4420,13 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   cursor: pointer;
 }
 
+/* Preview desde el chat: mismo criterio que .drawing-auto-overlay — fondo transparente.
+   (Un fondo negro full-bleed tapaba el iframe y dejaba pantalla negra al cerrar/cambiar clip.) */
 .drawing-preview-overlay {
   position: absolute;
   inset: 0;
   z-index: 25;
-  background: rgba(0, 0, 0, 0.5);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4447,6 +4449,7 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   position: absolute;
   top: 10px;
   right: 10px;
+  z-index: 1;
   background: rgba(239, 68, 68, 0.8);
   color: #fff;
   border: none;
