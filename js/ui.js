@@ -14,6 +14,20 @@ import { ClipExport } from './clipExport.js';
 export const UI = (() => {
     const HOTKEY_OPTIONS = ['', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
 
+    /** Playlist activa, ?playlist= en URL, o colección abierta (chat/dibujo usan el mismo esquema `id::clip`). */
+    function getChatScopePlaylistId() {
+        let pl = AppState.get('activePlaylistId');
+        if (!pl) {
+            const urlParams = new URLSearchParams(window.location.search);
+            pl = urlParams.get('playlist');
+        }
+        if (!pl) {
+            const col = AppState.get('activeCollection');
+            if (col?.id) pl = col.id;
+        }
+        return pl || null;
+    }
+
     /** Botón: clic → siguiente tecla A–Z queda como atajo; muestra la letra o — */
     function bindButtonboardHotkeyCapture(btn, { getValue, setValue, onUpdated }) {
         if (!btn) return;
@@ -553,6 +567,10 @@ export const UI = (() => {
         const sendBtn = panel.querySelector('.chat-send-btn');
         const nameInput = panel.querySelector('.chat-name-input');
         const sendMessage = () => {
+            if (document.body.classList.contains('read-only-mode')) {
+                toast('Solo lectura: no se pueden agregar comentarios.', 'error');
+                return;
+            }
             const name = nameInput.value.trim();
             const text = textInput.value.trim();
             if (!name) { toast('Escribí tu nombre', 'error'); nameInput.focus(); return; }
@@ -574,7 +592,7 @@ export const UI = (() => {
                 if (!confirm('¿Borrar este dibujo?')) return;
                 AppState.removeComment(btn.dataset.playlistId, btn.dataset.clipId, btn.dataset.ts);
                 showVideoChatPanel(playlistId, clipId);
-                AppState.saveToCloud().catch(() => {});
+                AppState.persistChatMutation(btn.dataset.playlistId, btn.dataset.clipId).catch(() => {});
             });
         });
 
@@ -899,6 +917,8 @@ export const UI = (() => {
             return;
         }
 
+        const colId = col.id;
+
         items.forEach((item, idx) => {
             const el = document.createElement('div');
             el.className = 'clip-item collection-clip-item' + (idx === activeIdx ? ' active' : '');
@@ -908,9 +928,14 @@ export const UI = (() => {
                 ? (item.sourceProjectTitle.length > 20 ? item.sourceProjectTitle.slice(0, 19) + '…' : item.sourceProjectTitle)
                 : 'Partido';
 
+            const nChat = colId ? AppState.getComments(colId, item.id).length : 0;
+            const chatHint = nChat ? `${nChat} comentario(s)` : 'Sin comentarios';
+            const chatIcon = `<span class="clip-flag-slot${nChat ? ' on' : ''}" title="${chatHint}">💬</span>`;
+
             el.innerHTML = `
                 <span class="collection-game-badge" title="${item.sourceProjectTitle || ''}">${gameLabel}</span>
                 <span class="clip-tag-badge">${item.tagLabel || 'Clip'}</span>
+                ${chatIcon}
                 <span class="collection-clip-time">${formatTime(item.startSec)} – ${formatTime(item.endSec)}</span>
                 <button class="clip-action-btn col-item-delete-btn" data-idx="${idx}" title="Quitar de colección">✕</button>
             `;
@@ -1312,9 +1337,14 @@ export const UI = (() => {
                 clearDrawingOverlays();
                 const currentClip = AppState.getCurrentClip();
                 if (currentClip && $('#toolbar-clip-name')) {
-                    const tagInfo = AppState.getTagType(currentClip.tag_type_id);
-                    const clipNum = AppState.getClipNumber(currentClip);
-                    $('#toolbar-clip-name').textContent = tagInfo ? `${tagInfo.label} ${clipNum}` : `Clip ${clipNum}`;
+                    if (currentClip._fromCollection) {
+                        $('#toolbar-clip-name').textContent =
+                            `${currentClip._collectionLabel} ${currentClip._collectionIndex}`;
+                    } else {
+                        const tagInfo = AppState.getTagType(currentClip.tag_type_id);
+                        const clipNum = AppState.getClipNumber(currentClip);
+                        $('#toolbar-clip-name').textContent = tagInfo ? `${tagInfo.label} ${clipNum}` : `Clip ${clipNum}`;
+                    }
                 }
                 toolbarEl.style.setProperty('display', 'flex', 'important');
                 // Initialize flag buttons state
@@ -1331,32 +1361,25 @@ export const UI = (() => {
                     }
                 });
 
-                // Disable chat/draw buttons if no active playlist
-                let activePlaylistId = AppState.get('activePlaylistId');
-                
-                // Fallback for read-only shared links if state is pending
-                if (!activePlaylistId) {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    activePlaylistId = urlParams.get('playlist');
-                }
+                const chatScopeId = getChatScopePlaylistId();
 
                 const chatBtn = $('#btn-clip-chat');
                 const drawBtn = $('#btn-clip-draw');
                 if (chatBtn) {
-                    if (activePlaylistId) {
+                    if (chatScopeId) {
                         chatBtn.style.setProperty('opacity', '1', 'important');
                         chatBtn.style.cursor = 'pointer';
                         chatBtn.title = 'Chat';
 
                         // Auto-open chat if clip has comments
-                        const comments = AppState.getComments(activePlaylistId, currentClipId);
+                        const comments = AppState.getComments(chatScopeId, currentClipId);
                         if (comments.length > 0) {
-                            showVideoChatPanel(activePlaylistId, currentClipId, { focusInput: false });
+                            showVideoChatPanel(chatScopeId, currentClipId, { focusInput: false });
                         }
                     } else {
                         chatBtn.style.setProperty('opacity', '0.3', 'important');
                         chatBtn.style.cursor = 'not-allowed';
-                        chatBtn.title = 'El chat requiere una playlist seleccionada';
+                        chatBtn.title = 'El chat requiere una playlist o una colección activa';
                     }
                 }
                 if (drawBtn) {
@@ -2199,6 +2222,10 @@ export const UI = (() => {
             if (typeof YTPlayer !== 'undefined') YTPlayer.seekTo(clip.start_sec);
         }
         else if (btn.id === 'btn-clip-next') {
+            if (AppState.get('activeCollection')) {
+                AppState.navigateCollectionItem('next');
+                return;
+            }
             AppState.navigateClip('next');
             const nextClip = AppState.getCurrentClip();
             if (nextClip && typeof YTPlayer !== 'undefined') {
@@ -2268,14 +2295,9 @@ export const UI = (() => {
             AppState.toggleFlag(clipId, btn.dataset.flag);
         }
         else if (btn.id === 'btn-clip-chat') {
-            let activePlaylistId = AppState.get('activePlaylistId');
-            if (!activePlaylistId) {
-                const urlParams = new URLSearchParams(window.location.search);
-                activePlaylistId = urlParams.get('playlist');
-            }
-
-            if (!activePlaylistId) {
-                UI.toast('El clip debe estar en una Playlist para usar el Chat', 'warning');
+            const scopeId = getChatScopePlaylistId();
+            if (!scopeId) {
+                UI.toast('Necesitás una playlist o una colección abierta para el chat', 'warning');
                 return;
             }
             // Toggle video chat overlay
@@ -2283,14 +2305,22 @@ export const UI = (() => {
             if (panel && panel.style.display !== 'none') {
                 hideVideoChatPanel();
             } else {
-                showVideoChatPanel(activePlaylistId, clipId);
+                showVideoChatPanel(scopeId, clipId);
             }
         }
         else if (btn.id === 'btn-clip-draw') {
-            const activePlaylistId = AppState.get('activePlaylistId') || null;
-            DrawingTool.open(activePlaylistId, clipId);
+            if (document.body.classList.contains('read-only-mode')) {
+                UI.toast('Solo lectura: no se puede dibujar.', 'error');
+                return;
+            }
+            const scopeId = getChatScopePlaylistId();
+            DrawingTool.open(scopeId || null, clipId);
         }
         else if (btn.id === 'btn-clip-mark-out') {
+            if (clip._fromCollection) {
+                UI.toast('En colección no se pueden editar los límites del clip.', 'info');
+                return;
+            }
             const t = YTPlayer.getCurrentTime();
             if (t > clip.start_sec) {
                 AppState.updateClipAbsoluteBounds(clipId, clip.start_sec, t);
@@ -2302,6 +2332,10 @@ export const UI = (() => {
             }
         }
         else if (btn.id === 'btn-clip-mark-in') {
+            if (clip._fromCollection) {
+                UI.toast('En colección no se pueden editar los límites del clip.', 'info');
+                return;
+            }
             const t = YTPlayer.getCurrentTime();
             if (t < clip.end_sec) {
                 AppState.updateClipAbsoluteBounds(clipId, t, clip.end_sec);

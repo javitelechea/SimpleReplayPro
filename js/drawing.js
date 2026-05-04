@@ -170,8 +170,12 @@ export const DrawingTool = (() => {
     // ── Save drawing as comment ──
     function save() {
         if (!_active) return;
+        if (document.body.classList.contains('read-only-mode')) {
+            UI.toast('Solo lectura: no se puede guardar el dibujo.', 'error');
+            return;
+        }
         if (!_playlistId) {
-            UI.toast('Agregá el clip a una playlist para poder guardar el dibujo', 'warning');
+            UI.toast('Necesitás una playlist o una colección abierta para guardar el dibujo', 'warning');
             return;
         }
         if (_strokes.length === 0) {

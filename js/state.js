@@ -100,8 +100,33 @@ export const AppState = (() => {
     state.localVideoFile = (file && typeof file === 'object' && 'arrayBuffer' in file) ? file : null;
   }
 
+  function _syntheticClipFromCollectionItem(item, col) {
+    const idx = col?.items ? col.items.findIndex(i => i.id === item.id) : -1;
+    const num = idx >= 0 ? idx + 1 : 1;
+    const label = item.tagLabel || 'Clip';
+    return {
+      id: item.id,
+      start_sec: item.startSec,
+      end_sec: item.endSec,
+      t_sec: item.t_sec != null ? item.t_sec : (item.startSec + item.endSec) / 2,
+      tag_type_id: null,
+      game_id: null,
+      _fromCollection: true,
+      _collectionLabel: label,
+      _collectionIndex: num,
+    };
+  }
+
   function getCurrentClip() {
-    return state.clips.find(c => c.id === state.currentClipId) || null;
+    const cid = state.currentClipId;
+    if (!cid) return null;
+    const fromProject = state.clips.find(c => c.id === cid);
+    if (fromProject) return fromProject;
+    if (state.activeCollection?.items?.length) {
+      const item = state.activeCollection.items.find(i => i.id === cid);
+      if (item) return _syntheticClipFromCollectionItem(item, state.activeCollection);
+    }
+    return null;
   }
 
   function getTagType(id) {
@@ -175,6 +200,14 @@ export const AppState = (() => {
   }
 
   function getClipUserFlags(clipId) {
+    if (state.activeCollection?.items?.length) {
+      const item = state.activeCollection.items.find(i => i.id === clipId);
+      if (item && Array.isArray(item.flags)) {
+        return item.flags
+          .filter(f => f.userId === state.userId)
+          .map(f => f.flag);
+      }
+    }
     return (state.clipFlags[clipId] || [])
       .filter(f => f.userId === state.userId)
       .map(f => f.flag);
@@ -418,6 +451,24 @@ export const AppState = (() => {
   }
 
   function toggleFlag(clipId, flag) {
+    const col = state.activeCollection;
+    if (col?.items?.some(i => i.id === clipId)) {
+      const items = col.items.map((it) => {
+        if (it.id !== clipId) return it;
+        const prev = [...(it.flags || [])];
+        const has = prev.some(f => f.userId === state.userId && f.flag === flag);
+        const nextFlags = has
+          ? prev.filter(f => !(f.userId === state.userId && f.flag === flag))
+          : [...prev, { userId: state.userId, flag }];
+        return { ...it, flags: nextFlags };
+      });
+      state.activeCollection = { ...col, items };
+      FirebaseData.saveCollection(col.id, state.activeCollection).catch((err) => {
+        console.warn('saveCollection (flags):', err);
+      });
+      emit('flagsUpdated', { clipId, flags: getClipUserFlags(clipId) });
+      return;
+    }
     const flags = getClipUserFlags(clipId);
     if (flags.includes(flag)) {
       DemoData.removeFlag(clipId, state.userId, flag);
@@ -550,6 +601,32 @@ export const AppState = (() => {
    * @param {object} colData
    * @param {{ clearProject?: boolean }} [options] — default: clear project and enter view (like opening another context)
    */
+  function _hydrateCollectionComments(col) {
+    if (!col?.id || !Array.isArray(col.items)) return;
+    col.items.forEach((item) => {
+      const key = col.id + '::' + item.id;
+      const raw = item.comments;
+      state.playlistComments[key] = Array.isArray(raw)
+        ? raw.map(c => ({ ...c }))
+        : [];
+    });
+  }
+
+  function _persistCollectionChat(playlistId, clipId) {
+    const col = state.activeCollection;
+    if (!col || col.id !== playlistId) return;
+    const key = playlistId + '::' + clipId;
+    const comments = state.playlistComments[key] || [];
+    const serial = comments.map(c => ({ ...c }));
+    const items = col.items.map((it) =>
+      it.id === clipId ? { ...it, comments: serial } : it
+    );
+    state.activeCollection = { ...col, items };
+    FirebaseData.saveCollection(col.id, state.activeCollection).catch((err) => {
+      console.warn('saveCollection (chat):', err);
+    });
+  }
+
   function openCollection(colData, options = {}) {
     const shouldClear = options.clearProject !== false;
     if (shouldClear) {
@@ -561,6 +638,7 @@ export const AppState = (() => {
       setMode('view');
     }
     state.activeCollection = colData;
+    _hydrateCollectionComments(colData);
     if (shouldClear) {
       state.activeCollectionItemIdx = -1;
     }
@@ -571,8 +649,17 @@ export const AppState = (() => {
   }
 
   function closeCollection() {
+    const colId = state.activeCollection?.id;
     state.activeCollection = null;
     state.activeCollectionItemIdx = -1;
+    if (colId) {
+      Object.keys(state.playlistComments).forEach((k) => {
+        if (k.startsWith(colId + '::')) delete state.playlistComments[k];
+      });
+    }
+    state.currentClipId = null;
+    state.currentClipIndex = -1;
+    emit('clipChanged', null);
     emit('collectionClosed');
   }
 
@@ -581,8 +668,12 @@ export const AppState = (() => {
     const items = state.activeCollection.items || [];
     if (idx < 0 || idx >= items.length) return null;
     state.activeCollectionItemIdx = idx;
-    emit('collectionItemChanged', items[idx]);
-    return items[idx];
+    const item = items[idx];
+    state.currentClipId = item.id;
+    state.currentClipIndex = -1;
+    emit('clipChanged', getCurrentClip());
+    emit('collectionItemChanged', item);
+    return item;
   }
 
   function navigateCollectionItem(direction) {
@@ -601,9 +692,19 @@ export const AppState = (() => {
     const items = [...(state.activeCollection.items || [])];
     items.splice(idx, 1);
     state.activeCollection = { ...state.activeCollection, items };
-    if (state.activeCollectionItemIdx >= items.length) {
-      state.activeCollectionItemIdx = items.length - 1;
+    if (!items.length) {
+      state.activeCollectionItemIdx = -1;
+      state.currentClipId = null;
+      state.currentClipIndex = -1;
+      emit('clipChanged', null);
+      emit('collectionItemsChanged', items);
+      return state.activeCollection;
     }
+    let newIdx = items.findIndex(i => i.id === state.currentClipId);
+    if (newIdx < 0) {
+      newIdx = Math.min(Math.max(0, idx), items.length - 1);
+    }
+    setCollectionItemIndex(newIdx);
     emit('collectionItemsChanged', items);
     return state.activeCollection;
   }
@@ -734,6 +835,7 @@ export const AppState = (() => {
     state.playlistComments[key].push(comment);
     emit('commentAdded', { playlistId, clipId, comment });
     if (drawing) emit('clipCommentsUpdated');
+    _persistCollectionChat(playlistId, clipId);
     return comment;
   }
 
@@ -760,10 +862,23 @@ export const AppState = (() => {
     if (!state.playlistComments[key]) return;
     state.playlistComments[key] = state.playlistComments[key].filter(c => c.timestamp !== timestamp);
     emit('commentAdded', { playlistId, clipId }); // reuse event to trigger re-render
+    _persistCollectionChat(playlistId, clipId);
+  }
+
+  /** Tras borrar en UI de chat: proyecto → nube; colección → doc `collections`. */
+  function persistChatMutation(playlistId, clipId) {
+    if (state.activeCollection?.id === playlistId) {
+      _persistCollectionChat(playlistId, clipId);
+      return Promise.resolve();
+    }
+    return saveToCloud();
   }
 
   // Helper: get sequential clip number per tag type
   function getClipNumber(clip) {
+    if (clip && clip._fromCollection && clip._collectionIndex != null) {
+      return clip._collectionIndex;
+    }
     const allClips = state.clips.filter(c => c.tag_type_id === clip.tag_type_id);
     allClips.sort((a, b) => a.t_sec - b.t_sec);
     const idx = allClips.findIndex(c => c.id === clip.id);
@@ -1227,7 +1342,7 @@ export const AppState = (() => {
     init, setFeatureFlags, hasFeature, setAuthenticatedUser,
     clearProject, saveToCloud, loadFromCloud, importXML, exportXML,
     exportProjectData, importProjectData,
-    addComment, getComments, removeComment, getClipNumber, getPreferredChatName,
+    addComment, getComments, removeComment, persistChatMutation, getClipNumber, getPreferredChatName,
     addActivity, getActivityLog,
     openCollection, closeCollection, setCollectionItemIndex, navigateCollectionItem,
     removeCollectionItem, reorderCollectionItems,

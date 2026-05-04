@@ -52,7 +52,10 @@ export const Timeline = (() => {
         // WebM sin metadata aún). Antes: zoomEnd = min(duration, end+5) achicaba la ventana y
         // el segmento del clip superaba el 100 % del ancho.
         if (currentClipId) {
-            const clip = AppState.get('clips').find((c) => c.id === currentClipId);
+            let clip = AppState.get('clips').find((c) => c.id === currentClipId);
+            if (!clip && typeof AppState.getCurrentClip === 'function') {
+                clip = AppState.getCurrentClip();
+            }
             if (clip) {
                 const pad = 5;
                 const zoomStart = Math.max(0, clip.start_sec - pad);

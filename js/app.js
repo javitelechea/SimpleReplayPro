@@ -1667,6 +1667,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     function setSaveButtonState(state = hasUnsavedChanges ? 'dirty' : 'idle') {
         const btn = $('#btn-save-project');
         if (!btn) return;
+        const savingCollection = !!AppState.get('activeCollection');
         btn.classList.remove('is-dirty', 'is-saving', 'is-saved');
         btn.disabled = state === 'saving';
 
@@ -1677,23 +1678,27 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         if (state === 'saving') {
             btn.textContent = '…';
-            btn.title = 'Guardando proyecto';
-            btn.setAttribute('aria-label', 'Guardando proyecto');
+            btn.title = savingCollection ? 'Guardando colección' : 'Guardando proyecto';
+            btn.setAttribute('aria-label', btn.title);
             btn.classList.add('is-saving');
             return;
         }
 
         if (state === 'saved') {
             btn.textContent = '✓';
-            btn.title = 'Proyecto guardado';
-            btn.setAttribute('aria-label', 'Proyecto guardado');
+            btn.title = savingCollection ? 'Colección guardada' : 'Proyecto guardado';
+            btn.setAttribute('aria-label', btn.title);
             btn.classList.add('is-saved');
             _saveButtonResetTimer = setTimeout(() => setSaveButtonState(), 1400);
             return;
         }
 
         btn.textContent = '💾';
-        btn.title = hasUnsavedChanges ? 'Guardar cambios pendientes' : 'Guardar proyecto';
+        if (savingCollection) {
+            btn.title = hasUnsavedChanges ? 'Guardar cambios de la colección' : 'Guardar colección';
+        } else {
+            btn.title = hasUnsavedChanges ? 'Guardar cambios pendientes' : 'Guardar proyecto';
+        }
         btn.setAttribute('aria-label', btn.title);
         btn.classList.toggle('is-dirty', !!hasUnsavedChanges);
     }
@@ -1909,7 +1914,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     });
 
     // ── Collection events ──
-    AppState.on('collectionOpened', () => {
+    AppState.on('collectionOpened', (col) => {
         // openCollection() ya fija modo Ver en AppState. No usar ?mode=view en la URL: se confunde
         // con enlaces de solo lectura (modal proyectos, etc.); el modo real va solo en estado.
         const u = new URL(window.location.href);
@@ -1920,6 +1925,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         u.searchParams.delete('mode');
         const qs = u.searchParams.toString();
         history.replaceState({}, '', u.pathname + (qs ? `?${qs}` : '') + u.hash);
+        const currentUser = getCurrentUser();
+        const ownerUid = col?.ownerUid || '';
+        const isOwner = !!(currentUser?.uid && ownerUid && currentUser.uid === ownerUid);
+        // Colección propia desde modal/listado no debe quedar con clases read-only heredadas.
+        if (!ownerUid || isOwner) {
+            document.body.classList.remove('read-only-mode', 'read-only-pro');
+        } else {
+            document.body.classList.add('read-only-mode');
+        }
+        syncReadOnlyCapabilitiesClass();
         UI.updateCollectionBar();
         UI.updateNoGameOverlay();
         UI.updateMode();
@@ -1948,6 +1963,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             await YTPlayer.loadVideoAsync(item.youtubeVideoId);
         }
         YTPlayer.playClip(item.startSec, item.endSec);
+        const col = AppState.get('activeCollection');
+        if (col?.id && typeof DrawingTool !== 'undefined' && DrawingTool.startPlaybackWatch) {
+            DrawingTool.startPlaybackWatch(col.id, item.id);
+        }
     });
 
     AppState.on('flagsUpdated', () => {
@@ -4336,6 +4355,28 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
     $('#btn-save-project').addEventListener('click', async () => {
         const btn = $('#btn-save-project');
+        const activeCollection = AppState.get('activeCollection');
+
+        if (activeCollection) {
+            if (document.body.classList.contains('read-only-mode')) {
+                UI.toast('Solo lectura: no podés guardar esta colección.', 'error');
+                return;
+            }
+            setSaveButtonState('saving');
+            try {
+                await FirebaseData.saveCollection(activeCollection.id, activeCollection);
+                UI.toast('Colección guardada ✅', 'success');
+                hasUnsavedChanges = false;
+                setSaveButtonState('saved');
+            } catch (err) {
+                console.error('Collection save error:', err);
+                UI.toast('Error al guardar la colección: ' + err.message, 'error');
+                setSaveButtonState();
+            } finally {
+                if (btn.classList.contains('is-saving')) setSaveButtonState();
+            }
+            return;
+        }
 
         // Before saving the first time, if we have custom games + the demo game, let's remove the demo game
         const hasCustomGames = AppState.get('games').some(g => g.id !== 'game-demo-1');
