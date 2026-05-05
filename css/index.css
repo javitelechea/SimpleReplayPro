@@ -1348,6 +1348,19 @@ body.collection-only-mode .mode-slider {
   transform: translateY(0);
 }
 
+/* Native YouTube controls mode: move app chrome out of the bottom controls area. */
+#player-container.yt-native-mode .player-chrome {
+  top: 8px;
+  bottom: auto;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  background: none;
+}
+
+#player-container.yt-native-mode .drawing-canvas {
+  pointer-events: none !important;
+}
+
 /* While chat overlay is open, hide player chrome to avoid interaction overlap. */
 #player-container.chat-open .player-chrome {
   opacity: 0 !important;
@@ -1359,6 +1372,7 @@ body.collection-only-mode .mode-slider {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  position: relative;
 }
 
 .player-chrome__rec-badge {
@@ -1515,6 +1529,59 @@ body.collection-only-mode .mode-slider {
   height: 18px;
   opacity: 0.92;
   display: block;
+}
+
+.player-chrome__quality {
+  position: relative;
+  margin-left: 4px;
+}
+
+.player-chrome__btn--quality {
+  min-width: 54px;
+  padding: 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.player-chrome__quality-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 82px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  background: rgba(14, 16, 24, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  z-index: 35;
+}
+
+.player-chrome__quality-menu.hidden {
+  display: none;
+}
+
+.player-chrome__quality-item {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text, #e8eaf0);
+  font-size: 0.82rem;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.player-chrome__quality-item:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.player-chrome__quality-item.is-active {
+  background: rgba(124, 92, 252, 0.28);
+  color: #fff;
 }
 
 .player-surface-seek-feedback {

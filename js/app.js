@@ -63,6 +63,20 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     const FRAME_SEEK_STEP_SEC = 1 / 30;
     const AUTO_SAVE_ENABLED_KEY = 'sr_auto_save_enabled';
     const AUTO_SAVE_INTERVAL_MS = 60000;
+    const YT_QUALITY_LABELS = {
+        highres: '4K',
+        hd2160: '2160p',
+        hd1440: '1440p',
+        hd1080: '1080p',
+        hd720: '720p',
+        large: '480p',
+        medium: '360p',
+        small: '240p',
+        tiny: '144p',
+        auto: 'Auto',
+        default: 'Auto',
+        unknown: 'Auto',
+    };
     const DEFAULT_SHORTCUTS = {
         playPause: 'Space',
         seekLeft: 'ArrowLeft',
@@ -73,6 +87,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     const QUICK_KEYS = ['q', 'w', 'e', 'r', 't', 'y', 'u'];
     let _quickClipMenuOpen = false;
     let _quickPlaylistPickerOpen = false;
+    let _playerChromeQualityMenuOpen = false;
+    let _nativeControlsToggleBusy = false;
     let _autoSaveTimer = null;
     let _autoSaveInFlight = false;
     let _autoSaveNudgeShown = false;
@@ -887,10 +903,102 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
     }
 
+    function toQualityLabel(quality) {
+        const key = String(quality || 'auto');
+        return YT_QUALITY_LABELS[key] || key.toUpperCase();
+    }
+
+    function closePlayerQualityMenu() {
+        _playerChromeQualityMenuOpen = false;
+        const menu = $('#player-chrome-quality-menu');
+        const btn = $('#player-chrome-quality-btn');
+        if (menu) menu.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+
+    function syncPlayerQualityMenuUi({ forceRebuild = false } = {}) {
+        const wrap = $('#player-chrome-quality');
+        const menu = $('#player-chrome-quality-menu');
+        const label = $('#player-chrome-quality-label');
+        const btn = $('#player-chrome-quality-btn');
+        if (!wrap || !menu || !label || !btn) return;
+
+        const source = typeof YTPlayer.getSourceType === 'function' ? YTPlayer.getSourceType() : null;
+        const isYoutube = source === 'youtube';
+        const nativeOn = typeof YTPlayer.isYoutubeNativeControlsEnabled === 'function'
+            ? !!YTPlayer.isYoutubeNativeControlsEnabled()
+            : false;
+        const nativeBtn = $('#player-chrome-yt-native');
+        if (nativeBtn) {
+            nativeBtn.setAttribute('aria-pressed', nativeOn ? 'true' : 'false');
+            nativeBtn.classList.toggle('player-chrome__btn--primary', nativeOn);
+            nativeBtn.textContent = nativeOn ? 'YT ON' : 'YT';
+            nativeBtn.title = nativeOn
+                ? 'Desactivar controles nativos de YouTube'
+                : 'Activar controles nativos de YouTube';
+            nativeBtn.disabled = _nativeControlsToggleBusy;
+        }
+
+        if (!isYoutube || nativeOn || typeof YTPlayer.getAvailableQualities !== 'function') {
+            wrap.classList.add('hidden');
+            closePlayerQualityMenu();
+            return;
+        }
+        wrap.classList.remove('hidden');
+
+        const requested = (typeof YTPlayer.getPreferredPlaybackQuality === 'function' && YTPlayer.getPreferredPlaybackQuality()) || 'auto';
+        const current = (typeof YTPlayer.getPlaybackQuality === 'function' && YTPlayer.getPlaybackQuality()) || 'auto';
+        label.textContent = toQualityLabel(requested);
+        btn.title = requested === current
+            ? `Calidad: ${toQualityLabel(requested)}`
+            : `Calidad pedida: ${toQualityLabel(requested)} · actual: ${toQualityLabel(current)}`;
+
+        const rawLevels = YTPlayer.getAvailableQualities() || [];
+        const levels = ['auto', ...rawLevels.filter((q) => q && q !== 'auto')];
+        const signature = levels.join('|');
+        if (forceRebuild || menu.dataset.signature !== signature) {
+            menu.dataset.signature = signature;
+            menu.innerHTML = levels.map((q) => (
+                `<button type="button" class="player-chrome__quality-item" data-quality="${q}" role="menuitem">${toQualityLabel(q)}</button>`
+            )).join('');
+        }
+        menu.querySelectorAll('.player-chrome__quality-item').forEach((item) => {
+            item.classList.toggle('is-active', item.dataset.quality === requested);
+        });
+        menu.classList.toggle('hidden', !_playerChromeQualityMenuOpen);
+        btn.setAttribute('aria-expanded', _playerChromeQualityMenuOpen ? 'true' : 'false');
+    }
+
+    function verifyAppliedQuality(requestedQuality) {
+        const requested = String(requestedQuality || 'auto');
+        window.setTimeout(() => {
+            if (typeof YTPlayer.getSourceType === 'function' && YTPlayer.getSourceType() !== 'youtube') return;
+            const actual = (typeof YTPlayer.getPlaybackQuality === 'function' && YTPlayer.getPlaybackQuality()) || 'auto';
+            const reqLabel = toQualityLabel(requested);
+            const actualLabel = toQualityLabel(actual);
+            if (requested === 'auto') {
+                UI.toast(`Calidad en automático (${actualLabel})`, 'info');
+                return;
+            }
+            if (actual === requested) {
+                UI.toast(`Calidad aplicada: ${actualLabel}`, 'success');
+                return;
+            }
+            UI.toast(`YouTube mantiene ${actualLabel} (pedida: ${reqLabel})`, 'info');
+        }, 1200);
+    }
+
     function syncPlayerChromeUi() {
         const chrome = $('#player-chrome');
         if (!chrome || chrome.classList.contains('hidden')) return;
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
+        const container = $('#player-container');
+        const nativeYoutubeControlsOn =
+            (typeof YTPlayer.getSourceType === 'function' && YTPlayer.getSourceType() === 'youtube') &&
+            (typeof YTPlayer.isYoutubeNativeControlsEnabled === 'function' && YTPlayer.isYoutubeNativeControlsEnabled());
+        if (container) {
+            container.classList.toggle('yt-native-mode', !!nativeYoutubeControlsOn);
+        }
 
         const playGroup = $('#player-chrome-play-group');
         playGroup?.classList.remove('hidden');
@@ -945,6 +1053,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H3v4h2V5h2V3Zm14 0h-4v2h2v2h2V3ZM5 17H3v4h4v-2H5v-2Zm16 0h-2v2h-2v2h4v-4Z" fill="currentColor"/></svg>';
             }
         }
+
+        syncPlayerQualityMenuUi();
     }
 
     function showPlayerSeekFeedback(dir, seconds, sideHint = null, opts = null) {
@@ -1290,6 +1400,44 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             syncPlayerChromeUi();
         });
 
+        $('#player-chrome-quality-btn')?.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            _playerChromeQualityMenuOpen = !_playerChromeQualityMenuOpen;
+            syncPlayerQualityMenuUi();
+        });
+
+        $('#player-chrome-quality-menu')?.addEventListener('click', (ev) => {
+            const btn = ev.target.closest('.player-chrome__quality-item');
+            if (!btn) return;
+            const quality = btn.dataset.quality;
+            const changed = typeof YTPlayer.setPlaybackQuality === 'function' && YTPlayer.setPlaybackQuality(quality);
+            if (!changed) {
+                UI.toast('No se pudo cambiar la calidad', 'error');
+                return;
+            }
+            closePlayerQualityMenu();
+            syncPlayerQualityMenuUi({ forceRebuild: false });
+            verifyAppliedQuality(quality);
+        });
+
+        $('#player-chrome-yt-native')?.addEventListener('click', async () => {
+            if (typeof YTPlayer.setYoutubeNativeControlsEnabled !== 'function') return;
+            if (_nativeControlsToggleBusy) return;
+            const current = typeof YTPlayer.isYoutubeNativeControlsEnabled === 'function'
+                ? !!YTPlayer.isYoutubeNativeControlsEnabled()
+                : false;
+            _nativeControlsToggleBusy = true;
+            syncPlayerQualityMenuUi();
+            const ok = await YTPlayer.setYoutubeNativeControlsEnabled(!current);
+            _nativeControlsToggleBusy = false;
+            syncPlayerChromeUi();
+            if (!ok) {
+                UI.toast('No se pudo cambiar a modo nativo de YouTube', 'error');
+                return;
+            }
+            UI.toast(!current ? 'Modo YouTube nativo activado' : 'Modo controles de la app activado', 'success');
+        });
+
         $('#player-chrome-mute')?.addEventListener('click', () => {
             if (PopoutController && PopoutController.isConnected && PopoutController.isConnected()) return;
             if (YTPlayer.toggleMute) YTPlayer.toggleMute();
@@ -1315,6 +1463,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         });
 
         document.addEventListener('fullscreenchange', syncPlayerChromeUi);
+        document.addEventListener('click', (ev) => {
+            const qualityWrap = $('#player-chrome-quality');
+            if (!qualityWrap || qualityWrap.contains(ev.target)) return;
+            closePlayerQualityMenu();
+        });
 
         setInterval(syncPlayerChromeUi, 450);
     }
@@ -1923,6 +2076,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         u.searchParams.delete('playlist');
         u.searchParams.delete('editKey');
         u.searchParams.delete('mode');
+        if (col?.id) {
+            u.searchParams.set('collection', col.id);
+        } else {
+            u.searchParams.delete('collection');
+        }
         const qs = u.searchParams.toString();
         history.replaceState({}, '', u.pathname + (qs ? `?${qs}` : '') + u.hash);
         const currentUser = getCurrentUser();
@@ -1943,6 +2101,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     });
 
     AppState.on('collectionClosed', () => {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('collection');
+        const qs = u.searchParams.toString();
+        history.replaceState({}, '', u.pathname + (qs ? `?${qs}` : '') + u.hash);
         UI.updateCollectionBar();
         UI.updateNoGameOverlay();
         UI.updateMode();

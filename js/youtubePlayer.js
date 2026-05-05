@@ -20,6 +20,17 @@ export const YTPlayer = (() => {
     let _lastMedia = null;
     let _commandListener = null;
     let _suppressMirrorEchoUntil = 0;
+    let _youtubeNativeControlsEnabled = false;
+
+    function _buildVideoPlayerInstance() {
+        _videoPlayer = new VideoPlayer('youtube-player', { youtubeShowControls: _youtubeNativeControlsEnabled });
+        _videoPlayer.setPlaybackActivityCallback((ev) => {
+            if (!ev || !ev.action) return;
+            if (ev.action === 'play') _emit('play');
+            else if (ev.action === 'pause') _emit('pause');
+            else if (ev.action === 'seek' && typeof ev.time === 'number') _emit('seek', { seconds: ev.time });
+        });
+    }
 
     function _usingLiveCapture() {
         return _lastMedia?.kind === 'liveCapture';
@@ -127,13 +138,7 @@ export const YTPlayer = (() => {
             return;
         }
 
-        _videoPlayer = new VideoPlayer('youtube-player', { youtubeShowControls: false });
-        _videoPlayer.setPlaybackActivityCallback((ev) => {
-            if (!ev || !ev.action) return;
-            if (ev.action === 'play') _emit('play');
-            else if (ev.action === 'pause') _emit('pause');
-            else if (ev.action === 'seek' && typeof ev.time === 'number') _emit('seek', { seconds: ev.time });
-        });
+        _buildVideoPlayerInstance();
         _ready = true;
         console.log('YTPlayer wrapper: player instance created, ready');
 
@@ -343,6 +348,67 @@ export const YTPlayer = (() => {
         return _videoPlayer.getType();
     }
 
+    function isYoutubeNativeControlsEnabled() {
+        return !!_youtubeNativeControlsEnabled;
+    }
+
+    async function setYoutubeNativeControlsEnabled(enabled) {
+        if (!_ready || !_videoPlayer) return false;
+        const next = !!enabled;
+        if (_youtubeNativeControlsEnabled === next) return true;
+        _youtubeNativeControlsEnabled = next;
+        _videoPlayer.setYoutubeShowControls(next);
+
+        if (_lastMedia?.kind !== 'youtube' || !_lastMedia.id) return true;
+        const currentTime = getCurrentTime();
+        const wasPlaying = isPlaying();
+        const selectedQ = (typeof _videoPlayer.getPreferredPlaybackQuality === 'function')
+            ? _videoPlayer.getPreferredPlaybackQuality()
+            : 'auto';
+        try {
+            // YouTube controls flag is fixed at iframe creation time; recreate player instance.
+            _buildVideoPlayerInstance();
+            await _videoPlayer.loadVideo({ type: 'youtube', id: _lastMedia.id });
+            if (currentTime > 0) _videoPlayer.seekTo(currentTime);
+            if (selectedQ && selectedQ !== 'auto') _videoPlayer.setPlaybackQuality(selectedQ);
+            if (wasPlaying) _videoPlayer.play();
+            else _videoPlayer.pause();
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function getAvailableQualities() {
+        if (!_ready || _usingLiveCapture() || !_videoPlayer || typeof _videoPlayer.getAvailableQualityLevels !== 'function') {
+            return [];
+        }
+        return _videoPlayer.getAvailableQualityLevels();
+    }
+
+    function getPlaybackQuality() {
+        if (!_ready || _usingLiveCapture() || !_videoPlayer || typeof _videoPlayer.getPlaybackQuality !== 'function') {
+            return 'auto';
+        }
+        return _videoPlayer.getPlaybackQuality();
+    }
+
+    function getPreferredPlaybackQuality() {
+        if (!_ready || _usingLiveCapture() || !_videoPlayer || typeof _videoPlayer.getPreferredPlaybackQuality !== 'function') {
+            return 'auto';
+        }
+        return _videoPlayer.getPreferredPlaybackQuality();
+    }
+
+    function setPlaybackQuality(quality) {
+        if (!_ready || _usingLiveCapture() || !_videoPlayer || typeof _videoPlayer.setPlaybackQuality !== 'function') {
+            return false;
+        }
+        const ok = _videoPlayer.setPlaybackQuality(quality);
+        if (ok) _emit('quality', { quality: _videoPlayer.getPlaybackQuality?.() || quality });
+        return ok;
+    }
+
     function jumpToLiveEdge() {
         if (!_ready) return;
         if (_usingLiveCapture() && _liveFacade) {
@@ -440,6 +506,12 @@ export const YTPlayer = (() => {
         isPlaying,
         getPlayerState,
         setSpeed,
+        isYoutubeNativeControlsEnabled,
+        setYoutubeNativeControlsEnabled,
+        getAvailableQualities,
+        getPlaybackQuality,
+        getPreferredPlaybackQuality,
+        setPlaybackQuality,
         getSourceType,
         jumpToLiveEdge,
         isLiveStream,

@@ -14,6 +14,8 @@ export class VideoPlayer {
         this._onYoutubeResize = null;
         this._ytResizeObserver = null;
         this._youtubeShowControls = options.youtubeShowControls !== false;
+        this._preferredYoutubeQuality = 'default';
+        this._qualityFallbackLockUntil = 0;
 
         // Ensure container is styled correctly
         this.container.style.position = 'relative';
@@ -59,6 +61,59 @@ export class VideoPlayer {
         if (typeof ResizeObserver !== 'undefined') {
             this._ytResizeObserver = new ResizeObserver(() => this._fitYoutubeToContainer());
             this._ytResizeObserver.observe(this.container);
+        }
+    }
+
+    _syncYoutubeIframeInteractivity() {
+        if (this.type !== 'youtube' || !this.container) return;
+        const iframe = this.container.querySelector('iframe');
+        if (!iframe) return;
+        iframe.style.pointerEvents = this._youtubeShowControls ? 'auto' : 'none';
+    }
+
+    _normalizeYoutubeQuality(quality) {
+        const q = String(quality || '').trim().toLowerCase();
+        if (!q || q === 'auto' || q === 'default' || q === 'unknown') return 'default';
+        return q;
+    }
+
+    _applyYoutubeQualityPreference({ allowReloadFallback = false } = {}) {
+        if (this.type !== 'youtube' || !this.player || typeof this.player.setPlaybackQuality !== 'function') return false;
+        const q = this._normalizeYoutubeQuality(this._preferredYoutubeQuality);
+        try {
+            if (typeof this.player.setPlaybackQualityRange === 'function') {
+                if (q === 'default') this.player.setPlaybackQualityRange('default');
+                else this.player.setPlaybackQualityRange(q, q);
+            }
+            this.player.setPlaybackQuality(q);
+
+            // Fallback (user action only): some streams ignore setPlaybackQuality until reload.
+            const canFallbackNow = Date.now() >= this._qualityFallbackLockUntil;
+            if (allowReloadFallback && canFallbackNow && typeof this.player.loadVideoById === 'function' && typeof this.player.getCurrentTime === 'function') {
+                const data = (typeof this.player.getVideoData === 'function' && this.player.getVideoData()) || {};
+                const videoId = data.video_id || data.videoId;
+                if (videoId && q !== 'default') {
+                    this._qualityFallbackLockUntil = Date.now() + 2000;
+                    const currentTime = Math.max(0, Number(this.player.getCurrentTime()) || 0);
+                    const wasPlaying =
+                        typeof this.player.getPlayerState === 'function' &&
+                        typeof window !== 'undefined' &&
+                        window.YT &&
+                        window.YT.PlayerState &&
+                        this.player.getPlayerState() === window.YT.PlayerState.PLAYING;
+                    this.player.loadVideoById({
+                        videoId,
+                        startSeconds: currentTime,
+                        suggestedQuality: q,
+                    });
+                    if (!wasPlaying && typeof this.player.pauseVideo === 'function') {
+                        this.player.pauseVideo();
+                    }
+                }
+            }
+            return true;
+        } catch (_) {
+            return false;
         }
     }
 
@@ -125,6 +180,8 @@ export class VideoPlayer {
                                 console.log('VideoPlayer: YT Player Ready');
                                 this._fitYoutubeToContainer();
                                 this._attachYoutubeResize();
+                                this._syncYoutubeIframeInteractivity();
+                                this._applyYoutubeQualityPreference();
                                 resolve();
                             },
                             'onStateChange': (event) => {
@@ -133,6 +190,7 @@ export class VideoPlayer {
                                 let t = 0;
                                 try { t = this.getCurrentTime(); } catch (_) { /* noop */ }
                                 if (st === YT.PlayerState.PLAYING) {
+                                    this._applyYoutubeQualityPreference();
                                     this._dispatchPlaybackActivity({ action: 'play', time: t });
                                 } else if (st === YT.PlayerState.PAUSED) {
                                     this._dispatchPlaybackActivity({ action: 'pause', time: t });
@@ -329,6 +387,52 @@ export class VideoPlayer {
 
     getType() {
         return this.type;
+    }
+
+    setYoutubeShowControls(enabled) {
+        this._youtubeShowControls = enabled !== false;
+        this._syncYoutubeIframeInteractivity();
+    }
+
+    getAvailableQualityLevels() {
+        if (this.type !== 'youtube' || !this.player || typeof this.player.getAvailableQualityLevels !== 'function') {
+            return [];
+        }
+        try {
+            const levels = this.player.getAvailableQualityLevels();
+            return Array.isArray(levels) ? levels.filter(Boolean) : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    getPlaybackQuality() {
+        if (this.type !== 'youtube' || !this.player || typeof this.player.getPlaybackQuality !== 'function') {
+            return 'auto';
+        }
+        try {
+            const q = this.player.getPlaybackQuality();
+            if (!q || q === 'default' || q === 'unknown') return 'auto';
+            return q;
+        } catch (_) {
+            return 'auto';
+        }
+    }
+
+    getPreferredPlaybackQuality() {
+        const q = this._normalizeYoutubeQuality(this._preferredYoutubeQuality);
+        return q === 'default' ? 'auto' : q;
+    }
+
+    setPlaybackQuality(quality) {
+        if (this.type !== 'youtube' || !this.player || typeof this.player.setPlaybackQuality !== 'function') {
+            return false;
+        }
+        const q = this._normalizeYoutubeQuality(quality);
+        const available = this.getAvailableQualityLevels();
+        if (q !== 'default' && available.length && !available.includes(q)) return false;
+        this._preferredYoutubeQuality = q;
+        return this._applyYoutubeQualityPreference({ allowReloadFallback: true });
     }
 
     isYoutubeLive() {

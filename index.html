@@ -145,6 +145,12 @@
               <button type="button" id="player-chrome-play" class="player-chrome__btn player-chrome__btn--primary" title="Reproducir o pausa" aria-label="Reproducir o pausa">
                 <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>
               </button>
+              <div id="player-chrome-quality" class="player-chrome__quality hidden">
+                <button type="button" id="player-chrome-quality-btn" class="player-chrome__btn player-chrome__btn--quality" title="Cambiar calidad de YouTube" aria-label="Cambiar calidad de YouTube" aria-expanded="false">
+                  <span id="player-chrome-quality-label">Auto</span>
+                </button>
+                <div id="player-chrome-quality-menu" class="player-chrome__quality-menu hidden" role="menu" aria-label="Calidades disponibles"></div>
+              </div>
             </div>
             <button type="button" id="player-chrome-seek-fwd" class="player-chrome__btn" title="Avanzar (paso de preferencias)" aria-label="Avanzar en el video">
               <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 7v10l6-5-6-5ZM5 7v10l6-5-6-5Z" fill="currentColor"/></svg>
@@ -154,6 +160,7 @@
                 <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm12.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 15.5 12Z" fill="currentColor"/></svg>
               </button>
             </div>
+            <button type="button" id="player-chrome-yt-native" class="player-chrome__btn player-chrome__btn--quality" title="Activar controles nativos de YouTube" aria-label="Activar controles nativos de YouTube" aria-pressed="false">YT</button>
             <div class="player-chrome__display" title="Pantalla completa">
               <button type="button" id="player-chrome-fullscreen" class="player-chrome__btn player-chrome__btn--fullscreen" aria-label="Entrar en pantalla completa" aria-pressed="false">
                 <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H3v4h2V5h2V3Zm14 0h-4v2h2v2h2V3ZM5 17H3v4h4v-2H5v-2Zm16 0h-2v2h-2v2h4v-4Z" fill="currentColor"/></svg>
