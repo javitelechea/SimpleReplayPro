@@ -17,16 +17,7 @@
   <!-- ═══════ HEADER ═══════ -->
   <header id="app-header">
     <div class="header-left" id="logo-home" style="cursor: pointer;" title="Ir al inicio">
-      <svg class="logo-icon" width="28" height="28" viewBox="0 0 28 28" fill="none">
-        <rect width="28" height="28" rx="6" fill="url(#logoGrad)" />
-        <polygon points="11,7 22,14 11,21" fill="#fff" />
-        <defs>
-          <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28">
-            <stop offset="0%" stop-color="#6366f1" />
-            <stop offset="100%" stop-color="#06b6d4" />
-          </linearGradient>
-        </defs>
-      </svg>
+      <img class="logo-icon" src="assets/app-logo-icon.png" width="28" height="28" alt="Logo SimpleReplay" />
       <h1 class="app-title"><span class="app-title-simple">simple</span><span class="app-title-replay">replay</span></h1>
     </div>
 
@@ -390,19 +381,54 @@
               <div class="livecapture-setup__step">
                 <span class="livecapture-setup__badge" aria-hidden="true">1</span>
                 <div class="livecapture-setup__content">
-                  <span class="livecapture-setup__heading">Detectar cámaras</span>
-                  <button type="button" id="btn-livecapture-setup-devices" class="btn btn-sm btn-outline livecapture-btn-detect">Detectar cámaras</button>
+                  <div class="livecapture-field">
+                    <label for="livecapture-source-kind">Origen</label>
+                    <input id="livecapture-source-kind" type="hidden" value="camera" />
+                    <div id="livecapture-source-picker" class="new-project-source-picker" role="group" aria-label="Origen de captura">
+                      <button type="button" class="new-project-source-chip active" data-source-kind="camera">
+                        <span class="new-project-source-chip__icon" aria-hidden="true">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                          </svg>
+                        </span>
+                        <span class="new-project-source-chip__text">Cámara local</span>
+                      </button>
+                      <button type="button" class="new-project-source-chip" data-source-kind="ip">
+                        <span class="new-project-source-chip__icon" aria-hidden="true">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="8"/>
+                            <path d="M4 12h16M12 4a13 13 0 0 1 0 16M12 4a13 13 0 0 0 0 16"/>
+                          </svg>
+                        </span>
+                        <span class="new-project-source-chip__text">Cámara IP</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div class="livecapture-setup__step">
+              <div class="livecapture-setup__step" id="livecapture-step-local">
                 <span class="livecapture-setup__badge" aria-hidden="true">2</span>
                 <div class="livecapture-setup__content">
+                  <span class="livecapture-setup__heading">Configurar cámara local</span>
+                  <button type="button" id="btn-livecapture-setup-devices" class="btn btn-sm btn-outline livecapture-btn-detect">Detectar cámaras</button>
                   <div class="livecapture-field">
                     <label for="livecapture-device">Cámara</label>
                     <select id="livecapture-device" class="input-sm">
                       <option value="">Predeterminada del sistema</option>
                     </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="livecapture-setup__step" id="livecapture-step-ip">
+                <span class="livecapture-setup__badge" aria-hidden="true">2</span>
+                <div class="livecapture-setup__content">
+                  <div class="livecapture-field">
+                    <label for="livecapture-stream-url" id="livecapture-stream-url-label">URL</label>
+                    <input id="livecapture-stream-url" class="input-sm" type="url" placeholder="http://192.168.0.234:8889/live/gopro8" />
+                    <button type="button" id="btn-livecapture-load-url" class="btn btn-sm btn-outline">Conectar</button>
                   </div>
                 </div>
               </div>

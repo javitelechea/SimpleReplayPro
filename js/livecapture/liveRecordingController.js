@@ -19,7 +19,7 @@ import { buildBlobFromSessionParts } from './sessionConsolidate.js';
 let _active = null;
 
 /** Vista previa sin grabar: mismo MediaStream que se reutiliza al iniciar REC. */
-/** @type {{ facade: import('./LiveCaptureFacade.js').LiveCaptureFacade, capture: import('./CaptureSession.js').CaptureSession }|null} */
+/** @type {{ facade: import('./LiveCaptureFacade.js').LiveCaptureFacade, capture: import('./CaptureSession.js').CaptureSession|null, sourceType: 'camera'|'url' }|null} */
 let _preview = null;
 
 /** Metadatos de la última sesión detenida (para consolidar / promoción local). */
@@ -60,7 +60,7 @@ function pickMimeType(preferred) {
  * @param {'720'|'1080'|'any'} [opts.resolution]
  */
 export async function startLivePreview(opts) {
-  const { facade, deviceId, resolution = '720' } = opts;
+  const { facade, deviceId, resolution = '720', sourceType = 'camera', streamUrl = '' } = opts;
   if (_active) return;
   if (!facade || typeof facade.isActive !== 'function' || !facade.isActive()) {
     throw new Error('LiveCaptureFacade no está activo.');
@@ -68,18 +68,27 @@ export async function startLivePreview(opts) {
 
   const resNorm = resolution === '1080' || resolution === 'any' || resolution === '720' ? resolution : '720';
   stopLivePreview();
+  if (sourceType === 'ip' || sourceType === 'url') {
+    const src = String(streamUrl || '').trim();
+    if (!src) throw new Error('Ingresá una URL de cámara IP.');
+    await facade.attachPreviewIp(src);
+    _preview = { facade, capture: null, sourceType: 'url' };
+    return;
+  }
   const capture = new CaptureSession(buildVideoConstraints({ deviceId, resolution: resNorm }));
   const stream = await capture.open();
   facade.attachPreviewStream(stream);
-  _preview = { facade, capture };
+  _preview = { facade, capture, sourceType: 'camera' };
 }
 
 export function stopLivePreview() {
   if (!_preview) return;
-  try {
-    _preview.capture.close();
-  } catch {
-    /* noop */
+  if (_preview.capture) {
+    try {
+      _preview.capture.close();
+    } catch {
+      /* noop */
+    }
   }
   try {
     _preview.facade.attachPreviewStream(null);
@@ -90,7 +99,9 @@ export function stopLivePreview() {
 }
 
 export function isLivePreviewActive() {
-  return _preview != null && !!_preview.capture.getStream();
+  if (!_preview) return false;
+  if (_preview.sourceType === 'url') return true;
+  return !!_preview.capture?.getStream();
 }
 
 export async function startLiveRecording(opts) {
@@ -113,13 +124,21 @@ export async function startLiveRecording(opts) {
 
   let capture;
   let stream;
-  const reusePreview = _preview && _preview.facade === facade && _preview.capture.getStream();
+  const reusePreview = _preview && _preview.facade === facade && _preview.sourceType === 'camera' && _preview.capture?.getStream();
+  const reuseUrlPreview = _preview && _preview.facade === facade && _preview.sourceType === 'url';
   if (reusePreview) {
     capture = _preview.capture;
     stream = capture.getStream();
     _preview = null;
     if (!stream) {
       throw new Error('La vista previa no tiene stream; elegí la cámara de nuevo.');
+    }
+  } else if (reuseUrlPreview) {
+    capture = null;
+    stream = facade.getPreviewCaptureStream?.() || null;
+    _preview = null;
+    if (!stream) {
+      throw new Error('No se pudo capturar el stream de la cámara IP en este navegador.');
     }
   } else {
     stopLivePreview();
@@ -179,6 +198,7 @@ export async function startLiveRecording(opts) {
   }
 
   rolling.start();
+  facade.markLiveStarted?.();
 
   const handle = {
     sessionId,
@@ -191,7 +211,15 @@ export async function startLiveRecording(opts) {
 
     async stop() {
       await rolling.stop();
-      capture.close();
+      if (capture) {
+        capture.close();
+      } else {
+        try {
+          stream?.getTracks?.().forEach((t) => t.stop());
+        } catch {
+          /* noop */
+        }
+      }
       facade.attachPreviewStream(null);
 
       try {

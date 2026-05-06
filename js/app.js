@@ -1107,6 +1107,15 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const statusEl = $('#livecapture-status');
         const selRes = $('#livecapture-resolution');
         const selDevice = $('#livecapture-device');
+        const selSourceKind = $('#livecapture-source-kind');
+        const sourcePicker = $('#livecapture-source-picker');
+        const inputStreamUrl = $('#livecapture-stream-url');
+        const streamUrlLabel = $('#livecapture-stream-url-label');
+        const btnLoadUrl = $('#btn-livecapture-load-url');
+        const stepLocal = $('#livecapture-step-local');
+        const stepIp = $('#livecapture-step-ip');
+        const fieldDevice = selDevice ? selDevice.closest('.livecapture-field') : null;
+        const fieldStreamUrl = inputStreamUrl ? inputStreamUrl.closest('.livecapture-field') : null;
         const btnSetupDevices = $('#btn-livecapture-setup-devices');
         const btnRec = $('#btn-livecapture-rec');
         const btnPause = $('#btn-livecapture-pause');
@@ -1140,9 +1149,22 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const envOk = typeof canRunLiveCapture === 'function' && canRunLiveCapture();
         if (!envOk && unavailableEl && controlsEl) {
             unavailableEl.textContent =
-                'La captura desde cámara no está disponible aquí (probá HTTPS en localhost o Chrome actualizado).';
+                'La captura desde cámara no está disponible aquí (probá HTTPS en localhost o Chrome actualizado). Podés usar URL HLS/IP cam.';
             unavailableEl.classList.remove('hidden');
-            controlsEl.classList.add('hidden');
+        }
+
+        function getLiveSourceKind() {
+            const v = selSourceKind?.value || 'camera';
+            if (v === 'ip') return 'ip';
+            return 'camera';
+        }
+
+        function setLiveSourceKind(kind) {
+            const next = kind === 'ip' ? 'ip' : 'camera';
+            if (selSourceKind) selSourceKind.value = next;
+            sourcePicker?.querySelectorAll('[data-source-kind]').forEach((btn) => {
+                btn.classList.toggle('active', btn.getAttribute('data-source-kind') === next);
+            });
         }
 
         function ensureCaptureSessionId() {
@@ -1162,17 +1184,33 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
 
         async function refreshLivePreviewNow() {
-            if (!envOk || isLiveRecordingActive()) return;
+            if (isLiveRecordingActive()) return;
             const game = AppState.getCurrentGame?.();
             if (game?.video_source !== 'liveCapture') return;
+            const sourceType = getLiveSourceKind();
+            if (sourceType === 'camera' && !envOk) return;
             try {
                 ensureCaptureSessionId();
                 if (!facade.getSessionId?.()) return;
                 const deviceId = ($('#livecapture-device')?.value || '').trim() || undefined;
                 const resolution = selRes?.value === '1080' ? '1080' : '720';
-                await startLivePreview({ facade, deviceId, resolution });
+                const streamUrl = (inputStreamUrl?.value || '').trim();
+                if (sourceType === 'ip' && !streamUrl) {
+                    // Si el usuario cambia a URL pero aún no cargó una, apagar preview de cámara.
+                    stopLivePreview();
+                    facade.attachPreviewStream?.(null);
+                    refreshLiveCapturePanelState();
+                    return;
+                }
+                if (sourceType === 'ip' && !/^https?:\/\//i.test(streamUrl)) {
+                    throw new Error('La URL debe comenzar con http:// o https://');
+                }
+                await startLivePreview({ facade, deviceId, resolution, sourceType, streamUrl });
             } catch (e) {
                 console.warn('[LiveCapture] vista previa:', e?.message || e);
+                if (sourceType === 'ip') {
+                    UI.toast(e?.message || 'No se pudo conectar la cámara IP', 'error');
+                }
             }
             refreshLiveCapturePanelState();
         }
@@ -1212,6 +1250,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const gameTb = gidTb ? AppState.getCurrentGame?.() : null;
             const isCaptureProjectTb = gameTb?.video_source === 'liveCapture';
             const block = !envOk || !facade || !isCaptureProjectTb;
+            const sourceType = getLiveSourceKind();
+            const usingExternalUrl = sourceType === 'ip';
 
             if (btnRec) {
                 btnRec.disabled = block || !previewOnly;
@@ -1219,6 +1259,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const recPaused = recOn && isLiveRecordingPaused();
                 btnRec.classList.toggle('livecapture-rec--recording', recOn && !recPaused);
                 btnRec.classList.toggle('livecapture-rec--recording-paused', recOn && recPaused);
+                btnRec.title = 'Iniciar grabación';
             }
             if (btnPause && btnStop) {
                 btnPause.disabled = block || !recording;
@@ -1240,15 +1281,30 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
 
         function refreshLiveCapturePanelState() {
+            setLiveSourceKind(getLiveSourceKind());
             const recording = isLiveRecordingActive();
             const mode = facade.getMode?.() ?? 'live';
             const gid = AppState.get('currentGameId');
             const game = gid ? AppState.getCurrentGame?.() : null;
             const isCaptureProject = game?.video_source === 'liveCapture';
+            const sourceType = getLiveSourceKind();
+            const isUrlSource = sourceType === 'ip';
+
+            if (stepLocal) stepLocal.style.display = isUrlSource ? 'none' : '';
+            if (stepIp) stepIp.style.display = isUrlSource ? '' : 'none';
+            if (fieldDevice) fieldDevice.style.display = isUrlSource ? 'none' : '';
+            if (fieldStreamUrl) fieldStreamUrl.style.display = isUrlSource ? '' : 'none';
+            if (streamUrlLabel) streamUrlLabel.textContent = 'URL Cámara IP';
+            if (inputStreamUrl) {
+                inputStreamUrl.placeholder = 'http://192.168.0.234:8889/live/gopro8';
+            }
+            if (btnLoadUrl) btnLoadUrl.textContent = 'Conectar cámara IP';
 
             if (selRes) selRes.disabled = !!recording;
-            if (selDevice) selDevice.disabled = !!recording;
-            if (btnSetupDevices) btnSetupDevices.disabled = !!recording || !envOk;
+            if (selDevice) selDevice.disabled = !!recording || isUrlSource;
+            if (btnSetupDevices) btnSetupDevices.disabled = !!recording || !envOk || isUrlSource;
+            if (inputStreamUrl) inputStreamUrl.disabled = !!recording || !isUrlSource;
+            if (btnLoadUrl) btnLoadUrl.disabled = !!recording || !isUrlSource;
 
             if (btnDownload) {
                 btnDownload.disabled = !AppState.getLocalVideoFile?.();
@@ -1258,11 +1314,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
             const lines = [];
             if (!envOk) {
-                lines.push('Captura no disponible aquí.');
+                lines.push('Captura de cámara no disponible aquí.');
             } else if (!isCaptureProject) {
                 lines.push('No es proyecto de captura.');
             } else if (recording) {
                 lines.push(mode === 'review' ? 'Grabando · revisión' : 'Grabando');
+            } else if (isUrlSource) {
+                lines.push('Fuente Cámara IP activa.');
             }
             if (statusEl) statusEl.innerHTML = lines.length ? lines.join('<br/>') : '';
         }
@@ -1293,11 +1351,46 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         selDevice?.addEventListener('change', () => scheduleLivePreviewRefresh());
         selRes?.addEventListener('change', () => scheduleLivePreviewRefresh());
+        sourcePicker?.querySelectorAll('[data-source-kind]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const next = btn.getAttribute('data-source-kind') || 'camera';
+                if (next === getLiveSourceKind()) return;
+                setLiveSourceKind(next);
+                // Cambiar tipo de fuente debe cortar inmediatamente la preview previa (webcam o URL).
+                stopLivePreview();
+                facade.attachPreviewStream?.(null);
+                refreshLiveCapturePanelState();
+                scheduleLivePreviewRefresh();
+            });
+        });
+        btnLoadUrl?.addEventListener('click', () => {
+            const kind = getLiveSourceKind();
+            if (kind !== 'ip') {
+                UI.toast('Elegí "Cámara IP" como fuente.', 'info');
+                return;
+            }
+            const rawUrl = (inputStreamUrl?.value || '').trim();
+            if (!rawUrl) {
+                UI.toast('Ingresá una URL válida de stream.', 'warning');
+                return;
+            }
+            if (!/^https?:\/\//i.test(rawUrl)) {
+                UI.toast('La URL debe comenzar con http:// o https://', 'warning');
+                return;
+            }
+            clearTimeout(_previewDebounce);
+            refreshLivePreviewNow();
+        });
+        inputStreamUrl?.addEventListener('keydown', (ev) => {
+            if (ev.key !== 'Enter') return;
+            ev.preventDefault();
+            btnLoadUrl?.click();
+        });
 
         btnRec?.addEventListener('click', async () => {
             if (typeof isLiveRecordingActive === 'function' && isLiveRecordingActive()) return;
             if (typeof isLivePreviewActive !== 'function' || !isLivePreviewActive()) {
-                UI.toast('Elegí cámara y resolución arriba.', 'info');
+                UI.toast('Conectá una fuente antes de grabar.', 'info');
                 return;
             }
             if (!facade) return;
