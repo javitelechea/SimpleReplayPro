@@ -1250,8 +1250,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const gameTb = gidTb ? AppState.getCurrentGame?.() : null;
             const isCaptureProjectTb = gameTb?.video_source === 'liveCapture';
             const block = !envOk || !facade || !isCaptureProjectTb;
-            const sourceType = getLiveSourceKind();
-            const usingExternalUrl = sourceType === 'ip';
 
             if (btnRec) {
                 btnRec.disabled = block || !previewOnly;
@@ -2482,6 +2480,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     });
 
     $('#btn-save-game').addEventListener('click', async () => {
+        const teardownPreviousPlayback = () => {
+            try { YTPlayer.pause?.(); } catch (_) { /* noop */ }
+            try { YTPlayer.clearClipEnd?.(); } catch (_) { /* noop */ }
+            try { YTPlayer.clearAutoPause?.(); } catch (_) { /* noop */ }
+            try { stopLivePreview?.(); } catch (_) { /* noop */ }
+            try { YTPlayer.leaveLiveCapture?.(); } catch (_) { /* noop */ }
+            try { DrawingTool.dismissPlaybackOverlays?.(); } catch (_) { /* noop */ }
+            try { DrawingTool.dismissDrawingPreview?.(); } catch (_) { /* noop */ }
+        };
+
         if (activeMainTab === 'json') {
             if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const jsonFile = $('#input-import-json').files[0];
@@ -2535,6 +2543,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
             if (!title) { UI.toast('Ingresá un título', 'error'); return; }
 
+            teardownPreviousPlayback();
             AppState.clearProject();
             DemoData.clear();
             resetShellForNewLocalDraft();
@@ -2574,6 +2583,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             return;
         }
 
+        teardownPreviousPlayback();
         AppState.clearProject();
         DemoData.clear();
         resetShellForNewLocalDraft();

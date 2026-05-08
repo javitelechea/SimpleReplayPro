@@ -106,9 +106,16 @@ export const YTPlayer = (() => {
             return;
         }
         if (!_guardNotRecording('loadLiveCapture')) return;
-        _leaveLiveCaptureIfNeeded();
+        // Al entrar a captura, pausar cualquier media previa (YouTube/local) para evitar
+        // que quede audio sonando "debajo" de la superficie live.
+        try {
+            if (_videoPlayer && typeof _videoPlayer.pause === 'function') {
+                _videoPlayer.pause();
+            }
+        } catch (_) { /* noop */ }
         _clipEndSec = null;
         _stopPoll();
+        _leaveLiveCaptureIfNeeded();
 
         _liveFacade.load(payload);
         _lastMedia = {
