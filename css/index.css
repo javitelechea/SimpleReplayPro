@@ -1909,6 +1909,9 @@ body.collection-only-mode .mode-slider {
   padding: var(--sp-sm) var(--sp-md);
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
+  overflow-y: auto;
+  flex-shrink: 0;
+  max-height: 35vh;
 }
 
 .tag-team-row {
@@ -4751,6 +4754,15 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
     font-size: 0.78rem;
     padding: 6px 6px;
   }
+
+  .tag-bar {
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+
+  .tag-buttons-row {
+    flex-wrap: wrap;
+  }
 }
 
 /* ═══════════════════════════════════════════
@@ -4882,20 +4894,21 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
     min-width: 0;
     height: var(--mobile-video-h);
     max-height: var(--mobile-video-h);
+    overflow: hidden;
   }
 
-  /*
-   * Player: la caja coincide con 16:9 al ancho de pantalla. Antes forzábamos ~56vh
-   * y el video real era más bajo → mucha franja negra vacía sin sentido.
-   */
   #player-container {
-    flex: none;
+    flex: 1 1 0%;
     width: 100%;
     min-width: 0;
-    height: 100%;
-    aspect-ratio: auto;
     min-height: 0;
-    max-height: 100%;
+    aspect-ratio: auto;
+  }
+
+  .tag-bar {
+    flex-shrink: 0;
+    max-height: 40%;
+    overflow-y: auto;
   }
 
   .side-panel {
