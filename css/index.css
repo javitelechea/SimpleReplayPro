@@ -1419,10 +1419,6 @@ html.sr-player-fs-active #no-game-overlay {
   pointer-events: none !important;
 }
 
-html.sr-player-fs-active.sr-mobile-yt-native-fs #youtube-player iframe {
-  pointer-events: auto !important;
-}
-
 html.sr-player-fs-active #app-main {
   padding: 0 !important;
   margin: 0 !important;

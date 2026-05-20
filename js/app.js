@@ -1051,7 +1051,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         document.querySelectorAll('.clip-chat-panel').forEach((el) => el.remove());
     }
 
-    let _mobileFsYoutubeControlsWasEnabled = null;
     let _pseudoFsViewportTimer = null;
 
     function startPseudoFsViewportWatch() {
@@ -1067,47 +1066,21 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
     }
 
-    async function prepareMobileYoutubeNativeControls() {
+    /** En móvil usamos controles de la app (◀ clip ▶), no los de YouTube (solo partido completo). */
+    async function ensureAppYoutubeControlsForMobileFs() {
         if (!isMobileLayout()) return;
         if (typeof YTPlayer?.getSourceType !== 'function') return;
         if (YTPlayer.getSourceType() !== 'youtube') return;
         if (typeof YTPlayer.isYoutubeNativeControlsEnabled !== 'function') return;
-
-        const wasOn = YTPlayer.isYoutubeNativeControlsEnabled();
-        if (_mobileFsYoutubeControlsWasEnabled === null) {
-            _mobileFsYoutubeControlsWasEnabled = wasOn;
-        }
-        document.documentElement.classList.add('sr-mobile-yt-native-fs');
-
-        if (!wasOn && typeof YTPlayer.setYoutubeNativeControlsEnabled === 'function') {
-            await YTPlayer.setYoutubeNativeControlsEnabled(true);
-        }
-
-        const iframe = $('#youtube-player')?.querySelector('iframe');
-        if (iframe) iframe.style.pointerEvents = 'auto';
-
-        if (isIosDevice() && !sessionStorage.getItem('sr_yt_fs_hint_shown')) {
-            sessionStorage.setItem('sr_yt_fs_hint_shown', '1');
-            UI.toast('Para ocultar la barra de Safari, tocá ⛶ en el reproductor de YouTube', 'info');
-        }
-    }
-
-    async function restoreMobileYoutubeNativeControls() {
-        document.documentElement.classList.remove('sr-mobile-yt-native-fs');
-        if (_mobileFsYoutubeControlsWasEnabled === null) return;
-        const restore = _mobileFsYoutubeControlsWasEnabled;
-        _mobileFsYoutubeControlsWasEnabled = null;
-        if (!restore && typeof YTPlayer?.setYoutubeNativeControlsEnabled === 'function') {
-            try {
-                await YTPlayer.setYoutubeNativeControlsEnabled(false);
-            } catch (_) { /* noop */ }
+        if (!YTPlayer.isYoutubeNativeControlsEnabled()) return;
+        if (typeof YTPlayer.setYoutubeNativeControlsEnabled === 'function') {
+            await YTPlayer.setYoutubeNativeControlsEnabled(false);
         }
     }
 
     function cleanupFullscreenState() {
         stopPseudoFsViewportWatch();
         document.documentElement.classList.remove('sr-immersive-fs');
-        document.documentElement.classList.remove('sr-mobile-yt-native-fs');
         document.documentElement.style.removeProperty('--sr-fs-vv-top');
         document.documentElement.style.removeProperty('--sr-fs-vv-height');
         hideFsControls(getPlayerContainer());
@@ -1263,11 +1236,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         if (isMobileLayout()) {
             setFullscreenClipRailCollapsed(true);
-            await prepareMobileYoutubeNativeControls();
+            await ensureAppYoutubeControlsForMobileFs();
             enterPseudoPlayerFullscreen();
             if (!isIosDevice()) {
                 await requestDocumentFullscreen();
             }
+            revealFsControls(container, 6000);
             onPlayerFullscreenChange();
             return true;
         }
@@ -1292,7 +1266,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (isPseudoPlayerFullscreen()) {
             exitPseudoPlayerFullscreen();
         }
-        await restoreMobileYoutubeNativeControls();
         cleanupFullscreenState();
         syncPlayerChromeUi();
         syncFullscreenClipRail();
@@ -2262,6 +2235,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 singleClickTimer = null;
             }
             suppressSingleClickUntil = Date.now() + 350;
+            if (shouldUseImmersiveFsControls() && AppState.get('mode') === 'view' && AppState.get('currentClipId')) {
+                navigateToClipAndPlay(resolveDirectionFromX(ev.clientX) < 0 ? 'prev' : 'next');
+                revealFsControls(container);
+                return;
+            }
             seekBySurface(resolveDirectionFromX(ev.clientX));
         });
 
@@ -2281,7 +2259,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     singleClickTimer = null;
                 }
                 suppressSingleClickUntil = Date.now() + 350;
-                seekBySurface(resolveDirectionFromX(touch.clientX));
+                if (shouldUseImmersiveFsControls() && AppState.get('mode') === 'view' && AppState.get('currentClipId')) {
+                    navigateToClipAndPlay(resolveDirectionFromX(touch.clientX) < 0 ? 'prev' : 'next');
+                    revealFsControls(container);
+                } else {
+                    seekBySurface(resolveDirectionFromX(touch.clientX));
+                }
                 lastTapTs = 0;
                 lastTapX = 0;
                 return;
