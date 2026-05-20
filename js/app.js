@@ -1153,6 +1153,18 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const videoArea = $('#video-area');
         const root = document.documentElement;
         if (!videoArea) return;
+
+        const landscapePhone = window.matchMedia('(orientation: landscape)').matches && isMobileLayout();
+        if (landscapePhone) {
+            root.style.setProperty('--sr-fs-vv-top', '0px');
+            root.style.setProperty('--sr-fs-vv-height', '100dvh');
+            videoArea.style.top = '0';
+            videoArea.style.left = '0';
+            videoArea.style.width = '100%';
+            videoArea.style.height = '100dvh';
+            return;
+        }
+
         const vv = window.visualViewport;
         if (vv) {
             root.style.setProperty('--sr-fs-vv-top', `${vv.offsetTop}px`);

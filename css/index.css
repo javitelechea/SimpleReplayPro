@@ -5246,6 +5246,27 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
     display: none !important;
   }
 
+  /* Modo Ver: sin timeline ni barra inferior (hueco tipo chat) */
+  body.mode-view {
+    --mobile-video-h: min(56dvh, calc(100vw * 9 / 16));
+  }
+
+  body.mode-view #custom-timeline,
+  body.mode-view #clip-view-toolbar {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+  }
+
+  body.mode-view #player-container {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+
   #app-main {
     flex-direction: column;
     height: 100dvh;
@@ -5550,9 +5571,7 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   }
 
   body {
-    /* iPhone con notch / Dynamic Island */
-    padding-left: env(safe-area-inset-left, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
     box-sizing: border-box;
   }
 
@@ -5564,7 +5583,8 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   #tag-bar,
   #toast-container,
   #nav-arrows,
-  #focus-overlay {
+  #focus-overlay,
+  #video-chat-panel {
     display: none !important;
   }
 
@@ -5579,18 +5599,20 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   }
 
   #video-area {
-    position: static !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    flex: 1 1 auto !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    flex: none !important;
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
     min-width: 0 !important;
     min-height: 0 !important;
-    height: 100% !important;
-    max-height: none !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    z-index: 3000;
   }
 
   #player-container {
@@ -5608,7 +5630,6 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
     height: 100% !important;
   }
 
-  /* Chat flotante: oculto en modo “solo video” (al volver a vertical, el JS sigue manejando el estado) */
   #video-chat-panel {
     display: none !important;
   }
@@ -5624,6 +5645,18 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   #player-container .player-chrome__bar {
     gap: 10px;
     padding: 6px 12px 8px;
+  }
+}
+
+@media (orientation: landscape) {
+  html.sr-player-fs-active #video-area {
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    --sr-fs-vv-top: 0px;
+    --sr-fs-vv-height: 100dvh;
   }
 }
 

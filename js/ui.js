@@ -1910,6 +1910,9 @@ export const UI = (() => {
             renderSharePanel();
         }
         document.body.classList.toggle('collection-only-mode', inCollection);
+        document.body.classList.toggle('mode-view', mode === 'view');
+        document.body.classList.toggle('mode-analyze', mode === 'analyze');
+        document.body.classList.toggle('mode-share', mode === 'share');
         updateClipEditControls();
 
         // Slider animation (2 botones: Ver+Compartir, sin Analizar)
