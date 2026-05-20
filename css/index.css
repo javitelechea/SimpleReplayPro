@@ -1358,77 +1358,20 @@ body.collection-only-mode .mode-slider {
   outline: none;
 }
 
-/* iOS / móvil: pseudo fullscreen (reproductor movido a body) */
-#player-container.player-container--pseudo-fs {
-  position: fixed !important;
-  inset: 0 !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  height: 100dvh !important;
-  height: 100svh !important;
-  max-width: none !important;
-  max-height: none !important;
-  margin: 0 !important;
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px) !important;
-  z-index: 10050 !important;
-  background: #000;
-  border-radius: 0 !important;
-  box-sizing: border-box !important;
-}
-
-.player-mobile-fs-btn {
-  display: none;
-  position: absolute;
-  top: max(8px, env(safe-area-inset-top, 0px));
-  right: max(8px, env(safe-area-inset-right, 0px));
-  z-index: 30;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 10px;
-  background: rgba(12, 14, 20, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #fff;
-  font-size: 1.25rem;
-  line-height: 1;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.player-mobile-fs-btn:not(.hidden) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#player-container.player-container--pseudo-fs .player-mobile-fs-btn {
-  top: max(12px, env(safe-area-inset-top, 0px));
-  right: max(12px, env(safe-area-inset-right, 0px));
-  z-index: 10060;
-}
-
+/* Móvil: pseudo fullscreen — expandir #video-area (no sacar el player del layout) */
 html.sr-player-fs-active,
 html.sr-player-fs-active body {
   overflow: hidden;
   overscroll-behavior: none;
 }
 
-/* Móvil: #video-area es un bloque fijo chico; hay que expandir toda el área al simular fullscreen */
 @media (max-width: 768px) {
   html.sr-player-fs-active #app-main {
     padding-top: 0 !important;
   }
 
   html.sr-player-fs-active #app-header {
-    opacity: 0;
+    visibility: hidden;
     pointer-events: none;
   }
 
@@ -1444,21 +1387,45 @@ html.sr-player-fs-active body {
     max-height: none !important;
     min-height: 0 !important;
     z-index: 10060 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding:
+      env(safe-area-inset-top, 0px)
+      env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px)
+      env(safe-area-inset-left, 0px) !important;
+    box-sizing: border-box !important;
+    background: #000 !important;
   }
 
-  html.sr-player-fs-active #player-container.player-container--pseudo-fs {
-    position: absolute !important;
-    inset: 0 !important;
+  html.sr-player-fs-active #player-container {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  html.sr-player-fs-active #youtube-player,
+  html.sr-player-fs-active #youtube-player iframe,
+  html.sr-player-fs-active #player-container > video {
     width: 100% !important;
     height: 100% !important;
-    max-height: none !important;
-    z-index: 1 !important;
+    min-height: 0 !important;
   }
 
+  html.sr-player-fs-active #custom-timeline,
+  html.sr-player-fs-active #clip-view-toolbar,
   html.sr-player-fs-active #side-panel,
   html.sr-player-fs-active .tag-bar {
-    visibility: hidden !important;
-    pointer-events: none !important;
+    display: none !important;
+  }
+
+  html.sr-player-fs-active #player-container .player-chrome:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -1471,17 +1438,16 @@ html.sr-player-fs-active body.read-only-mode #video-area {
   max-height: none !important;
 }
 
-#player-container.player-container--pseudo-fs .player-chrome:not(.hidden) {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-#player-container.player-container--pseudo-fs .fullscreen-clip-rail:not(.hidden) {
+html.sr-player-fs-active #player-container .fullscreen-clip-rail:not(.hidden) {
   display: flex;
 }
 
-#player-container:not(:fullscreen):not(.player-container--pseudo-fs) .fullscreen-clip-rail {
-  display: none;
+#player-container:not(:fullscreen) .fullscreen-clip-rail {
+  display: none !important;
+}
+
+html.sr-player-fs-active #player-container .fullscreen-clip-rail:not(.hidden) {
+  display: flex !important;
 }
 
 /* En táctil, mostrar siempre la barra de controles (no hay hover) */
@@ -1576,10 +1542,6 @@ html.sr-player-fs-active body.read-only-mode #video-area {
 }
 
 .fullscreen-clip-rail.hidden {
-  display: none !important;
-}
-
-#player-container:not(:fullscreen):not(.player-container--pseudo-fs) .fullscreen-clip-rail {
   display: none !important;
 }
 

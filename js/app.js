@@ -996,14 +996,14 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         return $('#player-container');
     }
 
-    const PSEUDO_FS_CLASS = 'player-container--pseudo-fs';
+    const PSEUDO_FS_CLASS = 'sr-player-fs-active';
 
     function getNativeFullscreenElement() {
         return document.fullscreenElement || document.webkitFullscreenElement || null;
     }
 
-    function isPseudoPlayerFullscreen(container) {
-        return !!(container && container.classList.contains(PSEUDO_FS_CLASS));
+    function isPseudoPlayerFullscreen() {
+        return document.documentElement.classList.contains(PSEUDO_FS_CLASS);
     }
 
     function isCoarsePointerDevice() {
@@ -1019,7 +1019,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     function isPlayerFullscreen() {
         const container = getPlayerContainer();
         if (!container) return false;
-        return getNativeFullscreenElement() === container || isPseudoPlayerFullscreen(container);
+        return getNativeFullscreenElement() === container || isPseudoPlayerFullscreen();
     }
 
     async function requestNativePlayerFullscreen(container) {
@@ -1036,34 +1036,19 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (typeof fn === 'function') await fn.call(document);
     }
 
-    function enterPseudoPlayerFullscreen(container) {
-        if (!container.dataset.fsPlaceholderId) {
-            const ph = document.createElement('span');
-            ph.id = `fs-ph-${Date.now()}`;
-            ph.hidden = true;
-            ph.style.display = 'none';
-            container.parentNode?.insertBefore(ph, container);
-            container.dataset.fsPlaceholderId = ph.id;
-        }
-        if (container.parentElement !== document.body) {
-            document.body.appendChild(container);
-        }
-        container.classList.add(PSEUDO_FS_CLASS);
-        document.documentElement.classList.add('sr-player-fs-active');
-        document.body.classList.add('sr-player-fs-active');
+    function enterPseudoPlayerFullscreen() {
+        document.documentElement.classList.add(PSEUDO_FS_CLASS);
+        document.body.classList.add(PSEUDO_FS_CLASS);
+        requestAnimationFrame(() => {
+            window.dispatchEvent(new Event('resize'));
+            requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+        });
     }
 
-    function exitPseudoPlayerFullscreen(container) {
-        container.classList.remove(PSEUDO_FS_CLASS);
-        document.documentElement.classList.remove('sr-player-fs-active');
-        document.body.classList.remove('sr-player-fs-active');
-        const phId = container.dataset.fsPlaceholderId;
-        if (phId) {
-            const ph = document.getElementById(phId);
-            if (ph?.parentNode) {
-                ph.parentNode.insertBefore(container, ph.nextSibling);
-            }
-        }
+    function exitPseudoPlayerFullscreen() {
+        document.documentElement.classList.remove(PSEUDO_FS_CLASS);
+        document.body.classList.remove(PSEUDO_FS_CLASS);
+        requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
     }
 
     function tryIosLocalVideoFullscreen(container) {
@@ -1088,7 +1073,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
 
         if (isMobileLayout()) {
-            enterPseudoPlayerFullscreen(container);
+            enterPseudoPlayerFullscreen();
             onPlayerFullscreenChange();
             return true;
         }
@@ -1098,17 +1083,15 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             requestAnimationFrame(focusPlayerSurfaceForKeys);
             return true;
         } catch (_) {
-            enterPseudoPlayerFullscreen(container);
+            enterPseudoPlayerFullscreen();
             onPlayerFullscreenChange();
             return true;
         }
     }
 
     async function exitPlayerFullscreen() {
-        const container = getPlayerContainer();
-        if (!container) return;
-        if (isPseudoPlayerFullscreen(container)) {
-            exitPseudoPlayerFullscreen(container);
+        if (isPseudoPlayerFullscreen()) {
+            exitPseudoPlayerFullscreen();
         } else {
             try {
                 await exitNativePlayerFullscreen();
@@ -1131,43 +1114,21 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
     }
 
-    let _fsTapLockUntil = 0;
-
-    function syncMobileFullscreenButton() {
-        const btn = $('#player-mobile-fullscreen');
-        if (!btn) return;
-        const hasGame = !!AppState.get('currentGameId') || !!AppState.get('activeCollection');
-        const show = hasGame && isMobileLayout();
-        btn.classList.toggle('hidden', !show);
-        const on = isPlayerFullscreen();
-        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        btn.setAttribute('aria-label', on ? 'Salir de pantalla completa' : 'Pantalla completa');
-        btn.title = on ? 'Salir de pantalla completa' : 'Pantalla completa';
-        btn.textContent = on ? '✕' : '⛶';
-    }
-
     function wireFullscreenButton() {
-        if (document.body.dataset.fsControlsWired === '1') return;
-        document.body.dataset.fsControlsWired = '1';
+        const fsBtn = $('#player-chrome-fullscreen');
+        if (!fsBtn || fsBtn.dataset.fsWired === '1') return;
+        fsBtn.dataset.fsWired = '1';
         const onFsActivate = (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
-            const now = Date.now();
-            if (now < _fsTapLockUntil) return;
-            _fsTapLockUntil = now + 450;
             void togglePlayerFullscreen();
         };
-        ['#player-chrome-fullscreen', '#player-mobile-fullscreen'].forEach((sel) => {
-            const btn = $(sel);
-            if (!btn) return;
-            btn.addEventListener('pointerup', onFsActivate);
-            btn.addEventListener('click', onFsActivate);
-        });
+        fsBtn.addEventListener('pointerup', onFsActivate);
+        fsBtn.addEventListener('click', onFsActivate);
     }
 
     function onPlayerFullscreenChange() {
         syncPlayerChromeUi();
-        syncMobileFullscreenButton();
         syncFullscreenClipRail();
         if (isPlayerFullscreen()) {
             requestAnimationFrame(focusPlayerSurfaceForKeys);
@@ -1487,8 +1448,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (fullscreenBtn) {
             const container = $('#player-container');
             const mode = AppState.get('mode');
-            const showFsChrome = mode === 'view' || isMobileLayout();
-            fullscreenBtn.style.display = showFsChrome ? '' : 'none';
+            fullscreenBtn.style.display = mode === 'view' ? '' : 'none';
             if (container) {
                 const isFullscreen = isPlayerFullscreen();
                 fullscreenBtn.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
@@ -1499,8 +1459,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H3v4h2V5h2V3Zm14 0h-4v2h2v2h2V3ZM5 17H3v4h4v-2H5v-2Zm16 0h-2v2h-2v2h4v-4Z" fill="currentColor"/></svg>';
             }
         }
-
-        syncMobileFullscreenButton();
 
         syncPlayerYtNativeBtnUi();
         syncFullscreenClipRail();
