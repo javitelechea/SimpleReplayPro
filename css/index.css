@@ -1599,6 +1599,63 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* Rail compacto en móvil (fullscreen) */
+@media (max-width: 768px) {
+  .fullscreen-clip-rail.is-compact {
+    right: 8px;
+    bottom: 52px;
+    max-width: min(200px, 52vw);
+    gap: 2px;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__head {
+    gap: 4px;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle {
+    padding: 4px 8px;
+    font-size: 0.62rem;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle-label {
+    display: none;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle--draw {
+    min-width: 32px;
+    padding: 4px 7px;
+    font-size: 0.85rem;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__body {
+    width: min(200px, 52vw);
+    padding: 4px 5px 3px;
+    gap: 2px;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__row {
+    padding: 3px 5px;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__row:disabled {
+    display: none;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__line {
+    font-size: 0.62rem;
+    line-height: 1.2;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__count {
+    margin-top: 0;
+    font-size: 0.58rem;
+  }
+
+  html.sr-player-fs-active .fullscreen-clip-rail.is-compact {
+    bottom: max(48px, calc(env(safe-area-inset-bottom, 0px) + 44px));
+  }
+}
+
 /* Native YouTube controls mode: move app chrome out of the bottom controls area. */
 #player-container.yt-native-mode .player-chrome {
   top: 8px;

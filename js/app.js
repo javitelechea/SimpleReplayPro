@@ -1073,6 +1073,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
 
         if (isMobileLayout()) {
+            setFullscreenClipRailCollapsed(true);
             enterPseudoPlayerFullscreen();
             onPlayerFullscreenChange();
             return true;
@@ -1221,10 +1222,23 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         };
     }
 
+    function clipRailCompactLine(roleLabel, clip) {
+        if (!clip) return '—';
+        const label = clipRailLabel(clip);
+        const t = UI.formatTime(clip.start_sec);
+        if (roleLabel === 'Anterior') return `◀ ${label}`;
+        if (roleLabel === 'Siguiente') return `${label} ▶`;
+        return `${label} · ${t}`;
+    }
+
     function fillFullscreenRailRow(rowEl, roleLabel, clip) {
         if (!rowEl) return;
         const line = rowEl.querySelector('.fullscreen-clip-rail__line');
         if (!line) return;
+        if (isMobileLayout()) {
+            line.textContent = clipRailCompactLine(roleLabel, clip);
+            return;
+        }
         if (!clip) {
             line.textContent = `${roleLabel} — —`;
             return;
@@ -1235,7 +1249,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     const FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
 
     function isFullscreenClipRailCollapsed() {
-        return localStorage.getItem(FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY) === '1';
+        const stored = localStorage.getItem(FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY);
+        if (stored === null && isMobileLayout()) return true;
+        return stored === '1';
     }
 
     function setFullscreenClipRailCollapsed(collapsed) {
@@ -1267,17 +1283,24 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     }
 
     function buildClipRailPopoutPayload(ctx) {
+        const compact = isMobileLayout();
         return {
             show: true,
             collapsed: isFullscreenClipRailCollapsed(),
             prevLine: ctx.prev
-                ? `Anterior — ${clipRailLabel(ctx.prev)} — ${clipRailTimeRange(ctx.prev)}`
+                ? (compact
+                    ? clipRailCompactLine('Anterior', ctx.prev)
+                    : `Anterior — ${clipRailLabel(ctx.prev)} — ${clipRailTimeRange(ctx.prev)}`)
                 : null,
             currentLine: ctx.current
-                ? `Actual — ${clipRailLabel(ctx.current)} — ${clipRailTimeRange(ctx.current)}`
+                ? (compact
+                    ? clipRailCompactLine('Actual', ctx.current)
+                    : `Actual — ${clipRailLabel(ctx.current)} — ${clipRailTimeRange(ctx.current)}`)
                 : 'Actual — —',
             nextLine: ctx.next
-                ? `Siguiente — ${clipRailLabel(ctx.next)} — ${clipRailTimeRange(ctx.next)}`
+                ? (compact
+                    ? clipRailCompactLine('Siguiente', ctx.next)
+                    : `Siguiente — ${clipRailLabel(ctx.next)} — ${clipRailTimeRange(ctx.next)}`)
                 : null,
             count: ctx.total > 0 ? `${ctx.idx + 1} / ${ctx.total}` : '',
             prevDisabled: !ctx.prev,
@@ -1336,6 +1359,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             rail.classList.add('hidden');
             rail.hidden = true;
         }
+        rail.classList.toggle('is-compact', isMobileLayout());
 
         const prevBtn = rail.querySelector('[data-rail-dir="prev"]');
         const nextBtn = rail.querySelector('[data-rail-dir="next"]');
