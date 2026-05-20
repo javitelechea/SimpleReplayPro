@@ -1404,6 +1404,10 @@ html.sr-player-fs-active .btn-expand,
 html.sr-player-fs-active #nav-arrows,
 html.sr-player-fs-active #toast-container,
 html.sr-player-fs-active #video-chat-panel,
+html.sr-player-fs-active #quick-clip-menu,
+html.sr-player-fs-active .clip-chat-panel,
+html.sr-player-fs-active #export-progress,
+html.sr-player-fs-active #mobile-mode-menu,
 html.sr-player-fs-active #focus-overlay,
 html.sr-player-fs-active #drawing-toolbar,
 html.sr-player-fs-active #custom-timeline,
@@ -1411,6 +1415,12 @@ html.sr-player-fs-active #clip-view-toolbar,
 html.sr-player-fs-active .tag-bar,
 html.sr-player-fs-active #no-game-overlay {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+html.sr-player-fs-active.sr-mobile-yt-native-fs #youtube-player iframe {
+  pointer-events: auto !important;
 }
 
 html.sr-player-fs-active #app-main {
@@ -1425,12 +1435,12 @@ html.sr-player-fs-active #app-main {
 html.sr-player-fs-active #video-area {
   position: fixed !important;
   inset: 0 !important;
-  top: 0 !important;
+  top: var(--sr-fs-vv-top, 0) !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 0 !important;
+  bottom: auto !important;
   width: 100% !important;
-  height: 100% !important;
+  height: var(--sr-fs-vv-height, 100%) !important;
   max-height: none !important;
   min-height: 0 !important;
   z-index: 10060 !important;

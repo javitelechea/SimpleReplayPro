@@ -1016,10 +1016,102 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     }
 
+    function isIosDevice() {
+        return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    }
+
     function isPlayerFullscreen() {
         const container = getPlayerContainer();
         if (!container) return false;
-        return getNativeFullscreenElement() === container || isPseudoPlayerFullscreen();
+        const nativeEl = getNativeFullscreenElement();
+        if (nativeEl === container || nativeEl === document.documentElement) return true;
+        return isPseudoPlayerFullscreen();
+    }
+
+    async function requestDocumentFullscreen() {
+        const el = document.documentElement;
+        const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (typeof fn !== 'function') return false;
+        try {
+            await fn.call(el);
+            return !!getNativeFullscreenElement();
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function hideAppOverlaysForFullscreen() {
+        const chatPanel = $('#video-chat-panel');
+        if (chatPanel) {
+            chatPanel.style.display = 'none';
+            chatPanel.innerHTML = '';
+        }
+        getPlayerContainer()?.classList.remove('chat-open');
+        if (typeof closeQuickClipMenu === 'function') closeQuickClipMenu();
+        document.querySelectorAll('.clip-chat-panel').forEach((el) => el.remove());
+    }
+
+    let _mobileFsYoutubeControlsWasEnabled = null;
+    let _pseudoFsViewportTimer = null;
+
+    function startPseudoFsViewportWatch() {
+        stopPseudoFsViewportWatch();
+        syncPseudoFsViewport();
+        _pseudoFsViewportTimer = window.setInterval(syncPseudoFsViewport, 350);
+    }
+
+    function stopPseudoFsViewportWatch() {
+        if (_pseudoFsViewportTimer) {
+            clearInterval(_pseudoFsViewportTimer);
+            _pseudoFsViewportTimer = null;
+        }
+    }
+
+    async function prepareMobileYoutubeNativeControls() {
+        if (!isMobileLayout()) return;
+        if (typeof YTPlayer?.getSourceType !== 'function') return;
+        if (YTPlayer.getSourceType() !== 'youtube') return;
+        if (typeof YTPlayer.isYoutubeNativeControlsEnabled !== 'function') return;
+
+        const wasOn = YTPlayer.isYoutubeNativeControlsEnabled();
+        if (_mobileFsYoutubeControlsWasEnabled === null) {
+            _mobileFsYoutubeControlsWasEnabled = wasOn;
+        }
+        document.documentElement.classList.add('sr-mobile-yt-native-fs');
+
+        if (!wasOn && typeof YTPlayer.setYoutubeNativeControlsEnabled === 'function') {
+            await YTPlayer.setYoutubeNativeControlsEnabled(true);
+        }
+
+        const iframe = $('#youtube-player')?.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = 'auto';
+
+        if (isIosDevice() && !sessionStorage.getItem('sr_yt_fs_hint_shown')) {
+            sessionStorage.setItem('sr_yt_fs_hint_shown', '1');
+            UI.toast('Para ocultar la barra de Safari, tocá ⛶ en el reproductor de YouTube', 'info');
+        }
+    }
+
+    async function restoreMobileYoutubeNativeControls() {
+        document.documentElement.classList.remove('sr-mobile-yt-native-fs');
+        if (_mobileFsYoutubeControlsWasEnabled === null) return;
+        const restore = _mobileFsYoutubeControlsWasEnabled;
+        _mobileFsYoutubeControlsWasEnabled = null;
+        if (!restore && typeof YTPlayer?.setYoutubeNativeControlsEnabled === 'function') {
+            try {
+                await YTPlayer.setYoutubeNativeControlsEnabled(false);
+            } catch (_) { /* noop */ }
+        }
+    }
+
+    function cleanupFullscreenState() {
+        stopPseudoFsViewportWatch();
+        document.documentElement.classList.remove('sr-immersive-fs');
+        document.documentElement.classList.remove('sr-mobile-yt-native-fs');
+        document.documentElement.style.removeProperty('--sr-fs-vv-top');
+        document.documentElement.style.removeProperty('--sr-fs-vv-height');
+        hideFsControls(getPlayerContainer());
+        clearPseudoFsViewportStyles();
     }
 
     async function requestNativePlayerFullscreen(container) {
@@ -1086,14 +1178,19 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     function syncPseudoFsViewport() {
         if (!isPseudoPlayerFullscreen()) return;
         const videoArea = $('#video-area');
+        const root = document.documentElement;
         if (!videoArea) return;
         const vv = window.visualViewport;
         if (vv) {
+            root.style.setProperty('--sr-fs-vv-top', `${vv.offsetTop}px`);
+            root.style.setProperty('--sr-fs-vv-height', `${vv.height}px`);
             videoArea.style.top = `${vv.offsetTop}px`;
             videoArea.style.left = `${vv.offsetLeft}px`;
             videoArea.style.width = `${vv.width}px`;
             videoArea.style.height = `${vv.height}px`;
         } else {
+            root.style.removeProperty('--sr-fs-vv-top');
+            root.style.removeProperty('--sr-fs-vv-height');
             videoArea.style.top = '0';
             videoArea.style.left = '0';
             videoArea.style.width = '100%';
@@ -1111,26 +1208,28 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     }
 
     function enterPseudoPlayerFullscreen() {
+        hideAppOverlaysForFullscreen();
+        if (isMobileLayout()) {
+            window.scrollTo(0, 1);
+        }
         document.documentElement.classList.add(PSEUDO_FS_CLASS);
         document.body.classList.add(PSEUDO_FS_CLASS);
         syncImmersiveFsUi();
         hideFsControls(getPlayerContainer());
         wirePseudoFsViewport();
         syncPseudoFsViewport();
+        startPseudoFsViewportWatch();
         requestAnimationFrame(() => {
-            window.scrollTo(0, 1);
-            requestAnimationFrame(() => {
-                window.scrollTo(0, 0);
-                syncPseudoFsViewport();
-                window.dispatchEvent(new Event('resize'));
-            });
+            window.scrollTo(0, 0);
+            syncPseudoFsViewport();
+            window.dispatchEvent(new Event('resize'));
         });
     }
 
     function exitPseudoPlayerFullscreen() {
         document.documentElement.classList.remove(PSEUDO_FS_CLASS);
         document.body.classList.remove(PSEUDO_FS_CLASS);
-        document.documentElement.classList.remove('sr-immersive-fs');
+        stopPseudoFsViewportWatch();
         hideFsControls(getPlayerContainer());
         clearPseudoFsViewportStyles();
         requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
@@ -1153,11 +1252,24 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const container = getPlayerContainer();
         if (!container) return false;
 
+        hideAppOverlaysForFullscreen();
+
         if (typeof YTPlayer?.getSourceType === 'function' && YTPlayer.getSourceType() === 'local') {
             if (tryIosLocalVideoFullscreen(container)) {
                 onPlayerFullscreenChange();
                 return true;
             }
+        }
+
+        if (isMobileLayout()) {
+            setFullscreenClipRailCollapsed(true);
+            await prepareMobileYoutubeNativeControls();
+            enterPseudoPlayerFullscreen();
+            if (!isIosDevice()) {
+                await requestDocumentFullscreen();
+            }
+            onPlayerFullscreenChange();
+            return true;
         }
 
         const nativeOk = await requestNativePlayerFullscreen(container);
@@ -1168,22 +1280,20 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             return true;
         }
 
-        if (isMobileLayout()) {
-            setFullscreenClipRailCollapsed(true);
-        }
         enterPseudoPlayerFullscreen();
         onPlayerFullscreenChange();
         return true;
     }
 
     async function exitPlayerFullscreen() {
+        try {
+            await exitNativePlayerFullscreen();
+        } catch (_) { /* noop */ }
         if (isPseudoPlayerFullscreen()) {
             exitPseudoPlayerFullscreen();
-        } else {
-            try {
-                await exitNativePlayerFullscreen();
-            } catch (_) { /* noop */ }
         }
+        await restoreMobileYoutubeNativeControls();
+        cleanupFullscreenState();
         syncPlayerChromeUi();
         syncFullscreenClipRail();
     }
@@ -1214,21 +1324,25 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     }
 
     function onPlayerFullscreenChange() {
-        syncImmersiveFsUi();
-        syncPlayerChromeUi();
-        syncFullscreenClipRail();
-        if (isPlayerFullscreen()) {
-            if (shouldUseImmersiveFsControls()) {
-                hideFsControls(getPlayerContainer());
-            } else {
-                requestAnimationFrame(focusPlayerSurfaceForKeys);
-            }
-        } else {
-            document.documentElement.classList.remove('sr-immersive-fs');
-            hideFsControls(getPlayerContainer());
+        const inFs = isPlayerFullscreen();
+        if (!inFs) {
+            if (isPseudoPlayerFullscreen()) exitPseudoPlayerFullscreen();
+            cleanupFullscreenState();
+            syncPlayerChromeUi();
+            syncFullscreenClipRail();
             if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive?.()) {
                 DrawingTool.close();
             }
+            return;
+        }
+
+        syncImmersiveFsUi();
+        syncPlayerChromeUi();
+        syncFullscreenClipRail();
+        if (shouldUseImmersiveFsControls()) {
+            hideFsControls(getPlayerContainer());
+        } else {
+            requestAnimationFrame(focusPlayerSurfaceForKeys);
         }
     }
 
