@@ -1036,18 +1036,99 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (typeof fn === 'function') await fn.call(document);
     }
 
+    function shouldUseImmersiveFsControls() {
+        if (!isPlayerFullscreen()) return false;
+        if (isPseudoPlayerFullscreen()) return true;
+        return isCoarsePointerDevice() || isMobileLayout();
+    }
+
+    function syncImmersiveFsUi() {
+        document.documentElement.classList.toggle('sr-immersive-fs', shouldUseImmersiveFsControls());
+    }
+
+    function revealFsControls(container, autoHideMs = 4000) {
+        if (!container) return;
+        container.classList.add('sr-fs-controls-visible');
+        clearTimeout(container._fsControlsHideTimer);
+        container._fsControlsHideTimer = setTimeout(() => {
+            hideFsControls(container);
+        }, autoHideMs);
+    }
+
+    function hideFsControls(container) {
+        if (!container) container = getPlayerContainer();
+        if (!container) return;
+        clearTimeout(container._fsControlsHideTimer);
+        container.classList.remove('sr-fs-controls-visible');
+        const active = document.activeElement;
+        if (active && container.contains(active)) {
+            try { active.blur(); } catch (_) { /* noop */ }
+        }
+        try { container.blur(); } catch (_) { /* noop */ }
+    }
+
+    let pseudoFsViewportWired = false;
+
+    function wirePseudoFsViewport() {
+        if (pseudoFsViewportWired) return;
+        pseudoFsViewportWired = true;
+        const sync = () => syncPseudoFsViewport();
+        window.visualViewport?.addEventListener('resize', sync);
+        window.visualViewport?.addEventListener('scroll', sync);
+        window.addEventListener('resize', sync);
+        window.addEventListener('orientationchange', sync);
+    }
+
+    function syncPseudoFsViewport() {
+        if (!isPseudoPlayerFullscreen()) return;
+        const videoArea = $('#video-area');
+        if (!videoArea) return;
+        const vv = window.visualViewport;
+        if (vv) {
+            videoArea.style.top = `${vv.offsetTop}px`;
+            videoArea.style.left = `${vv.offsetLeft}px`;
+            videoArea.style.width = `${vv.width}px`;
+            videoArea.style.height = `${vv.height}px`;
+        } else {
+            videoArea.style.top = '0';
+            videoArea.style.left = '0';
+            videoArea.style.width = '100%';
+            videoArea.style.height = `${window.innerHeight}px`;
+        }
+    }
+
+    function clearPseudoFsViewportStyles() {
+        const videoArea = $('#video-area');
+        if (!videoArea) return;
+        videoArea.style.top = '';
+        videoArea.style.left = '';
+        videoArea.style.width = '';
+        videoArea.style.height = '';
+    }
+
     function enterPseudoPlayerFullscreen() {
         document.documentElement.classList.add(PSEUDO_FS_CLASS);
         document.body.classList.add(PSEUDO_FS_CLASS);
+        syncImmersiveFsUi();
+        hideFsControls(getPlayerContainer());
+        wirePseudoFsViewport();
+        syncPseudoFsViewport();
         requestAnimationFrame(() => {
-            window.dispatchEvent(new Event('resize'));
-            requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+            window.scrollTo(0, 1);
+            requestAnimationFrame(() => {
+                window.scrollTo(0, 0);
+                syncPseudoFsViewport();
+                window.dispatchEvent(new Event('resize'));
+            });
         });
     }
 
     function exitPseudoPlayerFullscreen() {
         document.documentElement.classList.remove(PSEUDO_FS_CLASS);
         document.body.classList.remove(PSEUDO_FS_CLASS);
+        document.documentElement.classList.remove('sr-immersive-fs');
+        hideFsControls(getPlayerContainer());
+        clearPseudoFsViewportStyles();
         requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
     }
 
@@ -1069,25 +1150,26 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (!container) return false;
 
         if (typeof YTPlayer?.getSourceType === 'function' && YTPlayer.getSourceType() === 'local') {
-            if (tryIosLocalVideoFullscreen(container)) return true;
-        }
-
-        if (isMobileLayout()) {
-            setFullscreenClipRailCollapsed(true);
-            enterPseudoPlayerFullscreen();
-            onPlayerFullscreenChange();
-            return true;
+            if (tryIosLocalVideoFullscreen(container)) {
+                onPlayerFullscreenChange();
+                return true;
+            }
         }
 
         try {
             await requestNativePlayerFullscreen(container);
+            hideFsControls(container);
             requestAnimationFrame(focusPlayerSurfaceForKeys);
-            return true;
-        } catch (_) {
-            enterPseudoPlayerFullscreen();
             onPlayerFullscreenChange();
             return true;
+        } catch (_) { /* pseudo fallback */ }
+
+        if (isMobileLayout()) {
+            setFullscreenClipRailCollapsed(true);
         }
+        enterPseudoPlayerFullscreen();
+        onPlayerFullscreenChange();
+        return true;
     }
 
     async function exitPlayerFullscreen() {
@@ -1129,12 +1211,21 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     }
 
     function onPlayerFullscreenChange() {
+        syncImmersiveFsUi();
         syncPlayerChromeUi();
         syncFullscreenClipRail();
         if (isPlayerFullscreen()) {
-            requestAnimationFrame(focusPlayerSurfaceForKeys);
-        } else if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive?.()) {
-            DrawingTool.close();
+            if (shouldUseImmersiveFsControls()) {
+                hideFsControls(getPlayerContainer());
+            } else {
+                requestAnimationFrame(focusPlayerSurfaceForKeys);
+            }
+        } else {
+            document.documentElement.classList.remove('sr-immersive-fs');
+            hideFsControls(getPlayerContainer());
+            if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive?.()) {
+                DrawingTool.close();
+            }
         }
     }
 
@@ -1400,6 +1491,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         });
 
         rail.addEventListener('mousedown', (ev) => ev.stopPropagation());
+        rail.addEventListener('pointerdown', () => {
+            if (shouldUseImmersiveFsControls()) revealFsControls(getPlayerContainer());
+        }, { passive: true });
         rail.addEventListener('click', (ev) => {
             ev.stopPropagation();
             if (ev.target.closest('#fullscreen-clip-rail-toggle')) return;
@@ -1895,6 +1989,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         root.addEventListener('click', swallow);
         root.addEventListener('dblclick', swallow);
         root.addEventListener('touchend', swallow, { passive: true });
+        root.addEventListener('pointerdown', () => {
+            if (shouldUseImmersiveFsControls()) revealFsControls(getPlayerContainer());
+        }, { passive: true });
 
         const clipToolbar = $('#clip-view-toolbar');
         if (clipToolbar && clipToolbar.dataset.surfaceGuardWired !== '1') {
@@ -1972,6 +2069,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         });
 
         wireFullscreenButton();
+        wirePseudoFsViewport();
 
         document.addEventListener('fullscreenchange', onPlayerFullscreenChange);
         document.addEventListener('webkitfullscreenchange', onPlayerFullscreenChange);
@@ -2026,6 +2124,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             // Only primary-button clicks; ignore modified clicks.
             if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return;
             if (!canHandleSurfaceGesture(ev.target)) return;
+            if (shouldUseImmersiveFsControls()) {
+                revealFsControls(container);
+            }
             if (typeof YTPlayer === 'undefined' || !YTPlayer.togglePlay) return;
             if (singleClickTimer) clearTimeout(singleClickTimer);
             singleClickTimer = setTimeout(() => {
@@ -2051,6 +2152,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (!canHandleSurfaceGesture(ev.target)) return;
             const touch = ev.changedTouches && ev.changedTouches[0];
             if (!touch) return;
+            if (shouldUseImmersiveFsControls()) {
+                revealFsControls(container);
+            }
             const now = Date.now();
             const dt = now - lastTapTs;
             const dx = Math.abs(touch.clientX - lastTapX);

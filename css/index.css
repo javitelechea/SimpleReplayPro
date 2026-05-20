@@ -1348,6 +1348,30 @@ body.collection-only-mode .mode-slider {
   transform: translateY(0);
 }
 
+html.sr-immersive-fs #player-container:not(.sr-fs-controls-visible) .player-chrome,
+html.sr-immersive-fs #player-container:not(.sr-fs-controls-visible):hover .player-chrome,
+html.sr-immersive-fs #player-container:not(.sr-fs-controls-visible):focus-within .player-chrome,
+html.sr-immersive-fs #player-container:not(.sr-fs-controls-visible) .fullscreen-clip-rail {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(12px) !important;
+}
+
+html.sr-immersive-fs #player-container.sr-fs-controls-visible .player-chrome:not(.hidden) {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+html.sr-immersive-fs #player-container.sr-fs-controls-visible .fullscreen-clip-rail:not(.hidden) {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
 #player-container:fullscreen,
 #player-container:-webkit-full-screen {
   background: #000;
@@ -1358,21 +1382,44 @@ body.collection-only-mode .mode-slider {
   outline: none;
 }
 
-/* Móvil: pseudo fullscreen — expandir #video-area (no sacar el player del layout) */
+/* Móvil: pseudo fullscreen — solo video a pantalla completa */
 html.sr-player-fs-active,
 html.sr-player-fs-active body {
-  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 !important;
+  overflow: hidden !important;
   overscroll-behavior: none;
+  background: #000 !important;
 }
 
 @media (max-width: 768px) {
-  html.sr-player-fs-active #app-main {
-    padding-top: 0 !important;
+  html.sr-player-fs-active #app-header,
+  html.sr-player-fs-active #side-panel,
+  html.sr-player-fs-active .side-panel,
+  html.sr-player-fs-active .btn-expand,
+  html.sr-player-fs-active #nav-arrows,
+  html.sr-player-fs-active #toast-container,
+  html.sr-player-fs-active #video-chat-panel,
+  html.sr-player-fs-active #focus-overlay,
+  html.sr-player-fs-active #drawing-toolbar,
+  html.sr-player-fs-active #custom-timeline,
+  html.sr-player-fs-active #clip-view-toolbar,
+  html.sr-player-fs-active .tag-bar,
+  html.sr-player-fs-active #no-game-overlay {
+    display: none !important;
   }
 
-  html.sr-player-fs-active #app-header {
-    visibility: hidden;
-    pointer-events: none;
+  html.sr-player-fs-active #app-main {
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
   }
 
   html.sr-player-fs-active #video-area {
@@ -1381,19 +1428,15 @@ html.sr-player-fs-active body {
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    width: 100vw !important;
-    height: 100dvh !important;
-    height: 100svh !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
     max-height: none !important;
     min-height: 0 !important;
     z-index: 10060 !important;
     display: flex !important;
     flex-direction: column !important;
-    padding:
-      env(safe-area-inset-top, 0px)
-      env(safe-area-inset-right, 0px)
-      env(safe-area-inset-bottom, 0px)
-      env(safe-area-inset-left, 0px) !important;
+    padding: 0 !important;
     box-sizing: border-box !important;
     background: #000 !important;
   }
@@ -1402,7 +1445,7 @@ html.sr-player-fs-active body {
     flex: 1 1 auto !important;
     min-height: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     max-height: none !important;
     position: relative !important;
     overflow: hidden !important;
@@ -1410,22 +1453,42 @@ html.sr-player-fs-active body {
 
   html.sr-player-fs-active #youtube-player,
   html.sr-player-fs-active #youtube-player iframe,
-  html.sr-player-fs-active #player-container > video {
+  html.sr-player-fs-active #player-container > video:not(#live-preview-video):not(#live-replay-video) {
     width: 100% !important;
     height: 100% !important;
     min-height: 0 !important;
   }
 
-  html.sr-player-fs-active #custom-timeline,
-  html.sr-player-fs-active #clip-view-toolbar,
-  html.sr-player-fs-active #side-panel,
-  html.sr-player-fs-active .tag-bar {
+  /* Solo video: controles al tocar la pantalla (refuerzo en móvil) */
+  html.sr-immersive-fs #player-container:not(.sr-fs-controls-visible) .player-chrome,
+  html.sr-immersive-fs #player-container:not(.sr-fs-controls-visible) .fullscreen-clip-rail,
+  html.sr-player-fs-active #player-container:not(.sr-fs-controls-visible) .player-chrome,
+  html.sr-player-fs-active #player-container:not(.sr-fs-controls-visible) .fullscreen-clip-rail,
+  #player-container:fullscreen:not(.sr-fs-controls-visible) .player-chrome,
+  #player-container:-webkit-full-screen:not(.sr-fs-controls-visible) .player-chrome,
+  #player-container:fullscreen:not(.sr-fs-controls-visible) .fullscreen-clip-rail,
+  #player-container:-webkit-full-screen:not(.sr-fs-controls-visible) .fullscreen-clip-rail {
     display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
 
-  html.sr-player-fs-active #player-container .player-chrome:not(.hidden) {
+  html.sr-immersive-fs #player-container.sr-fs-controls-visible .player-chrome:not(.hidden),
+  html.sr-player-fs-active #player-container.sr-fs-controls-visible .player-chrome:not(.hidden),
+  #player-container:fullscreen.sr-fs-controls-visible .player-chrome:not(.hidden),
+  #player-container:-webkit-full-screen.sr-fs-controls-visible .player-chrome:not(.hidden) {
+    display: flex !important;
+    visibility: visible !important;
     opacity: 1;
     transform: translateY(0);
+  }
+
+  html.sr-immersive-fs #player-container.sr-fs-controls-visible .fullscreen-clip-rail:not(.hidden),
+  html.sr-player-fs-active #player-container.sr-fs-controls-visible .fullscreen-clip-rail:not(.hidden),
+  #player-container:fullscreen.sr-fs-controls-visible .fullscreen-clip-rail:not(.hidden),
+  #player-container:-webkit-full-screen.sr-fs-controls-visible .fullscreen-clip-rail:not(.hidden) {
+    display: flex !important;
+    visibility: visible !important;
   }
 }
 
@@ -1433,26 +1496,29 @@ html.sr-player-fs-active body.read-only-mode #video-area {
   position: fixed !important;
   inset: 0 !important;
   top: 0 !important;
-  height: 100dvh !important;
-  height: 100svh !important;
+  height: 100% !important;
   max-height: none !important;
-}
-
-html.sr-player-fs-active #player-container .fullscreen-clip-rail:not(.hidden) {
-  display: flex;
+  padding: 0 !important;
 }
 
 #player-container:not(:fullscreen) .fullscreen-clip-rail {
   display: none !important;
 }
 
-html.sr-player-fs-active #player-container .fullscreen-clip-rail:not(.hidden) {
+html.sr-player-fs-active #player-container.sr-fs-controls-visible .fullscreen-clip-rail:not(.hidden) {
   display: flex !important;
 }
 
-/* En táctil, mostrar siempre la barra de controles (no hay hover) */
+@media (min-width: 769px) {
+  #player-container:fullscreen .fullscreen-clip-rail:not(.hidden),
+  #player-container:-webkit-full-screen .fullscreen-clip-rail:not(.hidden) {
+    display: flex !important;
+  }
+}
+
+/* En táctil, mostrar siempre la barra de controles — excepto en fullscreen inmersivo */
 @media (hover: none) and (pointer: coarse) {
-  #player-container .player-chrome:not(.hidden) {
+  html:not(.sr-immersive-fs) #player-container .player-chrome:not(.hidden) {
     opacity: 1;
     transform: translateY(0);
   }
@@ -1604,17 +1670,20 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   .fullscreen-clip-rail.is-compact {
     right: 8px;
     bottom: 52px;
-    max-width: min(200px, 52vw);
+    width: max-content;
+    max-width: min(148px, 62vw);
     gap: 2px;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__head {
-    gap: 4px;
+    gap: 3px;
+    width: auto;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle {
-    padding: 4px 8px;
-    font-size: 0.62rem;
+    padding: 3px 6px;
+    font-size: 0.6rem;
+    min-width: 0;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle-label {
@@ -1622,19 +1691,24 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle--draw {
-    min-width: 32px;
-    padding: 4px 7px;
-    font-size: 0.85rem;
+    min-width: 28px;
+    padding: 3px 5px;
+    font-size: 0.78rem;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__body {
-    width: min(200px, 52vw);
-    padding: 4px 5px 3px;
-    gap: 2px;
+    width: fit-content;
+    min-width: 0;
+    max-width: min(148px, 62vw);
+    padding: 3px 4px 2px;
+    gap: 1px;
+    box-sizing: border-box;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__row {
-    padding: 3px 5px;
+    padding: 2px 4px;
+    width: auto;
+    min-width: 0;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__row:disabled {
@@ -1642,13 +1716,15 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__line {
-    font-size: 0.62rem;
-    line-height: 1.2;
+    font-size: 0.58rem;
+    line-height: 1.15;
+    max-width: 128px;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__count {
     margin-top: 0;
-    font-size: 0.58rem;
+    font-size: 0.55rem;
+    line-height: 1.1;
   }
 
   html.sr-player-fs-active .fullscreen-clip-rail.is-compact {
