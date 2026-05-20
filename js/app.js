@@ -1025,8 +1025,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     async function requestNativePlayerFullscreen(container) {
         const fn = container.requestFullscreen || container.webkitRequestFullscreen;
         if (typeof fn !== 'function') return false;
-        await fn.call(container);
-        return true;
+        try {
+            await fn.call(container);
+            return getNativeFullscreenElement() === container;
+        } catch (_) {
+            return false;
+        }
     }
 
     async function exitNativePlayerFullscreen() {
@@ -1156,13 +1160,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
         }
 
-        try {
-            await requestNativePlayerFullscreen(container);
+        const nativeOk = await requestNativePlayerFullscreen(container);
+        if (nativeOk) {
             hideFsControls(container);
             requestAnimationFrame(focusPlayerSurfaceForKeys);
             onPlayerFullscreenChange();
             return true;
-        } catch (_) { /* pseudo fallback */ }
+        }
 
         if (isMobileLayout()) {
             setFullscreenClipRailCollapsed(true);
@@ -1187,13 +1191,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     async function togglePlayerFullscreen() {
         if (isPlayerFullscreen()) {
             await exitPlayerFullscreen();
+            onPlayerFullscreenChange();
         } else {
             const ok = await enterPlayerFullscreen();
             if (!ok) {
                 UI.toast('No se pudo activar pantalla completa', 'error');
-                return;
             }
-            onPlayerFullscreenChange();
         }
     }
 

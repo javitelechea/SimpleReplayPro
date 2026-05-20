@@ -1396,69 +1396,70 @@ html.sr-player-fs-active body {
   background: #000 !important;
 }
 
+/* Pseudo fullscreen — expandir video (portrait y landscape) */
+html.sr-player-fs-active #app-header,
+html.sr-player-fs-active #side-panel,
+html.sr-player-fs-active .side-panel,
+html.sr-player-fs-active .btn-expand,
+html.sr-player-fs-active #nav-arrows,
+html.sr-player-fs-active #toast-container,
+html.sr-player-fs-active #video-chat-panel,
+html.sr-player-fs-active #focus-overlay,
+html.sr-player-fs-active #drawing-toolbar,
+html.sr-player-fs-active #custom-timeline,
+html.sr-player-fs-active #clip-view-toolbar,
+html.sr-player-fs-active .tag-bar,
+html.sr-player-fs-active #no-game-overlay {
+  display: none !important;
+}
+
+html.sr-player-fs-active #app-main {
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+html.sr-player-fs-active #video-area {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  z-index: 10060 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  background: #000 !important;
+}
+
+html.sr-player-fs-active #player-container {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html.sr-player-fs-active #youtube-player,
+html.sr-player-fs-active #youtube-player iframe,
+html.sr-player-fs-active #player-container > video:not(#live-preview-video):not(#live-replay-video) {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
 @media (max-width: 768px) {
-  html.sr-player-fs-active #app-header,
-  html.sr-player-fs-active #side-panel,
-  html.sr-player-fs-active .side-panel,
-  html.sr-player-fs-active .btn-expand,
-  html.sr-player-fs-active #nav-arrows,
-  html.sr-player-fs-active #toast-container,
-  html.sr-player-fs-active #video-chat-panel,
-  html.sr-player-fs-active #focus-overlay,
-  html.sr-player-fs-active #drawing-toolbar,
-  html.sr-player-fs-active #custom-timeline,
-  html.sr-player-fs-active #clip-view-toolbar,
-  html.sr-player-fs-active .tag-bar,
-  html.sr-player-fs-active #no-game-overlay {
-    display: none !important;
-  }
-
-  html.sr-player-fs-active #app-main {
-    padding: 0 !important;
-    margin: 0 !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: hidden !important;
-  }
-
-  html.sr-player-fs-active #video-area {
-    position: fixed !important;
-    inset: 0 !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    max-height: none !important;
-    min-height: 0 !important;
-    z-index: 10060 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    padding: 0 !important;
-    box-sizing: border-box !important;
-    background: #000 !important;
-  }
-
-  html.sr-player-fs-active #player-container {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    max-height: none !important;
-    position: relative !important;
-    overflow: hidden !important;
-  }
-
-  html.sr-player-fs-active #youtube-player,
-  html.sr-player-fs-active #youtube-player iframe,
-  html.sr-player-fs-active #player-container > video:not(#live-preview-video):not(#live-replay-video) {
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 0 !important;
-  }
-
   /* Solo video: controles al tocar la pantalla (refuerzo en móvil) */
   html.sr-immersive-fs #player-container:not(.sr-fs-controls-visible) .player-chrome,
   html.sr-immersive-fs #player-container:not(.sr-fs-controls-visible) .fullscreen-clip-rail,
@@ -5604,6 +5605,19 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   /* Chat flotante: oculto en modo “solo video” (al volver a vertical, el JS sigue manejando el estado) */
   #video-chat-panel {
     display: none !important;
+  }
+
+  /* Horizontal: solo ◀  play  ▶ (sin volumen, YT, fullscreen ni rail de clips) */
+  #player-container .player-chrome__vol,
+  #player-container #player-chrome-yt-native,
+  #player-container .player-chrome__display,
+  #player-container .fullscreen-clip-rail {
+    display: none !important;
+  }
+
+  #player-container .player-chrome__bar {
+    gap: 10px;
+    padding: 6px 12px 8px;
   }
 }
 
