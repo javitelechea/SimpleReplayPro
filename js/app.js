@@ -1010,6 +1010,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     }
 
+    function isMobileLayout() {
+        return window.matchMedia('(max-width: 768px)').matches
+            || isCoarsePointerDevice()
+            || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    }
+
     function isPlayerFullscreen() {
         const container = getPlayerContainer();
         if (!container) return false;
@@ -1033,11 +1039,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     function enterPseudoPlayerFullscreen(container) {
         container.classList.add(PSEUDO_FS_CLASS);
         document.documentElement.classList.add('sr-player-fs-active');
+        document.body.classList.add('sr-player-fs-active');
     }
 
     function exitPseudoPlayerFullscreen(container) {
         container.classList.remove(PSEUDO_FS_CLASS);
         document.documentElement.classList.remove('sr-player-fs-active');
+        document.body.classList.remove('sr-player-fs-active');
     }
 
     function tryIosLocalVideoFullscreen(container) {
@@ -1061,9 +1069,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (tryIosLocalVideoFullscreen(container)) return true;
         }
 
-        if (isCoarsePointerDevice()) {
+        if (isMobileLayout()) {
             enterPseudoPlayerFullscreen(container);
-            requestAnimationFrame(focusPlayerSurfaceForKeys);
+            onPlayerFullscreenChange();
             return true;
         }
 
@@ -1073,7 +1081,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             return true;
         } catch (_) {
             enterPseudoPlayerFullscreen(container);
-            requestAnimationFrame(focusPlayerSurfaceForKeys);
+            onPlayerFullscreenChange();
             return true;
         }
     }
@@ -1097,8 +1105,25 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             await exitPlayerFullscreen();
         } else {
             const ok = await enterPlayerFullscreen();
-            if (!ok) UI.toast('No se pudo activar pantalla completa', 'error');
+            if (!ok) {
+                UI.toast('No se pudo activar pantalla completa', 'error');
+                return;
+            }
+            onPlayerFullscreenChange();
         }
+    }
+
+    function wireFullscreenButton() {
+        const fsBtn = $('#player-chrome-fullscreen');
+        if (!fsBtn || fsBtn.dataset.fsWired === '1') return;
+        fsBtn.dataset.fsWired = '1';
+        const onFsActivate = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            togglePlayerFullscreen();
+        };
+        fsBtn.addEventListener('click', onFsActivate);
+        fsBtn.addEventListener('touchend', onFsActivate, { passive: false });
     }
 
     function onPlayerFullscreenChange() {
@@ -1922,9 +1947,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             syncPlayerChromeUi();
         });
 
-        $('#player-chrome-fullscreen')?.addEventListener('click', () => {
-            togglePlayerFullscreen();
-        });
+        wireFullscreenButton();
 
         document.addEventListener('fullscreenchange', onPlayerFullscreenChange);
         document.addEventListener('webkitfullscreenchange', onPlayerFullscreenChange);

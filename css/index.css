@@ -1373,12 +1373,59 @@ body.collection-only-mode .mode-slider {
   border-radius: 0 !important;
 }
 
-html.sr-player-fs-active {
+html.sr-player-fs-active,
+html.sr-player-fs-active body {
   overflow: hidden;
 }
 
-html.sr-player-fs-active body {
-  overflow: hidden;
+/* Móvil: #video-area es un bloque fijo chico; hay que expandir toda el área al simular fullscreen */
+@media (max-width: 768px) {
+  html.sr-player-fs-active #app-main {
+    padding-top: 0 !important;
+  }
+
+  html.sr-player-fs-active #app-header {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  html.sr-player-fs-active #video-area {
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100svh !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    z-index: 10060 !important;
+  }
+
+  html.sr-player-fs-active #player-container.player-container--pseudo-fs {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    z-index: 1 !important;
+  }
+
+  html.sr-player-fs-active #side-panel,
+  html.sr-player-fs-active .tag-bar {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+html.sr-player-fs-active body.read-only-mode #video-area {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  height: 100dvh !important;
+  height: 100svh !important;
+  max-height: none !important;
 }
 
 #player-container.player-container--pseudo-fs .player-chrome:not(.hidden) {
