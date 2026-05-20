@@ -159,6 +159,26 @@
             </div>
           </div>
         </div>
+        <div id="fullscreen-clip-rail" class="fullscreen-clip-rail hidden" hidden aria-label="Cola de clips en pantalla completa">
+          <div class="fullscreen-clip-rail__head">
+            <button type="button" id="fullscreen-clip-rail-toggle" class="fullscreen-clip-rail__toggle" aria-expanded="true" title="Ocultar cola de clips">
+              <span class="fullscreen-clip-rail__toggle-label">Clips</span>
+              <span class="fullscreen-clip-rail__toggle-icon" aria-hidden="true">▾</span>
+            </button>
+          </div>
+          <div id="fullscreen-clip-rail-body" class="fullscreen-clip-rail__body">
+            <button type="button" class="fullscreen-clip-rail__row" data-rail-dir="prev" disabled>
+              <span class="fullscreen-clip-rail__line">Anterior — —</span>
+            </button>
+            <div class="fullscreen-clip-rail__row fullscreen-clip-rail__row--current" aria-current="true">
+              <span class="fullscreen-clip-rail__line">Actual — —</span>
+            </div>
+            <button type="button" class="fullscreen-clip-rail__row" data-rail-dir="next" disabled>
+              <span class="fullscreen-clip-rail__line">Siguiente — —</span>
+            </button>
+            <span class="fullscreen-clip-rail__count"></span>
+          </div>
+        </div>
         <div id="no-game-overlay" class="player-overlay">
           <div class="overlay-content">
             <svg width="64" height="64" viewBox="0 0 64 64" fill="none">

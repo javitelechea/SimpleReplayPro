@@ -80,6 +80,18 @@ export const YTPlayer = (() => {
         _suppressMirrorEchoUntil = Math.max(_suppressMirrorEchoUntil, Date.now() + ms);
     }
 
+    /** Playlist/colección: pausar al fin del clip. Proyecto (lista de clips): seguir para ajustar IN/OUT. */
+    function _shouldStopClipAtEnd() {
+        return !!(AppState.get('activePlaylistId') || AppState.get('activeCollection'));
+    }
+
+    function _stopPoll() {
+        if (_pollTimer) {
+            clearInterval(_pollTimer);
+            _pollTimer = null;
+        }
+    }
+
     function setCommandListener(fn) {
         _commandListener = typeof fn === 'function' ? fn : null;
     }
@@ -260,7 +272,7 @@ export const YTPlayer = (() => {
      * Durante LiveCapture + grabación activa el preview es directo (no se puede buscar).
      * Hay que cargar el replay consolidado hasta ahora (mismo flujo que «Revisar jugada») y ahí sí hacer seek.
      */
-    async function playClip(startSec, endSec) {
+    async function playClip(startSec, endSec, options = {}) {
         if (!_ready || !_engine()) return;
         if (_usingLiveCapture() && _liveFacade && isLiveRecordingActive()) {
             try {
@@ -270,11 +282,15 @@ export const YTPlayer = (() => {
                 return;
             }
         }
-        _clipEndSec = endSec;
+        clearClipEnd();
+        const stopAtEnd = options.stopAtEnd ?? _shouldStopClipAtEnd();
+        if (stopAtEnd) {
+            _clipEndSec = endSec;
+            _startPoll();
+        }
         _engine().seekTo(startSec);
         _engine().play();
         _emit('seek', { seconds: startSec });
-        _startPoll();
     }
 
     function clearClipEnd() {
@@ -291,19 +307,18 @@ export const YTPlayer = (() => {
         _clipAutoPaused = false;
         _pollTimer = setInterval(() => {
             const eng = _engine();
-            if (!eng || _clipEndSec === null) { _stopPoll(); return; }
+            if (!eng || _clipEndSec === null) {
+                _stopPoll();
+                return;
+            }
             const t = eng.getCurrentTime();
-            if (t >= _clipEndSec + 5) {
+            if (t >= _clipEndSec) {
                 eng.pause();
                 _clipEndSec = null;
                 _clipAutoPaused = true;
                 _stopPoll();
             }
         }, 100);
-    }
-
-    function _stopPoll() {
-        if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
     }
 
     function setSpeed(rate) {

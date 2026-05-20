@@ -2288,6 +2288,7 @@ export const UI = (() => {
         }
         // Actions
         else if (btn.id === 'btn-clip-close') {
+            if (typeof YTPlayer !== 'undefined') YTPlayer.clearClipEnd?.();
             AppState.setCurrentClip(null);
             if (typeof YTPlayer !== 'undefined') YTPlayer.play(); // resume main video
         }

@@ -1348,6 +1348,152 @@ body.collection-only-mode .mode-slider {
   transform: translateY(0);
 }
 
+#player-container:fullscreen {
+  background: #000;
+}
+
+#player-container:fullscreen:focus {
+  outline: none;
+}
+
+#player-container video:focus {
+  outline: none;
+}
+
+/* Rail de clips en pantalla completa (modo Ver) */
+.fullscreen-clip-rail {
+  position: absolute;
+  right: 12px;
+  bottom: 58px;
+  z-index: 18;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  max-width: min(320px, 42vw);
+  pointer-events: auto;
+}
+
+.fullscreen-clip-rail__head {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.fullscreen-clip-rail__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(8, 10, 16, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: rgba(232, 234, 240, 0.88);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  transition: background 0.15s ease;
+}
+
+.fullscreen-clip-rail__toggle:hover {
+  background: rgba(18, 22, 32, 0.62);
+}
+
+.fullscreen-clip-rail__toggle-icon {
+  font-size: 0.62rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.fullscreen-clip-rail__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(320px, 42vw);
+  padding: 7px 8px 5px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 10, 16, 0.38);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.fullscreen-clip-rail.is-collapsed .fullscreen-clip-rail__body {
+  display: none;
+}
+
+.fullscreen-clip-rail.is-collapsed .fullscreen-clip-rail__toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.fullscreen-clip-rail.hidden {
+  display: none !important;
+}
+
+#player-container:not(:fullscreen) .fullscreen-clip-rail {
+  display: none !important;
+}
+
+.fullscreen-clip-rail__row {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 5px 7px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text, #e8eaf0);
+  text-align: left;
+  font: inherit;
+  cursor: default;
+  transition: background 0.15s ease;
+}
+
+button.fullscreen-clip-rail__row:not(:disabled) {
+  cursor: pointer;
+}
+
+button.fullscreen-clip-rail__row:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.fullscreen-clip-rail__row--current {
+  background: rgba(99, 140, 255, 0.22);
+  border: 1px solid rgba(120, 160, 255, 0.35);
+}
+
+.fullscreen-clip-rail__row:disabled {
+  opacity: 0.35;
+}
+
+.fullscreen-clip-rail__line {
+  display: block;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.fullscreen-clip-rail__row--current .fullscreen-clip-rail__line {
+  font-weight: 600;
+}
+
+.fullscreen-clip-rail__count {
+  margin-top: 1px;
+  font-size: 0.64rem;
+  text-align: center;
+  color: rgba(232, 234, 240, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Native YouTube controls mode: move app chrome out of the bottom controls area. */
 #player-container.yt-native-mode .player-chrome {
   top: 8px;

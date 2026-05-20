@@ -930,13 +930,19 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             : false;
         const nativeBtn = $('#player-chrome-yt-native');
         if (nativeBtn) {
-            nativeBtn.setAttribute('aria-pressed', nativeOn ? 'true' : 'false');
-            nativeBtn.classList.toggle('player-chrome__btn--primary', nativeOn);
-            nativeBtn.textContent = nativeOn ? 'YT ON' : 'YT';
-            nativeBtn.title = nativeOn
-                ? 'Desactivar controles nativos de YouTube'
-                : 'Activar controles nativos de YouTube';
-            nativeBtn.disabled = _nativeControlsToggleBusy;
+            nativeBtn.style.display = isYoutube ? '' : 'none';
+            if (!isYoutube) {
+                nativeBtn.setAttribute('aria-pressed', 'false');
+                nativeBtn.classList.remove('player-chrome__btn--primary');
+            } else {
+                nativeBtn.setAttribute('aria-pressed', nativeOn ? 'true' : 'false');
+                nativeBtn.classList.toggle('player-chrome__btn--primary', nativeOn);
+                nativeBtn.textContent = nativeOn ? 'YT ON' : 'YT';
+                nativeBtn.title = nativeOn
+                    ? 'Desactivar controles nativos de YouTube'
+                    : 'Activar controles nativos de YouTube';
+                nativeBtn.disabled = _nativeControlsToggleBusy;
+            }
         }
 
         if (!isYoutube || nativeOn || typeof YTPlayer.getAvailableQualities !== 'function') {
@@ -986,6 +992,190 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
             UI.toast(`YouTube mantiene ${actualLabel} (pedida: ${reqLabel})`, 'info');
         }, 1200);
+    }
+
+    function getPlayerContainer() {
+        return $('#player-container');
+    }
+
+    function isPlayerFullscreen() {
+        const container = getPlayerContainer();
+        return !!(container && document.fullscreenElement === container);
+    }
+
+    /** Evita que Space/flechas queden atrapadas en botones o controles nativos tras fullscreen. */
+    function focusPlayerSurfaceForKeys() {
+        const container = getPlayerContainer();
+        if (!container) return;
+        const active = document.activeElement;
+        if (active && active !== document.body && container.contains(active)) {
+            const role = active.getAttribute?.('role');
+            if (active.tagName === 'BUTTON' || active.tagName === 'A' || role === 'button') {
+                active.blur();
+            }
+        }
+        // Con controles nativos, no enfocar el <video> (el teclado quedaría en la barra del navegador).
+        if (!container.hasAttribute('tabindex')) {
+            container.setAttribute('tabindex', '-1');
+        }
+        try {
+            container.focus({ preventScroll: true });
+        } catch {
+            container.focus();
+        }
+    }
+
+    function clipRailLabel(clip) {
+        if (!clip) return '—';
+        if (clip._fromCollection) {
+            return `${clip._collectionLabel || 'Clip'} ${clip._collectionIndex || ''}`.trim();
+        }
+        const tag = AppState.getTagType(clip.tag_type_id);
+        const num = AppState.getClipNumber(clip);
+        return tag ? `${tag.label} ${num}` : 'Clip';
+    }
+
+    function clipRailTimeRange(clip) {
+        if (!clip) return '';
+        const fmt = UI.formatTime;
+        return `${fmt(clip.start_sec)} → ${fmt(clip.end_sec)}`;
+    }
+
+    /** Índice y vecinos para el rail en Ver (proyecto, playlist o colección). */
+    function getFullscreenRailContext() {
+        const col = AppState.get('activeCollection');
+        if (col?.items?.length) {
+            const items = col.items;
+            let idx = items.findIndex((i) => i.id === AppState.get('currentClipId'));
+            if (idx < 0) idx = AppState.get('activeCollectionItemIdx');
+            if (idx < 0) idx = 0;
+            const clipAt = (i) => {
+                const item = items[i];
+                if (!item) return null;
+                return AppState.getCurrentClip()?.id === item.id
+                    ? AppState.getCurrentClip()
+                    : {
+                        id: item.id,
+                        start_sec: item.startSec,
+                        end_sec: item.endSec,
+                        _fromCollection: true,
+                        _collectionLabel: item.tagLabel || 'Clip',
+                        _collectionIndex: i + 1,
+                    };
+            };
+            return {
+                idx,
+                total: items.length,
+                prev: idx > 0 ? clipAt(idx - 1) : null,
+                current: clipAt(idx),
+                next: idx < items.length - 1 ? clipAt(idx + 1) : null,
+            };
+        }
+        const clips = AppState.getFilteredClips();
+        let idx = AppState.get('currentClipIndex');
+        const currentId = AppState.get('currentClipId');
+        if (idx < 0 && currentId) {
+            idx = clips.findIndex((c) => c.id === currentId);
+        }
+        if (idx < 0 && clips.length) idx = 0;
+        return {
+            idx,
+            total: clips.length,
+            prev: idx > 0 ? clips[idx - 1] : null,
+            current: idx >= 0 && idx < clips.length ? clips[idx] : null,
+            next: idx >= 0 && idx < clips.length - 1 ? clips[idx + 1] : null,
+        };
+    }
+
+    function fillFullscreenRailRow(rowEl, roleLabel, clip) {
+        if (!rowEl) return;
+        const line = rowEl.querySelector('.fullscreen-clip-rail__line');
+        if (!line) return;
+        if (!clip) {
+            line.textContent = `${roleLabel} — —`;
+            return;
+        }
+        line.textContent = `${roleLabel} — ${clipRailLabel(clip)} — ${clipRailTimeRange(clip)}`;
+    }
+
+    const FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
+
+    function isFullscreenClipRailCollapsed() {
+        return localStorage.getItem(FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY) === '1';
+    }
+
+    function setFullscreenClipRailCollapsed(collapsed) {
+        localStorage.setItem(FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY, collapsed ? '1' : '0');
+        const rail = $('#fullscreen-clip-rail');
+        const toggle = $('#fullscreen-clip-rail-toggle');
+        if (!rail) return;
+        rail.classList.toggle('is-collapsed', collapsed);
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggle.title = collapsed ? 'Mostrar cola de clips' : 'Ocultar cola de clips';
+        }
+    }
+
+    function syncFullscreenClipRail() {
+        const rail = $('#fullscreen-clip-rail');
+        if (!rail) return;
+        setFullscreenClipRailCollapsed(isFullscreenClipRailCollapsed());
+        const show =
+            AppState.get('mode') === 'view' &&
+            isPlayerFullscreen() &&
+            (!!AppState.get('currentGameId') || !!AppState.get('activeCollection'));
+        if (!show) {
+            rail.classList.add('hidden');
+            rail.hidden = true;
+            return;
+        }
+        const ctx = getFullscreenRailContext();
+        if (!ctx.total) {
+            rail.classList.add('hidden');
+            rail.hidden = true;
+            return;
+        }
+        rail.classList.remove('hidden');
+        rail.hidden = false;
+
+        const prevBtn = rail.querySelector('[data-rail-dir="prev"]');
+        const nextBtn = rail.querySelector('[data-rail-dir="next"]');
+        const currentRow = rail.querySelector('.fullscreen-clip-rail__row--current');
+        const countEl = rail.querySelector('.fullscreen-clip-rail__count');
+
+        fillFullscreenRailRow(prevBtn, 'Anterior', ctx.prev);
+        fillFullscreenRailRow(currentRow, 'Actual', ctx.current);
+        fillFullscreenRailRow(nextBtn, 'Siguiente', ctx.next);
+
+        if (prevBtn) prevBtn.disabled = !ctx.prev;
+        if (nextBtn) nextBtn.disabled = !ctx.next;
+        if (countEl) {
+            countEl.textContent = ctx.total > 0 ? `${ctx.idx + 1} / ${ctx.total}` : '';
+        }
+    }
+
+    function wireFullscreenClipRail() {
+        const rail = $('#fullscreen-clip-rail');
+        if (!rail || rail.dataset.wired === '1') return;
+        rail.dataset.wired = '1';
+        setFullscreenClipRailCollapsed(isFullscreenClipRailCollapsed());
+
+        $('#fullscreen-clip-rail-toggle')?.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            setFullscreenClipRailCollapsed(!rail.classList.contains('is-collapsed'));
+        });
+
+        rail.addEventListener('mousedown', (ev) => ev.stopPropagation());
+        rail.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (ev.target.closest('#fullscreen-clip-rail-toggle')) return;
+            const btn = ev.target.closest('[data-rail-dir]');
+            if (!btn || btn.disabled) return;
+            ev.preventDefault();
+            navigateToClipAndPlay(btn.dataset.railDir);
+            syncFullscreenClipRail();
+        });
     }
 
     function syncPlayerChromeUi() {
@@ -1055,6 +1245,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
 
         syncPlayerQualityMenuUi();
+        syncFullscreenClipRail();
     }
 
     function showPlayerSeekFeedback(dir, seconds, sideHint = null, opts = null) {
@@ -1456,6 +1647,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     }
 
     function wirePlayerChrome() {
+        wireFullscreenClipRail();
         const root = $('#player-chrome');
         if (!root || root.dataset.wired === '1') return;
         root.dataset.wired = '1';
@@ -1536,7 +1728,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         });
 
         $('#player-chrome-fullscreen')?.addEventListener('click', async () => {
-            const container = $('#player-container');
+            const container = getPlayerContainer();
             if (!container) return;
             try {
                 if (document.fullscreenElement === container) {
@@ -1551,9 +1743,18 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 UI.toast('No se pudo activar pantalla completa', 'error');
             }
             syncPlayerChromeUi();
+            if (isPlayerFullscreen()) {
+                requestAnimationFrame(focusPlayerSurfaceForKeys);
+            }
         });
 
-        document.addEventListener('fullscreenchange', syncPlayerChromeUi);
+        document.addEventListener('fullscreenchange', () => {
+            syncPlayerChromeUi();
+            syncFullscreenClipRail();
+            if (isPlayerFullscreen()) {
+                requestAnimationFrame(focusPlayerSurfaceForKeys);
+            }
+        });
         document.addEventListener('click', (ev) => {
             const qualityWrap = $('#player-chrome-quality');
             if (!qualityWrap || qualityWrap.contains(ev.target)) return;
@@ -2009,6 +2210,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         UI.updateMode();
         updateLiveEdgeButton();
         syncLiveCaptureAnalyzeDock();
+        syncFullscreenClipRail();
     });
 
     AppState.on('featuresChanged', () => {
@@ -2133,6 +2335,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     });
 
     AppState.on('clipChanged', (clip) => {
+        if (!clip) {
+            try {
+                YTPlayer.clearClipEnd?.();
+            } catch (_) {
+                /* noop */
+            }
+        }
         try {
             DrawingTool.dismissDrawingPreview?.();
         } catch (_) {
@@ -2142,11 +2351,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         UI.renderViewClips();
         UI.updateClipEditControls();
         UI.updateFocusView();
+        syncFullscreenClipRail();
     });
 
     AppState.on('clipsUpdated', () => {
         UI.renderAnalyzeClips();
         UI.renderViewClips();
+        syncFullscreenClipRail();
     });
 
     AppState.on('playlistsUpdated', () => {
@@ -2205,11 +2416,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
     AppState.on('collectionItemsChanged', () => {
         UI.renderViewClips();
+        syncFullscreenClipRail();
     });
 
     AppState.on('collectionItemChanged', async (item) => {
         if (!item) return;
         UI.renderViewClips();
+        syncFullscreenClipRail();
         const currentVideoId = YTPlayer.getCurrentVideoId();
         if (item.youtubeVideoId && item.youtubeVideoId !== currentVideoId) {
             UI.toast('Cargando video…', 'info');
@@ -4204,18 +4417,14 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     // KEYBOARD SHORTCUTS
     // ═══════════════════════════════════════
 
-    // Mouse clicks should not leave buttons focused (prevents Space re-triggering
-    // the last clicked action button, e.g. flags).
-    document.addEventListener('click', (e) => {
+    // Pointer clicks should not leave buttons focused (Space would re-trigger the last
+    // clicked control, e.g. flags). Capture + mousedown runs before click stopPropagation.
+    document.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || e.detail <= 0) return;
         const btn = e.target.closest('button');
-        if (!btn) return;
-        // detail > 0 => pointer-generated click (mouse/touch), keyboard clicks are usually 0.
-        if (e.detail > 0) {
-            setTimeout(() => {
-                if (document.activeElement === btn) btn.blur();
-            }, 0);
-        }
-    });
+        if (!btn || btn.disabled) return;
+        e.preventDefault();
+    }, true);
 
     document.addEventListener('keydown', (e) => {
         const bbModal = $('#modal-buttonboards');
@@ -4296,12 +4505,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         // Don't handle shortcuts when typing in inputs
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
         if (e.target && e.target.isContentEditable) return;
-        // Avoid double-toggle: when a button/control has focus, Space may trigger native click.
-        if (matchesShortcut(e, 'playPause') && e.target && typeof e.target.closest === 'function') {
-            if (e.target.closest('button, a, [role="button"], summary, video')) return;
-        }
 
-        // Play/Pause shortcut
+        // Play/Pause shortcut (capture: antes que botones/controles nativos del video)
         if (matchesShortcut(e, 'playPause')) {
             e.preventDefault();
             // If drawing overlays are visible: dismiss them and resume instead of toggling
@@ -4436,14 +4641,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             AppState.toggleFocusView();
         }
 
-        // Space: play/pause handled by YouTube player naturally
-    });
+    }, true);
 
     /**
-     * Con `<video>` enfocado (archivo local / WebM tras captura), el navegador aplica seek nativo
-     * con flechas sin modificadores — compite con «salto normal» (p. ej. 5 s) en Analizar y con
-     * anterior/siguiente clip en Ver. Shift+flecha no suele tener ese default, por eso el salto
-     * rápido parecía funcionar y el normal no. Evitamos el default en fase capture.
+     * Con `<video controls>` el navegador hace seek nativo con flechas; lo bloqueamos en capture
+     * para que en Ver ←/→ cambien de clip y Shift+flecha use los saltos de preferencias.
      */
     document.addEventListener(
         'keydown',
@@ -4453,7 +4655,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
             if (e.target?.isContentEditable) return;
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-            if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
             if (!e.target?.closest?.('video')) return;
             e.preventDefault();
         },

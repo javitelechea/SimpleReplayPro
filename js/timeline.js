@@ -129,7 +129,7 @@ export const Timeline = (() => {
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
         if (e.button !== 0) return; // only left click
 
-        // Manual timeline seek should disable clip-end auto-stop.
+        // Scrub manual: no auto-pausa al fin del clip (playlist/colección).
         if (typeof YTPlayer.clearClipEnd === 'function') {
             YTPlayer.clearClipEnd();
         }
