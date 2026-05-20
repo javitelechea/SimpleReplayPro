@@ -60,14 +60,12 @@ export const PopoutController = (() => {
             if (msg.type === 'ready') {
                 _ready = true;
                 _clearHandshakeTimer();
-                _sendInitialSync();
-                _startContinuousSync();
+                void _sendInitialSync().then(() => _startContinuousSync());
             } else if (msg.type === 'pong') {
                 // Re-handshake path when popup was already open before main reloaded.
                 _ready = true;
                 _clearHandshakeTimer();
-                _sendInitialSync();
-                _startContinuousSync();
+                void _sendInitialSync().then(() => _startContinuousSync());
             } else if (msg.type === 'closing') {
                 _ready = false;
                 _stopContinuousSync();
@@ -80,12 +78,28 @@ export const PopoutController = (() => {
         return _channel;
     }
 
-    function _sendInitialSync() {
+    async function _sendInitialSync() {
         if (!_ready || !_channel || !_provider) return;
-        const snapshot = _safe(() => _provider.getSnapshot());
+        let snapshot = _safe(() => _provider.getSnapshot());
+        if (typeof _provider.getSnapshotAsync === 'function') {
+            const asyncSnap = await _safeAsync(() => _provider.getSnapshotAsync());
+            if (asyncSnap) snapshot = asyncSnap;
+        }
         if (!snapshot) return;
-        _channel.postMessage({ type: 'sync', payload: snapshot });
-        _lastMedia = snapshot.media || _lastMedia;
+        try {
+            _channel.postMessage({ type: 'sync', payload: snapshot });
+            _lastMedia = snapshot.media || _lastMedia;
+        } catch (err) {
+            console.warn('[Popout] sync inicial falló:', err?.message || err);
+        }
+    }
+
+    async function _safeAsync(fn) {
+        try {
+            return await fn();
+        } catch (_) {
+            return null;
+        }
     }
 
     function _startContinuousSync() {
@@ -208,10 +222,10 @@ export const PopoutController = (() => {
     function notifyMediaLoaded(media) {
         _lastMedia = media || null;
         if (!_channel || !_ready) return;
-        if (_ready) {
+        try {
             send('load', media);
-        } else {
-            // Will be picked up by initial sync once popup signals ready.
+        } catch (err) {
+            console.warn('[Popout] load media falló:', err?.message || err);
         }
     }
 

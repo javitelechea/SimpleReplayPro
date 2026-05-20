@@ -28,16 +28,43 @@ let _currentMediaKey = '';
 /** Evita eco cuando el volumen viene de la app principal */
 let _lastVolMirror = { v: -1, m: null };
 
+function _isBlobLikeFile(obj) {
+    return !!(
+        obj &&
+        typeof obj === 'object' &&
+        typeof obj.size === 'number' &&
+        (typeof obj.arrayBuffer === 'function' || typeof obj.stream === 'function')
+    );
+}
+
+function _localFileFromPayload(payload) {
+    if (!payload || payload.kind !== 'local') return null;
+    if (_isBlobLikeFile(payload.file)) return payload.file;
+    if (payload.buffer instanceof ArrayBuffer && payload.buffer.byteLength > 0) {
+        return new File(
+            [payload.buffer],
+            payload.name || 'video.mp4',
+            { type: payload.type || 'video/mp4' }
+        );
+    }
+    return null;
+}
+
 function _mediaKey(payload) {
     if (!payload || typeof payload !== 'object') return '';
     if (payload.kind === 'youtube' && payload.id) return `yt:${payload.id}`;
-    if (payload.kind === 'local' && payload.file) {
-        const f = payload.file;
-        const name = typeof f.name === 'string' ? f.name : '';
-        const size = typeof f.size === 'number' ? f.size : -1;
-        const lm = typeof f.lastModified === 'number' ? f.lastModified : -1;
-        const type = typeof f.type === 'string' ? f.type : '';
-        return `local:${name}:${size}:${lm}:${type}`;
+    if (payload.kind === 'local') {
+        if (payload.buffer instanceof ArrayBuffer) {
+            return `local:buf:${payload.buffer.byteLength}:${payload.name || ''}:${payload.type || ''}`;
+        }
+        if (_isBlobLikeFile(payload.file)) {
+            const f = payload.file;
+            const name = typeof f.name === 'string' ? f.name : '';
+            const size = typeof f.size === 'number' ? f.size : -1;
+            const lm = typeof f.lastModified === 'number' ? f.lastModified : -1;
+            const type = typeof f.type === 'string' ? f.type : '';
+            return `local:${name}:${size}:${lm}:${type}`;
+        }
     }
     return '';
 }
@@ -94,15 +121,13 @@ async function loadMedia(payload) {
         return;
     }
 
-    const maybeFile = payload && payload.file;
-    const isBlobLike = !!(
-        maybeFile &&
-        typeof maybeFile === 'object' &&
-        typeof maybeFile.size === 'number' &&
-        (typeof maybeFile.arrayBuffer === 'function' || typeof maybeFile.stream === 'function')
-    );
-    if (payload.kind === 'local' && isBlobLike) {
-        const url = URL.createObjectURL(maybeFile);
+    if (payload.kind === 'local') {
+        const file = _localFileFromPayload(payload);
+        if (!file) {
+            showStatus('Video local: datos no recibidos', 2500);
+            return;
+        }
+        const url = URL.createObjectURL(file);
         _currentObjectUrl = url;
         await player.loadVideo({ type: 'local', url });
         _hasMedia = true;

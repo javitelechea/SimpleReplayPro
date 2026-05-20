@@ -763,18 +763,47 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
     }
 
+    async function _resolveLocalFileForPopoutAsync() {
+        let file = _resolveLocalFileForPopout();
+        if (file) return file;
+        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+        const url = media?.url || AppState.getCurrentGame()?.local_video_url || '';
+        if (!url) return null;
+        file = await _hydrateLocalVideoFileFromUrl(url);
+        if (file && url) YTPlayer.loadLocalVideo(url, file);
+        return file;
+    }
+
+    /** ArrayBuffer: la ventana popout no puede usar blob: de la app principal. */
+    async function _buildLocalPopoutPayload(file) {
+        if (!file) return null;
+        try {
+            const buffer = await file.arrayBuffer();
+            return {
+                kind: 'local',
+                buffer,
+                name: file.name || 'video.mp4',
+                type: file.type || 'video/mp4',
+                size: file.size,
+            };
+        } catch (e) {
+            console.warn('[Popout] no se pudo leer el archivo local:', e?.message || e);
+            return null;
+        }
+    }
+
     async function _pushLocalMediaToPopout() {
         const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
         if (!media || media.kind !== 'local') return;
-        let file = _resolveLocalFileForPopout();
-        const url = media.url || AppState.getCurrentGame()?.local_video_url || '';
-        if (!file && url) {
-            file = await _hydrateLocalVideoFileFromUrl(url);
-            if (file && url) YTPlayer.loadLocalVideo(url, file);
+        const file = await _resolveLocalFileForPopoutAsync();
+        if (!file) {
+            UI.toast('No se encontró el archivo de video local para el player externo', 'error');
+            return;
         }
-        if (!file) return;
+        const payload = await _buildLocalPopoutPayload(file);
+        if (!payload) return;
         if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
-        PopoutController.notifyMediaLoaded({ kind: 'local', file });
+        PopoutController.notifyMediaLoaded(payload);
     }
 
     function _popoutGetSnapshot() {
@@ -783,9 +812,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (media) {
             if (media.kind === 'youtube' && media.id) {
                 snapshotMedia = { kind: 'youtube', id: media.id };
-            } else if (media.kind === 'local') {
-                const file = _resolveLocalFileForPopout();
-                if (file) snapshotMedia = { kind: 'local', file };
             }
         }
         return {
@@ -798,10 +824,24 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         };
     }
 
+    async function _popoutGetSnapshotAsync() {
+        const base = _popoutGetSnapshot();
+        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+        if (!media || media.kind !== 'local') return base;
+        const file = await _resolveLocalFileForPopoutAsync();
+        if (!file) return base;
+        const localPayload = await _buildLocalPopoutPayload(file);
+        if (!localPayload) return base;
+        return { ...base, media: localPayload };
+    }
+
     function wirePopout() {
         if (typeof YTPlayer.setCommandListener !== 'function') return;
 
-        PopoutController.setProvider({ getSnapshot: _popoutGetSnapshot });
+        PopoutController.setProvider({
+            getSnapshot: _popoutGetSnapshot,
+            getSnapshotAsync: _popoutGetSnapshotAsync,
+        });
         YTPlayer.setPopoutBridge?.({
             isConnected: () => PopoutController.isConnected && PopoutController.isConnected(),
             notifySeek: (seconds) => PopoutController.notifySeek(seconds),
@@ -889,10 +929,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (pill) pill.hidden = !active;
             syncFullscreenClipRail();
             if (active) {
-                _pushLocalMediaToPopout();
+                void _pushLocalMediaToPopout();
+                window.setTimeout(() => void _pushLocalMediaToPopout(), 400);
+                window.setTimeout(() => void _pushLocalMediaToPopout(), 1200);
                 window.setTimeout(() => syncFullscreenClipRail(), 600);
                 window.setTimeout(() => syncFullscreenClipRail(), 1800);
-                window.setTimeout(() => _pushLocalMediaToPopout(), 400);
                 _popoutMirrorPlaying = YTPlayer.isPlaying ? !!YTPlayer.isPlaying() : false;
                 if (_mainAudioBeforePopout === null) {
                     _mainAudioBeforePopout = {
@@ -2761,11 +2802,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (game) {
             if (game.local_video_url) {
                 YTPlayer.loadLocalVideo(game.local_video_url, AppState.getLocalVideoFile?.());
-                if (!AppState.getLocalVideoFile?.()) {
+                if (AppState.getLocalVideoFile?.()) {
+                    void _pushLocalMediaToPopout();
+                } else {
                     _hydrateLocalVideoFileFromUrl(game.local_video_url).then((file) => {
                         if (file) {
                             YTPlayer.loadLocalVideo(game.local_video_url, file);
-                            _pushLocalMediaToPopout();
+                            void _pushLocalMediaToPopout();
                         }
                     });
                 }
