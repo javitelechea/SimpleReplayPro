@@ -83,7 +83,9 @@ export const Timeline = (() => {
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
 
         try {
-            const current = YTPlayer.getCurrentTime();
+            const current = YTPlayer.getUiCurrentTime
+                ? YTPlayer.getUiCurrentTime()
+                : YTPlayer.getCurrentTime();
             const bounds = getTimelineBounds();
 
             if (bounds.duration > 0) {

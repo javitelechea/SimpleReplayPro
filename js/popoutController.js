@@ -17,6 +17,7 @@ export const PopoutController = (() => {
     let _lastMedia = null;
     let _provider = null;
     let _mirrorHandler = null;
+    let _railNavHandler = null;
 
     function _emitState() {
         const active = isActive();
@@ -31,6 +32,10 @@ export const PopoutController = (() => {
 
     function setMirrorHandler(fn) {
         _mirrorHandler = typeof fn === 'function' ? fn : null;
+    }
+
+    function setRailNavHandler(fn) {
+        _railNavHandler = typeof fn === 'function' ? fn : null;
     }
 
     function onActiveChange(fn) {
@@ -68,6 +73,8 @@ export const PopoutController = (() => {
                 _stopContinuousSync();
             } else if (msg.type === 'mirror' && _mirrorHandler) {
                 _mirrorHandler(msg.payload);
+            } else if (msg.type === 'railNavigate' && _railNavHandler) {
+                _railNavHandler(msg.direction);
             }
         });
         return _channel;
@@ -83,14 +90,21 @@ export const PopoutController = (() => {
 
     function _startContinuousSync() {
         _stopContinuousSync();
+        // Solo volumen periódico: tiempo/play desde la ventana principal congelan el popout en bucle.
         _syncTimer = setInterval(() => {
             if (!_ready || !_channel || !_provider) return;
             const snapshot = _safe(() => _provider.getSnapshot());
             if (!snapshot) return;
             try {
-                _channel.postMessage({ type: 'sync', payload: snapshot });
+                _channel.postMessage({
+                    type: 'sync',
+                    payload: {
+                        volume: snapshot.volume,
+                        muted: snapshot.muted,
+                    },
+                });
             } catch (_) { /* noop */ }
-        }, 700);
+        }, 2000);
     }
 
     function _stopContinuousSync() {
@@ -216,9 +230,14 @@ export const PopoutController = (() => {
         send('volume', payload);
     }
 
+    function notifyRail(payload) {
+        send('rail', payload);
+    }
+
     return {
         setProvider,
         setMirrorHandler,
+        setRailNavHandler,
         onActiveChange,
         isActive,
         isConnected,
@@ -229,6 +248,7 @@ export const PopoutController = (() => {
         notifyPause,
         notifySeek,
         notifySpeed,
-        notifyVolume
+        notifyVolume,
+        notifyRail
     };
 })();

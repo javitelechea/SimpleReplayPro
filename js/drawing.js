@@ -34,6 +34,7 @@ export const DrawingTool = (() => {
     let _watchPlaylistId = null;
     let _watchClipId = null;
     let _watchShownIds = new Set(); // drawing comment IDs already shown this session
+    let _presentationMode = false;
 
     // ── Init (called once on app load) ──
     function init() {
@@ -97,11 +98,44 @@ export const DrawingTool = (() => {
         }
     }
 
+    function _applyToolbarMode() {
+        if (!_toolbar) return;
+        const actions = _toolbar.querySelector('.draw-toolbar-actions');
+        const hint = _toolbar.querySelector('#draw-presentation-hint');
+        const cancelBtn = _toolbar.querySelector('[data-action="draw-cancel"]');
+        _toolbar.classList.toggle('presentation-mode', _presentationMode);
+        if (_presentationMode) {
+            if (actions) actions.style.display = 'none';
+            if (hint) hint.classList.remove('hidden');
+        } else {
+            if (actions) actions.style.display = '';
+            if (hint) hint.classList.add('hidden');
+        }
+        if (cancelBtn) {
+            cancelBtn.textContent = '✕';
+            cancelBtn.title = 'Cerrar dibujo';
+            cancelBtn.setAttribute('aria-label', 'Cerrar dibujo');
+        }
+    }
+
+    function _onDrawingKeydown(e) {
+        if (!_active || e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+    }
+
+    /** Dibujo temporal para presentación (sin guardar en chat/playlist). */
+    function openPresentation(playlistId = null, clipId = null) {
+        open(playlistId, clipId, { presentation: true });
+    }
+
     // ── Open drawing mode ──
-    function open(playlistId, clipId) {
+    function open(playlistId, clipId, options = {}) {
         if (_active) return;
-        _playlistId = playlistId;
-        _clipId = clipId;
+        _presentationMode = !!options.presentation;
+        _playlistId = _presentationMode ? null : playlistId;
+        _clipId = clipId || null;
         _active = true;
         _strokes = [];
         _currentStroke = null;
@@ -131,33 +165,39 @@ export const DrawingTool = (() => {
         _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
         _updateToolbar();
 
-        // Disable save button if no playlist (can draw but not save)
-        const saveBtn = _toolbar.querySelector('[data-action="draw-save"]');
-        if (saveBtn) {
-            if (_playlistId) {
-                saveBtn.disabled = false;
-                saveBtn.style.opacity = '1';
-                saveBtn.style.cursor = 'pointer';
-                saveBtn.title = 'Guardar dibujo';
-            } else {
-                saveBtn.disabled = true;
-                saveBtn.style.opacity = '0.35';
-                saveBtn.style.cursor = 'not-allowed';
-                saveBtn.title = 'Agregá el clip a una playlist para poder guardar';
+        if (!_presentationMode) {
+            const saveBtn = _toolbar.querySelector('[data-action="draw-save"]');
+            if (saveBtn) {
+                if (_playlistId) {
+                    saveBtn.disabled = false;
+                    saveBtn.style.opacity = '1';
+                    saveBtn.style.cursor = 'pointer';
+                    saveBtn.title = 'Guardar dibujo';
+                } else {
+                    saveBtn.disabled = true;
+                    saveBtn.style.opacity = '0.35';
+                    saveBtn.style.cursor = 'not-allowed';
+                    saveBtn.title = 'Agregá el clip a una playlist para poder guardar';
+                }
             }
         }
+        _applyToolbarMode();
 
-        // Listen for window resize
         window.addEventListener('resize', _resizeCanvas);
+        document.addEventListener('keydown', _onDrawingKeydown, true);
     }
 
     // ── Close drawing mode (no save) ──
     function close() {
         if (!_active) return;
         _active = false;
+        _presentationMode = false;
         _canvas.classList.remove('active');
         _toolbar.classList.remove('active');
+        _toolbar.classList.remove('presentation-mode');
+        _applyToolbarMode();
         window.removeEventListener('resize', _resizeCanvas);
+        document.removeEventListener('keydown', _onDrawingKeydown, true);
         _strokes = [];
         _currentStroke = null;
         // Clear description field
@@ -170,6 +210,7 @@ export const DrawingTool = (() => {
     // ── Save drawing as comment ──
     function save() {
         if (!_active) return;
+        if (_presentationMode) return;
         if (document.body.classList.contains('read-only-mode')) {
             UI.toast('Solo lectura: no se puede guardar el dibujo.', 'error');
             return;
@@ -496,7 +537,9 @@ export const DrawingTool = (() => {
             const drawings = _getDrawingComments(playlistId, clipId);
             if (!drawings.length) return;
 
-            const t = YTPlayer.getCurrentTime();
+            const t = YTPlayer.getUiCurrentTime
+                ? YTPlayer.getUiCurrentTime()
+                : YTPlayer.getCurrentTime();
             drawings.forEach(d => {
                 const drawingKey = d.timestamp || `${d.videoTimeSec}|${d.text || ''}`;
                 if (_watchShownIds.has(drawingKey)) return;
@@ -555,7 +598,7 @@ export const DrawingTool = (() => {
         });
     }
 
-    return { init, open, close, save, isActive, showDrawingOverlay,
+    return { init, open, openPresentation, close, save, isActive, showDrawingOverlay,
              startPlaybackWatch, stopPlaybackWatch, hasPlaybackOverlays, dismissPlaybackOverlays,
              dismissDrawingPreview };
 })();

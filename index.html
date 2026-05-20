@@ -87,6 +87,7 @@
           <button id="btn-import-xml" class="header-action-item header-action-item--tool" type="button" title="Importar proyecto desde XML"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M12 4v11M8 11l4 4 4-4M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Importar XML</span></button>
           <div class="header-action-group-label">Reproducción</div>
           <button id="btn-open-popout" class="header-action-item header-action-item--tool" type="button" title="Abrir player en ventana externa"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M14 13l5 5M14 18h5v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Player externo</span></button>
+          <button id="btn-header-draw" class="header-action-item header-action-item--tool" type="button" style="display:none;" title="Dibujar sobre el video (no se guarda)"><span class="header-action-icon" aria-hidden="true">🎨</span><span>Dibujar</span></button>
           <button id="btn-relink-video" class="header-action-item header-action-item--tool" type="button" style="display:none;" title="Re-vincular video local"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M15 7h4v4M9 17H5v-4M19 11a7 7 0 0 0-12-3M5 13a7 7 0 0 0 12 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Vincular video</span></button>
           <div class="header-action-group-label">Sistema</div>
           <button id="btn-toggle-autosave" class="header-action-item header-action-item--tool" type="button" title="Activar auto-guardado"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M7 7h8a4 4 0 0 1 4 4v1M17 17H9a4 4 0 0 1-4-4v-1M16 4l3 3-3 3M8 20l-3-3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Auto-guardado</span><span id="autosave-menu-state" class="header-action-state">OFF</span></button>
@@ -132,17 +133,9 @@
             <button type="button" id="player-chrome-seek-back" class="player-chrome__btn" title="Retroceder (paso de preferencias)" aria-label="Retroceder en el video">
               <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7l-6 5 6 5V7Zm8 0-6 5 6 5V7Z" fill="currentColor"/></svg>
             </button>
-            <div id="player-chrome-play-group" class="player-chrome__group">
-              <button type="button" id="player-chrome-play" class="player-chrome__btn player-chrome__btn--primary" title="Reproducir o pausa" aria-label="Reproducir o pausa">
-                <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>
-              </button>
-              <div id="player-chrome-quality" class="player-chrome__quality hidden">
-                <button type="button" id="player-chrome-quality-btn" class="player-chrome__btn player-chrome__btn--quality" title="Cambiar calidad de YouTube" aria-label="Cambiar calidad de YouTube" aria-expanded="false">
-                  <span id="player-chrome-quality-label">Auto</span>
-                </button>
-                <div id="player-chrome-quality-menu" class="player-chrome__quality-menu hidden" role="menu" aria-label="Calidades disponibles"></div>
-              </div>
-            </div>
+            <button type="button" id="player-chrome-play" class="player-chrome__btn player-chrome__btn--primary" title="Reproducir o pausa" aria-label="Reproducir o pausa">
+              <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>
+            </button>
             <button type="button" id="player-chrome-seek-fwd" class="player-chrome__btn" title="Avanzar (paso de preferencias)" aria-label="Avanzar en el video">
               <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 7v10l6-5-6-5ZM5 7v10l6-5-6-5Z" fill="currentColor"/></svg>
             </button>
@@ -161,6 +154,7 @@
         </div>
         <div id="fullscreen-clip-rail" class="fullscreen-clip-rail hidden" hidden aria-label="Cola de clips en pantalla completa">
           <div class="fullscreen-clip-rail__head">
+            <button type="button" id="fullscreen-clip-rail-draw" class="fullscreen-clip-rail__toggle fullscreen-clip-rail__toggle--draw" title="Dibujar (presentación, no se guarda)" aria-label="Dibujar">🎨</button>
             <button type="button" id="fullscreen-clip-rail-toggle" class="fullscreen-clip-rail__toggle" aria-expanded="true" title="Ocultar cola de clips">
               <span class="fullscreen-clip-rail__toggle-label">Clips</span>
               <span class="fullscreen-clip-rail__toggle-icon" aria-hidden="true">▾</span>
@@ -218,11 +212,14 @@
             </button>
             <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-clear" title="Limpiar">🗑️</button>
           </div>
+          <span class="draw-toolbar-presentation-hint hidden" id="draw-presentation-hint">Presentación — no se guarda</span>
           <div class="draw-toolbar-group draw-toolbar-actions">
             <input type="text" id="draw-author" class="draw-description-input draw-author-input" placeholder="Nombre" autocomplete="off" />
             <input type="text" id="draw-description" class="draw-description-input" placeholder="Descripción del dibujo…" autocomplete="off" />
             <button class="btn btn-xs btn-primary" data-action="draw-save">💾 Guardar</button>
-            <button class="btn btn-xs btn-ghost" data-action="draw-cancel">✕</button>
+          </div>
+          <div class="draw-toolbar-group draw-toolbar-close">
+            <button type="button" class="btn btn-xs btn-ghost draw-toolbar-close-btn" data-action="draw-cancel" title="Cerrar dibujo" aria-label="Cerrar dibujo">✕</button>
           </div>
         </div>
         <!-- Focus View Overlay -->

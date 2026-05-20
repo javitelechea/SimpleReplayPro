@@ -6,6 +6,7 @@
 import { VideoPlayer } from './VideoPlayer.js';
 
 const CHANNEL_NAME = 'simplereplay-popout';
+const RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
 const channel = new BroadcastChannel(CHANNEL_NAME);
 
 const player = new VideoPlayer('popout-player', { youtubeShowControls: false });
@@ -17,6 +18,8 @@ player.setPlaybackActivityCallback((ev) => {
 });
 const emptyEl = document.getElementById('popout-empty');
 const statusEl = document.getElementById('popout-status');
+const clipRailEl = document.getElementById('popout-clip-rail');
+const clipRailToggle = document.getElementById('popout-clip-rail-toggle');
 
 let _currentObjectUrl = null;
 let _hasMedia = false;
@@ -33,7 +36,8 @@ function _mediaKey(payload) {
         const name = typeof f.name === 'string' ? f.name : '';
         const size = typeof f.size === 'number' ? f.size : -1;
         const lm = typeof f.lastModified === 'number' ? f.lastModified : -1;
-        return `local:${name}:${size}:${lm}`;
+        const type = typeof f.type === 'string' ? f.type : '';
+        return `local:${name}:${size}:${lm}:${type}`;
     }
     return '';
 }
@@ -94,8 +98,8 @@ async function loadMedia(payload) {
     const isBlobLike = !!(
         maybeFile &&
         typeof maybeFile === 'object' &&
-        typeof maybeFile.arrayBuffer === 'function' &&
-        typeof maybeFile.size === 'number'
+        typeof maybeFile.size === 'number' &&
+        (typeof maybeFile.arrayBuffer === 'function' || typeof maybeFile.stream === 'function')
     );
     if (payload.kind === 'local' && isBlobLike) {
         const url = URL.createObjectURL(maybeFile);
@@ -121,18 +125,19 @@ async function applySync(payload) {
     if (typeof payload.currentTime === 'number') {
         try {
             const current = player.getCurrentTime();
-            if (Math.abs(current - payload.currentTime) > 0.35) {
+            if (Math.abs(current - payload.currentTime) > 0.5) {
                 player.seekTo(payload.currentTime);
             }
         } catch (_) { /* noop */ }
     }
     if (payload.isPlaying === true) {
         try {
-            if (!player.isPlaying) player.play();
+            if (!player.isPlayingNow || !player.isPlayingNow()) player.play();
         } catch (_) { /* noop */ }
     } else if (payload.isPlaying === false) {
         try {
-            if (player.isPlaying) player.pause();
+            if (player.isPlayingNow && player.isPlayingNow()) player.pause();
+            else if (player.isPlaying) player.pause();
         } catch (_) { /* noop */ }
     }
     if (typeof payload.volume === 'number' || typeof payload.muted === 'boolean') {
@@ -146,8 +151,71 @@ async function applySync(payload) {
     _snapVolFromPlayer();
 }
 
+function applyPopoutClipRail(payload) {
+    if (!clipRailEl) return;
+    if (!payload || !payload.show) {
+        clipRailEl.classList.remove('is-visible');
+        clipRailEl.hidden = true;
+        return;
+    }
+    clipRailEl.hidden = false;
+    clipRailEl.classList.add('is-visible');
+    clipRailEl.classList.toggle('is-collapsed', !!payload.collapsed);
+
+    const prevBtn = clipRailEl.querySelector('[data-rail-dir="prev"]');
+    const nextBtn = clipRailEl.querySelector('[data-rail-dir="next"]');
+    const currentRow = clipRailEl.querySelector('.fullscreen-clip-rail__row--current');
+    const countEl = clipRailEl.querySelector('.fullscreen-clip-rail__count');
+
+    if (prevBtn) {
+        prevBtn.textContent = payload.prevLine || 'Anterior — —';
+        prevBtn.disabled = !!payload.prevDisabled;
+    }
+    if (currentRow) {
+        currentRow.textContent = payload.currentLine || 'Actual — —';
+    }
+    if (nextBtn) {
+        nextBtn.textContent = payload.nextLine || 'Siguiente — —';
+        nextBtn.disabled = !!payload.nextDisabled;
+    }
+    if (countEl) countEl.textContent = payload.count || '';
+
+    if (clipRailToggle) {
+        clipRailToggle.setAttribute('aria-expanded', payload.collapsed ? 'false' : 'true');
+    }
+}
+
+function wirePopoutClipRail() {
+    if (!clipRailEl || clipRailEl.dataset.wired === '1') return;
+    clipRailEl.dataset.wired = '1';
+
+    clipRailToggle?.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const collapsed = !clipRailEl.classList.contains('is-collapsed');
+        clipRailEl.classList.toggle('is-collapsed', collapsed);
+        localStorage.setItem(RAIL_COLLAPSED_KEY, collapsed ? '1' : '0');
+        if (clipRailToggle) {
+            clipRailToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        }
+    });
+
+    clipRailEl.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (ev.target.closest('#popout-clip-rail-toggle')) return;
+        const btn = ev.target.closest('[data-rail-dir]');
+        if (!btn || btn.disabled) return;
+        try {
+            channel.postMessage({ type: 'railNavigate', direction: btn.dataset.railDir });
+        } catch (_) { /* noop */ }
+    });
+}
+
 channel.addEventListener('message', async (ev) => {
     const msg = ev.data || {};
+    if (msg.type === 'rail') {
+        applyPopoutClipRail(msg.payload);
+        return;
+    }
     await player.playbackSilenced(async () => {
         switch (msg.type) {
             case 'sync':
@@ -203,6 +271,7 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
+wirePopoutClipRail();
 channel.postMessage({ type: 'ready' });
 showStatus('Conectado a SimpleReplay');
 
@@ -210,13 +279,22 @@ setInterval(() => {
     if (!_hasMedia) return;
     let v;
     let m;
+    let t;
     try {
         v = player.getVolume();
         m = player.isMuted();
+        t = player.getCurrentTime();
     } catch (_) {
         return;
     }
-    if (v === _lastVolMirror.v && m === _lastVolMirror.m) return;
-    _lastVolMirror = { v, m };
-    mirrorVolumeToMain();
-}, 800);
+    const volChanged = v !== _lastVolMirror.v || m !== _lastVolMirror.m;
+    if (volChanged) {
+        _lastVolMirror = { v, m };
+        mirrorVolumeToMain();
+    }
+    if (typeof t === 'number' && Number.isFinite(t)) {
+        try {
+            channel.postMessage({ type: 'mirror', payload: { action: 'time', time: t } });
+        } catch (_) { /* noop */ }
+    }
+}, 250);

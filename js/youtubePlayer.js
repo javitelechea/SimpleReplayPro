@@ -21,6 +21,32 @@ export const YTPlayer = (() => {
     let _commandListener = null;
     let _suppressMirrorEchoUntil = 0;
     let _youtubeNativeControlsEnabled = false;
+    let _lastSeekEmitAt = 0;
+    let _uiTimeOverride = null;
+    /** @type {{ isConnected?: () => boolean, notifySeek?: (s: number) => void, notifyPlay?: () => void, notifyPause?: () => void }|null} */
+    let _popoutBridge = null;
+
+    function setPopoutBridge(bridge) {
+        _popoutBridge = bridge && typeof bridge === 'object' ? bridge : null;
+    }
+
+    function _popoutActive() {
+        return !!(_popoutBridge && typeof _popoutBridge.isConnected === 'function' && _popoutBridge.isConnected());
+    }
+
+    /** Seek en el motor principal sin reenviar eventos al popout (evita bucles). */
+    function _seekEngineSilently(sec) {
+        const eng = _engine();
+        if (!eng || typeof eng.seekTo !== 'function') return;
+        const run = () => {
+            try { eng.seekTo(sec); } catch (_) { /* noop */ }
+        };
+        if (typeof eng.playbackSilenced === 'function') {
+            eng.playbackSilenced(run);
+        } else {
+            run();
+        }
+    }
 
     function _buildVideoPlayerInstance() {
         _videoPlayer = new VideoPlayer('youtube-player', { youtubeShowControls: _youtubeNativeControlsEnabled });
@@ -28,7 +54,12 @@ export const YTPlayer = (() => {
             if (!ev || !ev.action) return;
             if (ev.action === 'play') _emit('play');
             else if (ev.action === 'pause') _emit('pause');
-            else if (ev.action === 'seek' && typeof ev.time === 'number') _emit('seek', { seconds: ev.time });
+            else if (ev.action === 'seek' && typeof ev.time === 'number') {
+                const now = Date.now();
+                if (now - _lastSeekEmitAt < 220) return;
+                _lastSeekEmitAt = now;
+                _emit('seek', { seconds: ev.time });
+            }
         });
     }
 
@@ -138,7 +169,6 @@ export const YTPlayer = (() => {
     }
 
     function init() {
-        console.log('YTPlayer wrapper: init() called');
         return new Promise((resolve) => {
             _onReadyCb = resolve;
 
@@ -151,7 +181,6 @@ export const YTPlayer = (() => {
     }
 
     function _setupPlayer() {
-        console.log('YTPlayer wrapper: _setupPlayer executing');
         if (!document.getElementById('youtube-player')) {
             console.warn('YTPlayer: youtube-player element not found');
             return;
@@ -159,7 +188,6 @@ export const YTPlayer = (() => {
 
         _buildVideoPlayerInstance();
         _ready = true;
-        console.log('YTPlayer wrapper: player instance created, ready');
 
         if (_onReadyCb) {
             _onReadyCb();
@@ -167,44 +195,51 @@ export const YTPlayer = (() => {
     }
 
     function loadVideo(videoId) {
-        console.log('YTPlayer wrapper: loadVideo called with', videoId);
-        if (!_ready || !_videoPlayer) {
-            console.log('YTPlayer wrapper: NOT READY. _ready:', _ready, '_videoPlayer:', !!_videoPlayer);
-            return;
-        }
+        if (!_ready || !_videoPlayer) return;
         if (!_guardNotRecording('loadVideo')) return;
+        const id = String(videoId || '').trim();
+        if (!id) return;
+        if (getCurrentVideoId() === id && _videoPlayer.type === 'youtube') return;
         _leaveLiveCaptureIfNeeded();
         _clipEndSec = null;
         _stopPoll();
 
-        if (videoId) {
-            _videoPlayer.loadVideo({ type: 'youtube', id: videoId });
-            _lastMedia = { kind: 'youtube', id: videoId };
-            _emit('mediaLoaded', _lastMedia);
-        }
+        _videoPlayer.loadVideo({ type: 'youtube', id });
+        _lastMedia = { kind: 'youtube', id };
+        _emit('mediaLoaded', _lastMedia);
+    }
+
+    function getCurrentLocalUrl() {
+        return (_lastMedia && _lastMedia.kind === 'local') ? _lastMedia.url : null;
     }
 
     function loadLocalVideo(url, file) {
         if (!_ready || !_videoPlayer) return;
         if (!_guardNotRecording('loadLocalVideo')) return;
+        const u = String(url || '').trim();
+        if (!u) return;
+        const resolvedFile = file || AppState.getLocalVideoFile?.() || null;
+        if (getCurrentLocalUrl() === u && _videoPlayer.getType?.() === 'local') {
+            if (resolvedFile) _lastMedia = { kind: 'local', url: u, file: resolvedFile };
+            return;
+        }
         _leaveLiveCaptureIfNeeded();
         _clipEndSec = null;
         _stopPoll();
 
-        if (url) {
-            _videoPlayer.loadVideo({ type: 'local', url: url });
-            _lastMedia = { kind: 'local', url, file: file || null };
-            _emit('mediaLoaded', _lastMedia);
-        }
+        _videoPlayer.loadVideo({ type: 'local', url: u });
+        _lastMedia = { kind: 'local', url: u, file: resolvedFile };
+        _emit('mediaLoaded', _lastMedia);
     }
 
     /**
      * En vivo (preview) no hay scrub: flechas/timeline llaman seek pero la facade ignora hasta tener replay.
      * Si hay grabación activa, cargamos el DVR hasta ahora (como «Revisar jugada») cuando hace falta y recién ahí seek.
      */
-    function seekTo(seconds) {
+    function seekTo(seconds, opts = {}) {
         if (!_ready || !_engine()) return;
         const sec = Math.max(0, Number(seconds) || 0);
+        const fromPopout = !!(opts && opts.fromPopout);
 
         if (_usingLiveCapture() && _liveFacade && isLiveRecordingActive()) {
             (async () => {
@@ -231,6 +266,12 @@ export const YTPlayer = (() => {
             return;
         }
 
+        if (_popoutActive()) {
+            _uiTimeOverride = sec;
+            _seekEngineSilently(sec);
+            if (!fromPopout) _popoutBridge.notifySeek?.(sec);
+            return;
+        }
         _engine().seekTo(sec);
         _emit('seek', { seconds: sec });
     }
@@ -241,16 +282,29 @@ export const YTPlayer = (() => {
             AppState.setCurrentClip(null);
             _clipAutoPaused = false;
         }
+        if (_popoutActive()) {
+            _popoutBridge.notifyPlay?.();
+            return;
+        }
         _engine().play();
     }
 
     function pause() {
         if (!_ready || !_engine()) return;
+        if (_popoutActive()) {
+            _popoutBridge.notifyPause?.();
+            return;
+        }
         _engine().pause();
     }
 
     function togglePlay() {
         if (!_ready || !_engine()) return;
+        if (_popoutActive()) {
+            if (isPlaying()) pause();
+            else play();
+            return;
+        }
         if (_engine().isPlaying) {
             pause();
         } else {
@@ -287,6 +341,13 @@ export const YTPlayer = (() => {
         if (stopAtEnd) {
             _clipEndSec = endSec;
             _startPoll();
+        }
+        if (_popoutActive()) {
+            _uiTimeOverride = startSec;
+            _seekEngineSilently(startSec);
+            _popoutBridge.notifySeek?.(startSec);
+            _popoutBridge.notifyPlay?.();
+            return;
         }
         _engine().seekTo(startSec);
         _engine().play();
@@ -461,11 +522,13 @@ export const YTPlayer = (() => {
     async function loadVideoAsync(videoId) {
         if (!_ready || !_videoPlayer || !videoId) return;
         if (!_guardNotRecording('loadVideoAsync')) return;
+        const id = String(videoId).trim();
+        if (getCurrentVideoId() === id && _videoPlayer.type === 'youtube') return;
         _leaveLiveCaptureIfNeeded();
         _clipEndSec = null;
         _stopPoll();
-        await _videoPlayer.loadVideo({ type: 'youtube', id: videoId });
-        _lastMedia = { kind: 'youtube', id: videoId };
+        await _videoPlayer.loadVideo({ type: 'youtube', id });
+        _lastMedia = { kind: 'youtube', id };
         _emit('mediaLoaded', _lastMedia);
     }
 
@@ -474,7 +537,19 @@ export const YTPlayer = (() => {
     function isPlaying() {
         if (!_ready) return false;
         if (_usingLiveCapture()) return !!(_liveFacade && _liveFacade.isPlaying);
+        if (_videoPlayer && typeof _videoPlayer.isPlayingNow === 'function') {
+            return _videoPlayer.isPlayingNow();
+        }
         return !!(_videoPlayer && _videoPlayer.isPlaying);
+    }
+
+    function setUiTimeOverride(seconds) {
+        _uiTimeOverride = (typeof seconds === 'number' && Number.isFinite(seconds)) ? seconds : null;
+    }
+
+    function getUiCurrentTime() {
+        if (_uiTimeOverride != null) return _uiTimeOverride;
+        return getCurrentTime();
     }
 
     function mirrorRemotePlayback(payload) {
@@ -526,6 +601,8 @@ export const YTPlayer = (() => {
         clearAutoPause,
         isReady,
         isPlaying,
+        setUiTimeOverride,
+        getUiCurrentTime,
         getPlayerState,
         setSpeed,
         isYoutubeNativeControlsEnabled,
@@ -538,6 +615,7 @@ export const YTPlayer = (() => {
         jumpToLiveEdge,
         isLiveStream,
         setCommandListener,
+        setPopoutBridge,
         getLastMedia,
         mirrorRemotePlayback,
         getVolume,

@@ -43,6 +43,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     let authMenuWired = false;
     let _localVideoFileForCurrentGame = null;
     let _mainAudioBeforePopout = null;
+    let _popoutMirrorPlaying = false;
     /** Ref para crear proyecto «Captura» antes de que existan otros puntos de entrada. */
     /** @type {import('./livecapture/LiveCaptureFacade.js').LiveCaptureFacade|null} */
     let _liveCaptureFacadeRef = null;
@@ -63,20 +64,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     const FRAME_SEEK_STEP_SEC = 1 / 30;
     const AUTO_SAVE_ENABLED_KEY = 'sr_auto_save_enabled';
     const AUTO_SAVE_INTERVAL_MS = 60000;
-    const YT_QUALITY_LABELS = {
-        highres: '4K',
-        hd2160: '2160p',
-        hd1440: '1440p',
-        hd1080: '1080p',
-        hd720: '720p',
-        large: '480p',
-        medium: '360p',
-        small: '240p',
-        tiny: '144p',
-        auto: 'Auto',
-        default: 'Auto',
-        unknown: 'Auto',
-    };
     const DEFAULT_SHORTCUTS = {
         playPause: 'Space',
         seekLeft: 'ArrowLeft',
@@ -87,7 +74,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     const QUICK_KEYS = ['q', 'w', 'e', 'r', 't', 'y', 'u'];
     let _quickClipMenuOpen = false;
     let _quickPlaylistPickerOpen = false;
-    let _playerChromeQualityMenuOpen = false;
     let _nativeControlsToggleBusy = false;
     let _autoSaveTimer = null;
     let _autoSaveInFlight = false;
@@ -754,14 +740,52 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         });
     }
 
+    function _resolveLocalFileForPopout() {
+        const fromState = AppState.getLocalVideoFile?.();
+        if (fromState) return fromState;
+        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+        if (media?.kind === 'local' && media.file) return media.file;
+        return null;
+    }
+
+    async function _hydrateLocalVideoFileFromUrl(url) {
+        if (!url || AppState.getLocalVideoFile?.()) return AppState.getLocalVideoFile();
+        try {
+            const blob = await fetch(url).then((r) => {
+                if (!r.ok) throw new Error('fetch failed');
+                return r.blob();
+            });
+            const file = new File([blob], 'local-video', { type: blob.type || 'video/mp4' });
+            AppState.setLocalVideoFile(file);
+            return file;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async function _pushLocalMediaToPopout() {
+        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+        if (!media || media.kind !== 'local') return;
+        let file = _resolveLocalFileForPopout();
+        const url = media.url || AppState.getCurrentGame()?.local_video_url || '';
+        if (!file && url) {
+            file = await _hydrateLocalVideoFileFromUrl(url);
+            if (file && url) YTPlayer.loadLocalVideo(url, file);
+        }
+        if (!file) return;
+        if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
+        PopoutController.notifyMediaLoaded({ kind: 'local', file });
+    }
+
     function _popoutGetSnapshot() {
         const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
         let snapshotMedia = null;
         if (media) {
             if (media.kind === 'youtube' && media.id) {
                 snapshotMedia = { kind: 'youtube', id: media.id };
-            } else if (media.kind === 'local' && media.file) {
-                snapshotMedia = { kind: 'local', file: media.file };
+            } else if (media.kind === 'local') {
+                const file = _resolveLocalFileForPopout();
+                if (file) snapshotMedia = { kind: 'local', file };
             }
         }
         return {
@@ -778,32 +802,57 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (typeof YTPlayer.setCommandListener !== 'function') return;
 
         PopoutController.setProvider({ getSnapshot: _popoutGetSnapshot });
+        YTPlayer.setPopoutBridge?.({
+            isConnected: () => PopoutController.isConnected && PopoutController.isConnected(),
+            notifySeek: (seconds) => PopoutController.notifySeek(seconds),
+            notifyPlay: () => {
+                PopoutController.notifyPlay();
+                _popoutMirrorPlaying = true;
+            },
+            notifyPause: () => {
+                PopoutController.notifyPause();
+                _popoutMirrorPlaying = false;
+            },
+        });
         PopoutController.setMirrorHandler((payload) => {
-            // Policy: audio only in popup while it's active.
-            if (payload && payload.action === 'volume') return;
+            if (!payload || !payload.action) return;
+            if (payload.action === 'volume') return;
+            if (PopoutController.isConnected && PopoutController.isConnected()) {
+                if (payload.action === 'time' && typeof payload.time === 'number') {
+                    YTPlayer.setUiTimeOverride?.(payload.time);
+                    return;
+                }
+                if (payload.action === 'play') {
+                    _popoutMirrorPlaying = true;
+                    if (typeof payload.time === 'number') YTPlayer.setUiTimeOverride?.(payload.time);
+                    syncPlayerChromeUi();
+                    return;
+                }
+                if (payload.action === 'pause') {
+                    _popoutMirrorPlaying = false;
+                    if (typeof payload.time === 'number') YTPlayer.setUiTimeOverride?.(payload.time);
+                    syncPlayerChromeUi();
+                    return;
+                }
+                if (payload.action === 'seek' && typeof payload.time === 'number') {
+                    YTPlayer.seekTo?.(payload.time, { fromPopout: true });
+                    return;
+                }
+            }
             if (YTPlayer.mirrorRemotePlayback) YTPlayer.mirrorRemotePlayback(payload);
         });
 
         YTPlayer.setCommandListener((type, payload) => {
             if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
+            // Con popout activo el motor principal está muteado: ignorar play/pause/seek espurios del iframe.
+            if (type === 'play' || type === 'pause' || type === 'seek') return;
             switch (type) {
                 case 'mediaLoaded':
                     if (payload?.kind === 'liveCapture') break;
                     if (payload && payload.kind === 'youtube') {
                         PopoutController.notifyMediaLoaded({ kind: 'youtube', id: payload.id });
-                    } else if (payload && payload.kind === 'local' && payload.file) {
-                        PopoutController.notifyMediaLoaded({ kind: 'local', file: payload.file });
-                    }
-                    break;
-                case 'play':
-                    PopoutController.notifyPlay();
-                    break;
-                case 'pause':
-                    PopoutController.notifyPause();
-                    break;
-                case 'seek':
-                    if (payload && typeof payload.seconds === 'number') {
-                        PopoutController.notifySeek(payload.seconds);
+                    } else if (payload && payload.kind === 'local') {
+                        _pushLocalMediaToPopout();
                     }
                     break;
                 case 'speed':
@@ -829,9 +878,22 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 PopoutController.close();
             });
         }
+        PopoutController.setRailNavHandler((direction) => {
+            if (AppState.get('mode') !== 'view') return;
+            if (direction !== 'prev' && direction !== 'next') return;
+            navigateToClipAndPlay(direction);
+            syncFullscreenClipRail();
+        });
+
         PopoutController.onActiveChange((active) => {
             if (pill) pill.hidden = !active;
+            syncFullscreenClipRail();
             if (active) {
+                _pushLocalMediaToPopout();
+                window.setTimeout(() => syncFullscreenClipRail(), 600);
+                window.setTimeout(() => syncFullscreenClipRail(), 1800);
+                window.setTimeout(() => _pushLocalMediaToPopout(), 400);
+                _popoutMirrorPlaying = YTPlayer.isPlaying ? !!YTPlayer.isPlaying() : false;
                 if (_mainAudioBeforePopout === null) {
                     _mainAudioBeforePopout = {
                         muted: YTPlayer.isMuted ? !!YTPlayer.isMuted() : false,
@@ -839,7 +901,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     };
                 }
                 if (YTPlayer.mute) YTPlayer.mute();
-            } else if (_mainAudioBeforePopout) {
+            } else {
+                _popoutMirrorPlaying = false;
+                YTPlayer.setUiTimeOverride?.(null);
+            }
+            if (!active && _mainAudioBeforePopout) {
                 if (typeof _mainAudioBeforePopout.volume === 'number' && YTPlayer.setVolume) {
                     YTPlayer.setVolume(_mainAudioBeforePopout.volume);
                 }
@@ -903,104 +969,146 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
     }
 
-    function toQualityLabel(quality) {
-        const key = String(quality || 'auto');
-        return YT_QUALITY_LABELS[key] || key.toUpperCase();
-    }
-
-    function closePlayerQualityMenu() {
-        _playerChromeQualityMenuOpen = false;
-        const menu = $('#player-chrome-quality-menu');
-        const btn = $('#player-chrome-quality-btn');
-        if (menu) menu.classList.add('hidden');
-        if (btn) btn.setAttribute('aria-expanded', 'false');
-    }
-
-    function syncPlayerQualityMenuUi({ forceRebuild = false } = {}) {
-        const wrap = $('#player-chrome-quality');
-        const menu = $('#player-chrome-quality-menu');
-        const label = $('#player-chrome-quality-label');
-        const btn = $('#player-chrome-quality-btn');
-        if (!wrap || !menu || !label || !btn) return;
-
+    function syncPlayerYtNativeBtnUi() {
+        const nativeBtn = $('#player-chrome-yt-native');
+        if (!nativeBtn) return;
         const source = typeof YTPlayer.getSourceType === 'function' ? YTPlayer.getSourceType() : null;
         const isYoutube = source === 'youtube';
         const nativeOn = typeof YTPlayer.isYoutubeNativeControlsEnabled === 'function'
             ? !!YTPlayer.isYoutubeNativeControlsEnabled()
             : false;
-        const nativeBtn = $('#player-chrome-yt-native');
-        if (nativeBtn) {
-            nativeBtn.style.display = isYoutube ? '' : 'none';
-            if (!isYoutube) {
-                nativeBtn.setAttribute('aria-pressed', 'false');
-                nativeBtn.classList.remove('player-chrome__btn--primary');
-            } else {
-                nativeBtn.setAttribute('aria-pressed', nativeOn ? 'true' : 'false');
-                nativeBtn.classList.toggle('player-chrome__btn--primary', nativeOn);
-                nativeBtn.textContent = nativeOn ? 'YT ON' : 'YT';
-                nativeBtn.title = nativeOn
-                    ? 'Desactivar controles nativos de YouTube'
-                    : 'Activar controles nativos de YouTube';
-                nativeBtn.disabled = _nativeControlsToggleBusy;
-            }
-        }
-
-        if (!isYoutube || nativeOn || typeof YTPlayer.getAvailableQualities !== 'function') {
-            wrap.classList.add('hidden');
-            closePlayerQualityMenu();
+        nativeBtn.style.display = isYoutube ? '' : 'none';
+        if (!isYoutube) {
+            nativeBtn.setAttribute('aria-pressed', 'false');
+            nativeBtn.classList.remove('player-chrome__btn--primary');
             return;
         }
-        wrap.classList.remove('hidden');
-
-        const requested = (typeof YTPlayer.getPreferredPlaybackQuality === 'function' && YTPlayer.getPreferredPlaybackQuality()) || 'auto';
-        const current = (typeof YTPlayer.getPlaybackQuality === 'function' && YTPlayer.getPlaybackQuality()) || 'auto';
-        label.textContent = toQualityLabel(requested);
-        btn.title = requested === current
-            ? `Calidad: ${toQualityLabel(requested)}`
-            : `Calidad pedida: ${toQualityLabel(requested)} · actual: ${toQualityLabel(current)}`;
-
-        const rawLevels = YTPlayer.getAvailableQualities() || [];
-        const levels = ['auto', ...rawLevels.filter((q) => q && q !== 'auto')];
-        const signature = levels.join('|');
-        if (forceRebuild || menu.dataset.signature !== signature) {
-            menu.dataset.signature = signature;
-            menu.innerHTML = levels.map((q) => (
-                `<button type="button" class="player-chrome__quality-item" data-quality="${q}" role="menuitem">${toQualityLabel(q)}</button>`
-            )).join('');
-        }
-        menu.querySelectorAll('.player-chrome__quality-item').forEach((item) => {
-            item.classList.toggle('is-active', item.dataset.quality === requested);
-        });
-        menu.classList.toggle('hidden', !_playerChromeQualityMenuOpen);
-        btn.setAttribute('aria-expanded', _playerChromeQualityMenuOpen ? 'true' : 'false');
-    }
-
-    function verifyAppliedQuality(requestedQuality) {
-        const requested = String(requestedQuality || 'auto');
-        window.setTimeout(() => {
-            if (typeof YTPlayer.getSourceType === 'function' && YTPlayer.getSourceType() !== 'youtube') return;
-            const actual = (typeof YTPlayer.getPlaybackQuality === 'function' && YTPlayer.getPlaybackQuality()) || 'auto';
-            const reqLabel = toQualityLabel(requested);
-            const actualLabel = toQualityLabel(actual);
-            if (requested === 'auto') {
-                UI.toast(`Calidad en automático (${actualLabel})`, 'info');
-                return;
-            }
-            if (actual === requested) {
-                UI.toast(`Calidad aplicada: ${actualLabel}`, 'success');
-                return;
-            }
-            UI.toast(`YouTube mantiene ${actualLabel} (pedida: ${reqLabel})`, 'info');
-        }, 1200);
+        nativeBtn.setAttribute('aria-pressed', nativeOn ? 'true' : 'false');
+        nativeBtn.classList.toggle('player-chrome__btn--primary', nativeOn);
+        nativeBtn.textContent = nativeOn ? 'YT ON' : 'YT';
+        nativeBtn.title = nativeOn
+            ? 'Desactivar controles nativos de YouTube'
+            : 'Activar controles nativos de YouTube (calidad, velocidad, etc.)';
+        nativeBtn.disabled = _nativeControlsToggleBusy;
     }
 
     function getPlayerContainer() {
         return $('#player-container');
     }
 
+    const PSEUDO_FS_CLASS = 'player-container--pseudo-fs';
+
+    function getNativeFullscreenElement() {
+        return document.fullscreenElement || document.webkitFullscreenElement || null;
+    }
+
+    function isPseudoPlayerFullscreen(container) {
+        return !!(container && container.classList.contains(PSEUDO_FS_CLASS));
+    }
+
+    function isCoarsePointerDevice() {
+        return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    }
+
     function isPlayerFullscreen() {
         const container = getPlayerContainer();
-        return !!(container && document.fullscreenElement === container);
+        if (!container) return false;
+        return getNativeFullscreenElement() === container || isPseudoPlayerFullscreen(container);
+    }
+
+    async function requestNativePlayerFullscreen(container) {
+        const fn = container.requestFullscreen || container.webkitRequestFullscreen;
+        if (typeof fn !== 'function') return false;
+        await fn.call(container);
+        return true;
+    }
+
+    async function exitNativePlayerFullscreen() {
+        const el = getNativeFullscreenElement();
+        if (!el) return;
+        const fn = document.exitFullscreen || document.webkitExitFullscreen;
+        if (typeof fn === 'function') await fn.call(document);
+    }
+
+    function enterPseudoPlayerFullscreen(container) {
+        container.classList.add(PSEUDO_FS_CLASS);
+        document.documentElement.classList.add('sr-player-fs-active');
+    }
+
+    function exitPseudoPlayerFullscreen(container) {
+        container.classList.remove(PSEUDO_FS_CLASS);
+        document.documentElement.classList.remove('sr-player-fs-active');
+    }
+
+    function tryIosLocalVideoFullscreen(container) {
+        const video = container.querySelector(
+            'video:not(#live-preview-video):not(#live-replay-video)'
+        );
+        if (video && typeof video.webkitEnterFullscreen === 'function') {
+            try {
+                video.webkitEnterFullscreen();
+                return true;
+            } catch (_) { /* noop */ }
+        }
+        return false;
+    }
+
+    async function enterPlayerFullscreen() {
+        const container = getPlayerContainer();
+        if (!container) return false;
+
+        if (typeof YTPlayer?.getSourceType === 'function' && YTPlayer.getSourceType() === 'local') {
+            if (tryIosLocalVideoFullscreen(container)) return true;
+        }
+
+        if (isCoarsePointerDevice()) {
+            enterPseudoPlayerFullscreen(container);
+            requestAnimationFrame(focusPlayerSurfaceForKeys);
+            return true;
+        }
+
+        try {
+            await requestNativePlayerFullscreen(container);
+            requestAnimationFrame(focusPlayerSurfaceForKeys);
+            return true;
+        } catch (_) {
+            enterPseudoPlayerFullscreen(container);
+            requestAnimationFrame(focusPlayerSurfaceForKeys);
+            return true;
+        }
+    }
+
+    async function exitPlayerFullscreen() {
+        const container = getPlayerContainer();
+        if (!container) return;
+        if (isPseudoPlayerFullscreen(container)) {
+            exitPseudoPlayerFullscreen(container);
+        } else {
+            try {
+                await exitNativePlayerFullscreen();
+            } catch (_) { /* noop */ }
+        }
+        syncPlayerChromeUi();
+        syncFullscreenClipRail();
+    }
+
+    async function togglePlayerFullscreen() {
+        if (isPlayerFullscreen()) {
+            await exitPlayerFullscreen();
+        } else {
+            const ok = await enterPlayerFullscreen();
+            if (!ok) UI.toast('No se pudo activar pantalla completa', 'error');
+        }
+    }
+
+    function onPlayerFullscreenChange() {
+        syncPlayerChromeUi();
+        syncFullscreenClipRail();
+        if (isPlayerFullscreen()) {
+            requestAnimationFrame(focusPlayerSurfaceForKeys);
+        } else if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive?.()) {
+            DrawingTool.close();
+        }
     }
 
     /** Evita que Space/flechas queden atrapadas en botones o controles nativos tras fullscreen. */
@@ -1116,27 +1224,92 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
     }
 
+    function isPopoutPlayerConnected() {
+        return !!(PopoutController && PopoutController.isConnected && PopoutController.isConnected());
+    }
+
+    function closePopoutPlayer() {
+        if (!PopoutController || typeof PopoutController.isActive !== 'function') return;
+        if (!PopoutController.isActive()) return;
+        PopoutController.close();
+    }
+
+    function shouldShowClipRail() {
+        if (AppState.get('mode') !== 'view') return false;
+        if (!AppState.get('currentGameId') && !AppState.get('activeCollection')) return false;
+        return isPlayerFullscreen() || isPopoutPlayerConnected();
+    }
+
+    function buildClipRailPopoutPayload(ctx) {
+        return {
+            show: true,
+            collapsed: isFullscreenClipRailCollapsed(),
+            prevLine: ctx.prev
+                ? `Anterior — ${clipRailLabel(ctx.prev)} — ${clipRailTimeRange(ctx.prev)}`
+                : null,
+            currentLine: ctx.current
+                ? `Actual — ${clipRailLabel(ctx.current)} — ${clipRailTimeRange(ctx.current)}`
+                : 'Actual — —',
+            nextLine: ctx.next
+                ? `Siguiente — ${clipRailLabel(ctx.next)} — ${clipRailTimeRange(ctx.next)}`
+                : null,
+            count: ctx.total > 0 ? `${ctx.idx + 1} / ${ctx.total}` : '',
+            prevDisabled: !ctx.prev,
+            nextDisabled: !ctx.next,
+        };
+    }
+
+    function pushClipRailToPopout(payload) {
+        if (!isPopoutPlayerConnected() || !PopoutController.notifyRail) return;
+        try {
+            PopoutController.notifyRail(payload);
+        } catch (_) {
+            /* noop */
+        }
+    }
+
+    function openPresentationDraw() {
+        if (typeof DrawingTool === 'undefined' || !DrawingTool.openPresentation) return;
+        const clip = AppState.getCurrentClip();
+        DrawingTool.openPresentation(null, clip?.id || null);
+    }
+
+    function syncHeaderDrawMenu() {
+        const btn = $('#btn-header-draw');
+        const railDraw = $('#fullscreen-clip-rail-draw');
+        const inView = AppState.get('mode') === 'view';
+        const hasProject = !!AppState.get('currentGameId') || !!AppState.get('activeCollection');
+        if (btn) btn.style.display = inView && hasProject ? '' : 'none';
+        if (railDraw) railDraw.style.display = shouldShowClipRail() ? '' : 'none';
+    }
+
     function syncFullscreenClipRail() {
         const rail = $('#fullscreen-clip-rail');
         if (!rail) return;
         setFullscreenClipRailCollapsed(isFullscreenClipRailCollapsed());
-        const show =
-            AppState.get('mode') === 'view' &&
-            isPlayerFullscreen() &&
-            (!!AppState.get('currentGameId') || !!AppState.get('activeCollection'));
+
+        const show = shouldShowClipRail();
         if (!show) {
             rail.classList.add('hidden');
             rail.hidden = true;
+            pushClipRailToPopout({ show: false });
             return;
         }
         const ctx = getFullscreenRailContext();
         if (!ctx.total) {
             rail.classList.add('hidden');
             rail.hidden = true;
+            pushClipRailToPopout({ show: false });
             return;
         }
-        rail.classList.remove('hidden');
-        rail.hidden = false;
+
+        if (isPlayerFullscreen()) {
+            rail.classList.remove('hidden');
+            rail.hidden = false;
+        } else {
+            rail.classList.add('hidden');
+            rail.hidden = true;
+        }
 
         const prevBtn = rail.querySelector('[data-rail-dir="prev"]');
         const nextBtn = rail.querySelector('[data-rail-dir="next"]');
@@ -1152,6 +1325,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (countEl) {
             countEl.textContent = ctx.total > 0 ? `${ctx.idx + 1} / ${ctx.total}` : '';
         }
+
+        pushClipRailToPopout(buildClipRailPopoutPayload(ctx));
+        syncHeaderDrawMenu();
     }
 
     function wireFullscreenClipRail() {
@@ -1164,6 +1340,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             ev.preventDefault();
             ev.stopPropagation();
             setFullscreenClipRailCollapsed(!rail.classList.contains('is-collapsed'));
+            syncFullscreenClipRail();
+        });
+
+        $('#fullscreen-clip-rail-draw')?.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            openPresentationDraw();
         });
 
         rail.addEventListener('mousedown', (ev) => ev.stopPropagation());
@@ -1194,7 +1377,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         playGroup?.classList.remove('hidden');
         const playBtn = $('#player-chrome-play');
         if (playBtn) {
-            const playing = YTPlayer.isPlaying();
+            const playing = isPopoutPlayerConnected()
+                ? _popoutMirrorPlaying
+                : YTPlayer.isPlaying();
             playBtn.innerHTML = playing
                 ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h4v12H7zM13 6h4v12h-4z" fill="currentColor"/></svg>'
                 : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>';
@@ -1214,17 +1399,23 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
 
         const canNavigateClips = AppState.get('mode') === 'view';
+        const viewClipNav = canNavigateClips && !!AppState.get('currentClipId');
+        const seekStepSec = getSeekStep(false);
         const btnBack = $('#player-chrome-seek-back');
         const btnFwd = $('#player-chrome-seek-fwd');
         if (btnBack) {
             btnBack.disabled = !canNavigateClips;
             btnBack.setAttribute('aria-disabled', (!canNavigateClips).toString());
-            btnBack.title = canNavigateClips ? 'Clip anterior' : 'Disponible en modo Ver';
+            btnBack.title = canNavigateClips
+                ? (viewClipNav ? 'Clip anterior' : `Retroceder ${seekStepSec} s`)
+                : 'Disponible en modo Ver';
         }
         if (btnFwd) {
             btnFwd.disabled = !canNavigateClips;
             btnFwd.setAttribute('aria-disabled', (!canNavigateClips).toString());
-            btnFwd.title = canNavigateClips ? 'Siguiente clip' : 'Disponible en modo Ver';
+            btnFwd.title = canNavigateClips
+                ? (viewClipNav ? 'Siguiente clip' : `Avanzar ${seekStepSec} s`)
+                : 'Disponible en modo Ver';
         }
 
         const fullscreenBtn = $('#player-chrome-fullscreen');
@@ -1234,7 +1425,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const isViewMode = mode === 'view';
             fullscreenBtn.style.display = isViewMode ? '' : 'none';
             if (container) {
-                const isFullscreen = document.fullscreenElement === container;
+                const isFullscreen = isPlayerFullscreen();
                 fullscreenBtn.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
                 fullscreenBtn.setAttribute('aria-label', isFullscreen ? 'Salir de pantalla completa' : 'Entrar en pantalla completa');
                 fullscreenBtn.title = isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa';
@@ -1244,7 +1435,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
         }
 
-        syncPlayerQualityMenuUi();
+        syncPlayerYtNativeBtnUi();
         syncFullscreenClipRail();
     }
 
@@ -1667,13 +1858,37 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const navigateClipFromChrome = (dir) => {
             if (AppState.get('mode') !== 'view') return;
             if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
-            navigateToClipAndPlay(dir < 0 ? 'prev' : 'next');
+            if (AppState.get('currentClipId')) {
+                navigateToClipAndPlay(dir < 0 ? 'prev' : 'next');
+                return;
+            }
+            const t = YTPlayer.getCurrentTime() || 0;
+            const step = getSeekStep(false);
+            const dur = (YTPlayer.getDuration && YTPlayer.getDuration()) || 0;
+            if (dir < 0) {
+                YTPlayer.seekTo(Math.max(0, t - step));
+            } else {
+                const next = dur > 0 ? Math.min(dur, t + step) : t + step;
+                YTPlayer.seekTo(next);
+            }
+            showPlayerSeekFeedback(dir, step);
         };
 
         $('#player-chrome-seek-back')?.addEventListener('click', () => navigateClipFromChrome(-1));
         $('#player-chrome-seek-fwd')?.addEventListener('click', () => navigateClipFromChrome(1));
 
         $('#player-chrome-play')?.addEventListener('click', () => {
+            if (isPopoutPlayerConnected()) {
+                if (_popoutMirrorPlaying) {
+                    PopoutController.notifyPause();
+                    _popoutMirrorPlaying = false;
+                } else {
+                    PopoutController.notifyPlay();
+                    _popoutMirrorPlaying = true;
+                }
+                syncPlayerChromeUi();
+                return;
+            }
             if (typeof DrawingTool !== 'undefined' && DrawingTool.hasPlaybackOverlays()) {
                 DrawingTool.dismissPlaybackOverlays();
                 YTPlayer.play();
@@ -1683,26 +1898,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             syncPlayerChromeUi();
         });
 
-        $('#player-chrome-quality-btn')?.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            _playerChromeQualityMenuOpen = !_playerChromeQualityMenuOpen;
-            syncPlayerQualityMenuUi();
-        });
-
-        $('#player-chrome-quality-menu')?.addEventListener('click', (ev) => {
-            const btn = ev.target.closest('.player-chrome__quality-item');
-            if (!btn) return;
-            const quality = btn.dataset.quality;
-            const changed = typeof YTPlayer.setPlaybackQuality === 'function' && YTPlayer.setPlaybackQuality(quality);
-            if (!changed) {
-                UI.toast('No se pudo cambiar la calidad', 'error');
-                return;
-            }
-            closePlayerQualityMenu();
-            syncPlayerQualityMenuUi({ forceRebuild: false });
-            verifyAppliedQuality(quality);
-        });
-
         $('#player-chrome-yt-native')?.addEventListener('click', async () => {
             if (typeof YTPlayer.setYoutubeNativeControlsEnabled !== 'function') return;
             if (_nativeControlsToggleBusy) return;
@@ -1710,7 +1905,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 ? !!YTPlayer.isYoutubeNativeControlsEnabled()
                 : false;
             _nativeControlsToggleBusy = true;
-            syncPlayerQualityMenuUi();
+            syncPlayerYtNativeBtnUi();
             const ok = await YTPlayer.setYoutubeNativeControlsEnabled(!current);
             _nativeControlsToggleBusy = false;
             syncPlayerChromeUi();
@@ -1727,40 +1922,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             syncPlayerChromeUi();
         });
 
-        $('#player-chrome-fullscreen')?.addEventListener('click', async () => {
-            const container = getPlayerContainer();
-            if (!container) return;
-            try {
-                if (document.fullscreenElement === container) {
-                    await document.exitFullscreen();
-                } else if (!document.fullscreenElement) {
-                    await container.requestFullscreen();
-                } else {
-                    await document.exitFullscreen();
-                    await container.requestFullscreen();
-                }
-            } catch (_) {
-                UI.toast('No se pudo activar pantalla completa', 'error');
-            }
-            syncPlayerChromeUi();
-            if (isPlayerFullscreen()) {
-                requestAnimationFrame(focusPlayerSurfaceForKeys);
-            }
+        $('#player-chrome-fullscreen')?.addEventListener('click', () => {
+            togglePlayerFullscreen();
         });
 
-        document.addEventListener('fullscreenchange', () => {
-            syncPlayerChromeUi();
-            syncFullscreenClipRail();
-            if (isPlayerFullscreen()) {
-                requestAnimationFrame(focusPlayerSurfaceForKeys);
-            }
-        });
-        document.addEventListener('click', (ev) => {
-            const qualityWrap = $('#player-chrome-quality');
-            if (!qualityWrap || qualityWrap.contains(ev.target)) return;
-            closePlayerQualityMenu();
-        });
-
+        document.addEventListener('fullscreenchange', onPlayerFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onPlayerFullscreenChange);
         setInterval(syncPlayerChromeUi, 450);
     }
 
@@ -1886,6 +2053,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 }
                 openMenu();
             } else closeMenu();
+        });
+
+        $('#btn-header-draw')?.addEventListener('click', () => {
+            closeMenu();
+            openPresentationDraw();
         });
 
         menu.addEventListener('click', (ev) => {
@@ -2184,6 +2356,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     });
 
     window.addEventListener('beforeunload', (e) => {
+        closePopoutPlayer();
         if (hasUnsavedChanges) {
             e.preventDefault();
             e.returnValue = '';
@@ -2211,6 +2384,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         updateLiveEdgeButton();
         syncLiveCaptureAnalyzeDock();
         syncFullscreenClipRail();
+        syncHeaderDrawMenu();
     });
 
     AppState.on('featuresChanged', () => {
@@ -2294,6 +2468,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     });
 
     AppState.on('gameChanged', (game) => {
+        closePopoutPlayer();
         resetLiveProbe();
         try {
             DrawingTool.dismissDrawingPreview?.();
@@ -2322,7 +2497,15 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         syncAnalyzeLiveCaptureTabVisibility();
         if (game) {
             if (game.local_video_url) {
-                YTPlayer.loadLocalVideo(game.local_video_url);
+                YTPlayer.loadLocalVideo(game.local_video_url, AppState.getLocalVideoFile?.());
+                if (!AppState.getLocalVideoFile?.()) {
+                    _hydrateLocalVideoFileFromUrl(game.local_video_url).then((file) => {
+                        if (file) {
+                            YTPlayer.loadLocalVideo(game.local_video_url, file);
+                            _pushLocalMediaToPopout();
+                        }
+                    });
+                }
             } else if (game.youtube_video_id) {
                 YTPlayer.loadVideo(game.youtube_video_id);
             } else if (game.video_source === 'liveCapture') {
@@ -2332,6 +2515,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
         setTimeout(updateLiveEdgeButton, 400);
         setTimeout(syncPlayerChromeUi, 0);
+        syncHeaderDrawMenu();
     });
 
     AppState.on('clipChanged', (clip) => {
@@ -2829,12 +3013,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         UI.toast(`Proyecto creado: ${title}`, 'success');
         UI.refreshAll();
-
         if (localVideoUrl) {
-            YTPlayer.loadLocalVideo(localVideoUrl, _localVideoFileForCurrentGame);
             AppState.setLocalVideoFile(_localVideoFileForCurrentGame);
-        } else if (ytId) {
-            YTPlayer.loadVideo(ytId);
         }
     });
 
@@ -3939,14 +4119,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                         FirebaseData.addProjectLocally(p.id, false);
                         UI.toast('Proyecto cargado ✅', 'success');
                         UI.refreshAll();
-                        const game = AppState.getCurrentGame();
-                        if (game) {
-                            if (game.local_video_url) {
-                                YTPlayer.loadLocalVideo(game.local_video_url);
-                            } else if (game.youtube_video_id) {
-                                YTPlayer.loadVideo(game.youtube_video_id);
-                            }
-                        }
                         const url = FirebaseData.getShareUrl(p.id);
                         window.history.replaceState({}, '', url);
                     } else {
@@ -4565,8 +4737,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
         }
 
-        // Arrow keys: navigate clips (View mode). Flechas solas = clip anterior/siguiente;
-        // Shift+flecha (u otros atajos de seekLeftFast/seekRightFast) = salto de tiempo como en Análisis.
+        // Arrow keys (View mode). Con clip activo: flechas = clip anterior/siguiente.
+        // Sin clip (partido completo): flechas = salto de tiempo. Shift+flecha = salto rápido.
         if (mode === 'view') {
             if (isFrameStepShortcut(e) && typeof YTPlayer !== 'undefined' && YTPlayer.seekTo) {
                 e.preventDefault();
@@ -4599,14 +4771,31 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 showPlayerSeekFeedback(1, step);
                 return;
             }
+            const hasActiveClip = !!AppState.get('currentClipId');
             if (e.key === 'ArrowLeft' && !e.shiftKey) {
                 e.preventDefault();
-                navigateToClipAndPlay('prev');
+                if (hasActiveClip) {
+                    navigateToClipAndPlay('prev');
+                } else if (typeof YTPlayer !== 'undefined' && YTPlayer.seekTo) {
+                    const t = YTPlayer.getCurrentTime();
+                    const step = getSeekStep(false);
+                    YTPlayer.seekTo(Math.max(0, t - step));
+                    showPlayerSeekFeedback(-1, step);
+                }
                 return;
             }
             if (e.key === 'ArrowRight' && !e.shiftKey) {
                 e.preventDefault();
-                navigateToClipAndPlay('next');
+                if (hasActiveClip) {
+                    navigateToClipAndPlay('next');
+                } else if (typeof YTPlayer !== 'undefined' && YTPlayer.seekTo) {
+                    const t = YTPlayer.getCurrentTime();
+                    const step = getSeekStep(false);
+                    const dur = (YTPlayer.getDuration && YTPlayer.getDuration()) || 0;
+                    const next = dur > 0 ? Math.min(dur, t + step) : t + step;
+                    YTPlayer.seekTo(next);
+                    showPlayerSeekFeedback(1, step);
+                }
                 return;
             }
 
@@ -4627,8 +4816,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
         }
 
-        // Escape: close modals or exit focus (modal-buttonboards ya se manejó arriba)
+        // Escape: salir de pantalla completa, modals o focus view
         if (e.key === 'Escape') {
+            if (isPlayerFullscreen()) {
+                e.preventDefault();
+                exitPlayerFullscreen();
+                return;
+            }
             document.querySelectorAll('.modal:not(.hidden)').forEach(m => m.classList.add('hidden'));
             if (AppState.get('focusView')) {
                 AppState.toggleFocusView();
@@ -5407,15 +5601,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     }
                 }
 
-                const game = AppState.getCurrentGame();
-                if (game) {
-                    if (game.local_video_url) {
-                        YTPlayer.loadLocalVideo(game.local_video_url);
-                    } else if (game.youtube_video_id) {
-                        YTPlayer.loadVideo(game.youtube_video_id);
-                    }
-                }
-
                 // Determine read-only mode:
                 // 1. Explicit ?mode=view in URL, OR
                 // 2. Project has an editKey but the URL doesn't carry a matching one
@@ -5505,6 +5690,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         wireAutoSaveLoop();
         syncAutoSaveMenuState();
         syncHeaderProFeatureStates();
+        syncHeaderDrawMenu();
         setInterval(updateLiveEdgeButton, 1000);
     }
 

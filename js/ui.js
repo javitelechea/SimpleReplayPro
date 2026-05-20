@@ -1179,16 +1179,13 @@ export const UI = (() => {
             }
 
             el.addEventListener('click', (e) => {
-                console.log('CLIP CLICKED ALIVE', clip.id, e.target);
                 if (e.target.classList.contains('clip-checkbox')) return;
                 if (e.target.closest('.clip-action-btn')) return;
                 if (e.target.closest('.clip-action-icon')) return;
                 if (e.target.classList.contains('drag-handle')) return;
 
-                // Play first, then update state (which triggers a re-render)
+                AppState.setCurrentClip(clip.id);
                 YTPlayer.playClip(clip.start_sec, clip.end_sec);
-                // Slight delay to ensure player sync doesn't clear the active state
-                setTimeout(() => AppState.setCurrentClip(clip.id), 20);
                 
                 if (activePlaylistId) {
                     DrawingTool.startPlaybackWatch(activePlaylistId, clip.id);
@@ -2311,7 +2308,11 @@ export const UI = (() => {
         }
         else if (btn.id === 'btn-clip-draw') {
             if (document.body.classList.contains('read-only-mode')) {
-                UI.toast('Solo lectura: no se puede dibujar.', 'error');
+                if (typeof DrawingTool.openPresentation === 'function') {
+                    DrawingTool.openPresentation(null, clipId);
+                } else {
+                    UI.toast('Solo lectura: no se puede dibujar.', 'error');
+                }
                 return;
             }
             const scopeId = getChatScopePlaylistId();
