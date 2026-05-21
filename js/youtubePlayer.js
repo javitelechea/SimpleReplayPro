@@ -287,6 +287,7 @@ export const YTPlayer = (() => {
         }
         if (_popoutActive()) {
             _popoutBridge.notifyPlay?.();
+            try { _engine().play(); } catch (_) { /* noop */ }
             return;
         }
         _engine().play();
@@ -296,6 +297,7 @@ export const YTPlayer = (() => {
         if (!_ready || !_engine()) return;
         if (_popoutActive()) {
             _popoutBridge.notifyPause?.();
+            try { _engine().pause(); } catch (_) { /* noop */ }
             return;
         }
         _engine().pause();
@@ -347,9 +349,10 @@ export const YTPlayer = (() => {
         }
         if (_popoutActive()) {
             _uiTimeOverride = startSec;
-            _seekEngineSilently(startSec);
+            _engine().seekTo(startSec);
             _popoutBridge.notifySeek?.(startSec);
             _popoutBridge.notifyPlay?.();
+            try { _engine().play(); } catch (_) { /* noop */ }
             return;
         }
         _engine().seekTo(startSec);

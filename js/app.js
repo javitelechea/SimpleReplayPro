@@ -872,27 +872,33 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         PopoutController.setMirrorHandler((payload) => {
             if (!payload || !payload.action) return;
             if (payload.action === 'volume') return;
-            if (PopoutController.isConnected && PopoutController.isConnected()) {
-                if (payload.action === 'time' && typeof payload.time === 'number') {
-                    YTPlayer.setUiTimeOverride?.(payload.time);
-                    return;
+            if (payload.action === 'time' && typeof payload.time === 'number') {
+                YTPlayer.setUiTimeOverride?.(payload.time);
+                if (isPopoutPlayerConnected()) {
+                    const mainT = YTPlayer.getCurrentTime?.() || 0;
+                    if (Math.abs(mainT - payload.time) > 0.6) {
+                        YTPlayer.seekTo?.(payload.time, { fromPopout: true });
+                    }
                 }
-                if (payload.action === 'play') {
-                    _popoutMirrorPlaying = true;
-                    if (typeof payload.time === 'number') YTPlayer.setUiTimeOverride?.(payload.time);
-                    syncPlayerChromeUi();
-                    return;
-                }
-                if (payload.action === 'pause') {
-                    _popoutMirrorPlaying = false;
-                    if (typeof payload.time === 'number') YTPlayer.setUiTimeOverride?.(payload.time);
-                    syncPlayerChromeUi();
-                    return;
-                }
-                if (payload.action === 'seek' && typeof payload.time === 'number') {
-                    YTPlayer.seekTo?.(payload.time, { fromPopout: true });
-                    return;
-                }
+                return;
+            }
+            if (payload.action === 'play') {
+                _popoutMirrorPlaying = true;
+                if (typeof payload.time === 'number') YTPlayer.setUiTimeOverride?.(payload.time);
+                if (YTPlayer.mirrorRemotePlayback) YTPlayer.mirrorRemotePlayback(payload);
+                syncPlayerChromeUi();
+                return;
+            }
+            if (payload.action === 'pause') {
+                _popoutMirrorPlaying = false;
+                if (typeof payload.time === 'number') YTPlayer.setUiTimeOverride?.(payload.time);
+                if (YTPlayer.mirrorRemotePlayback) YTPlayer.mirrorRemotePlayback(payload);
+                syncPlayerChromeUi();
+                return;
+            }
+            if (payload.action === 'seek' && typeof payload.time === 'number') {
+                YTPlayer.seekTo?.(payload.time, { fromPopout: true });
+                return;
             }
             if (YTPlayer.mirrorRemotePlayback) YTPlayer.mirrorRemotePlayback(payload);
         });
@@ -2219,13 +2225,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         $('#player-chrome-play')?.addEventListener('click', () => {
             if (isPopoutPlayerConnected()) {
-                if (_popoutMirrorPlaying) {
-                    PopoutController.notifyPause();
-                    _popoutMirrorPlaying = false;
-                } else {
-                    PopoutController.notifyPlay();
-                    _popoutMirrorPlaying = true;
-                }
+                YTPlayer.togglePlay();
+                _popoutMirrorPlaying = YTPlayer.isPlaying ? !!YTPlayer.isPlaying() : false;
                 syncPlayerChromeUi();
                 return;
             }
