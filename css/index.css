@@ -4774,21 +4774,23 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
 
 .drawing-toolbar {
   position: absolute;
-  top: 10px;
+  top: 8px;
   left: 50%;
-  transform: translateX(-50%) translateY(-20px);
+  transform: translateX(-50%) translateY(-12px);
   z-index: 30;
   display: flex;
-  gap: 12px;
-  background: rgba(22, 25, 34, 0.9);
-  backdrop-filter: blur(8px);
-  padding: 8px 16px;
-  border-radius: var(--r-xl);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
+  align-items: center;
+  gap: 6px;
+  background: rgba(12, 14, 20, 0.48);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
   opacity: 0;
   pointer-events: none;
-  transition: all var(--tr-normal);
+  transition: opacity var(--tr-normal), transform var(--tr-normal);
 }
 
 .drawing-toolbar.active {
@@ -4798,10 +4800,10 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
 }
 
 .draw-toolbar-presentation-hint {
-  font-size: 0.72rem;
-  color: rgba(232, 234, 240, 0.75);
+  font-size: 0.65rem;
+  color: rgba(232, 234, 240, 0.62);
   white-space: nowrap;
-  padding: 0 4px;
+  padding: 0 2px;
 }
 
 .draw-toolbar-presentation-hint.hidden {
@@ -4809,15 +4811,16 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
 }
 
 .draw-toolbar-close-btn {
-  min-width: 32px;
-  min-height: 32px;
-  font-size: 1rem;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  font-size: 0.85rem;
   line-height: 1;
-  color: rgba(232, 234, 240, 0.92);
+  color: rgba(232, 234, 240, 0.78);
 }
 
 .draw-toolbar-close-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .drawing-toolbar.presentation-mode .draw-toolbar-close-btn {
@@ -4848,60 +4851,75 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
 .draw-toolbar-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
 }
 
 .draw-toolbar-group:not(:last-child)::after {
   content: '';
   width: 1px;
-  height: 24px;
-  background: var(--border);
-  margin-left: 6px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  margin-left: 3px;
+}
+
+.drawing-toolbar .btn-xs {
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  min-height: 22px;
 }
 
 .draw-color-swatch {
-  width: 24px;
-  height: 24px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   cursor: pointer;
-  border: 2px solid transparent;
+  border: 1.5px solid transparent;
   transition: transform var(--tr-fast), border-color var(--tr-fast);
 }
 
 .draw-color-swatch:hover {
-  transform: scale(1.15);
+  transform: scale(1.1);
 }
 
 .draw-color-swatch.active {
-  border-color: #fff;
-  transform: scale(1.15);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.1);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.35);
 }
 
 .draw-tool-btn {
-  padding: 4px;
-  border-radius: var(--r-sm);
+  padding: 2px;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: transparent;
+}
+
+.draw-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .draw-tool-icon {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   display: block;
-  opacity: 0.92;
+  opacity: 0.88;
 }
 
 .draw-tool-btn.active {
-  background: var(--bg-active);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
 .draw-size-slider {
-  width: 60px;
+  width: 44px;
+  height: 3px;
   accent-color: var(--accent);
   cursor: pointer;
+  opacity: 0.85;
 }
 
 /* Preview desde el chat: mismo criterio que .drawing-auto-overlay — fondo transparente.
@@ -4955,28 +4973,39 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
 /* Description input inside drawing toolbar */
 .draw-description-input {
   font-family: inherit;
-  font-size: 0.75rem;
-  padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--r-sm);
-  color: #fff;
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.92);
   outline: none;
-  width: 180px;
-  transition: border-color var(--tr-fast);
+  width: 140px;
+  transition: border-color var(--tr-fast), background var(--tr-fast);
 }
 
 .draw-author-input {
-  width: 130px;
+  width: 96px;
 }
 
 .draw-description-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .draw-description-input:focus {
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.drawing-toolbar [data-action="draw-save"] {
+  padding: 2px 8px;
+  font-size: 0.68rem;
+}
+
+.drawing-toolbar [data-action="draw-clear"] {
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 2px 4px;
 }
 
 /* Auto-show drawing overlays (during playback) */
