@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════ */
 
 import { VideoPlayer } from './VideoPlayer.js';
+import { readLocalFileForPopout } from './popoutMediaShare.js';
 
 const CHANNEL_NAME = 'simplereplay-popout';
 const RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
@@ -53,6 +54,9 @@ function _localFileFromPayload(payload) {
 function _mediaKey(payload) {
     if (!payload || typeof payload !== 'object') return '';
     if (payload.kind === 'youtube' && payload.id) return `yt:${payload.id}`;
+    if (payload.kind === 'local-opfs' && payload.shareId) {
+        return `opfs:${payload.shareId}:${payload.name || ''}:${payload.size || 0}`;
+    }
     if (payload.kind === 'local') {
         if (payload.buffer instanceof ArrayBuffer) {
             return `local:buf:${payload.buffer.byteLength}:${payload.name || ''}:${payload.type || ''}`;
@@ -109,6 +113,25 @@ async function loadMedia(payload) {
     if (_currentObjectUrl) {
         try { URL.revokeObjectURL(_currentObjectUrl); } catch (_) { /* noop */ }
         _currentObjectUrl = null;
+    }
+
+    if (payload.kind === 'local-opfs') {
+        showStatus('Cargando video local…', 8000);
+        try {
+            const file = await readLocalFileForPopout(payload);
+            const url = URL.createObjectURL(file);
+            _currentObjectUrl = url;
+            await player.loadVideo({ type: 'local', url });
+            _hasMedia = true;
+            _currentMediaKey = key;
+            _snapVolFromPlayer();
+            hideEmpty();
+            showStatus('Video local cargado');
+        } catch (e) {
+            console.warn('[Popout] OPFS read:', e?.message || e);
+            showStatus('No se pudo cargar el video (OPFS)', 4000);
+        }
+        return;
     }
 
     if (payload.kind === 'youtube' && payload.id) {

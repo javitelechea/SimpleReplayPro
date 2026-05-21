@@ -17,6 +17,10 @@ import { toMillis } from './access.js';
 import { ButtonboardTemplates } from './buttonboardTemplates.js';
 import { createSessionGuard } from './sessionGuard.js';
 import { PopoutController } from './popoutController.js';
+import {
+    canUsePopoutMediaShare,
+    writeLocalFileForPopout,
+} from './popoutMediaShare.js';
 import { LiveCaptureFacade } from './livecapture/LiveCaptureFacade.js';
 import {
     startLiveRecording,
@@ -774,18 +778,48 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         return file;
     }
 
-    /** ArrayBuffer: la ventana popout no puede usar blob: de la app principal. */
+    let _popoutLocalPayloadCache = null;
+    let _popoutLocalPushPromise = null;
+
+    /** OPFS compartido (mismo origin): evita arrayBuffer gigante que traba la app. */
     async function _buildLocalPopoutPayload(file) {
         if (!file) return null;
+        const gameId = AppState.get('currentGameId') || 'local';
+        const cacheKey = `${gameId}:${file.size}:${file.lastModified}:${file.name}`;
+        if (_popoutLocalPayloadCache?.key === cacheKey) {
+            return _popoutLocalPayloadCache.payload;
+        }
+
+        if (canUsePopoutMediaShare()) {
+            try {
+                const meta = await writeLocalFileForPopout(file, gameId);
+                const payload = { kind: 'local-opfs', ...meta };
+                _popoutLocalPayloadCache = { key: cacheKey, payload };
+                return payload;
+            } catch (e) {
+                console.warn('[Popout] OPFS share falló:', e?.message || e);
+            }
+        }
+
+        const maxInline = 8 * 1024 * 1024;
+        if (file.size > maxInline) {
+            UI.toast(
+                'El video es muy grande para el player externo sin OPFS. Usá Chrome/Edge actualizado.',
+                'error'
+            );
+            return null;
+        }
         try {
             const buffer = await file.arrayBuffer();
-            return {
+            const payload = {
                 kind: 'local',
                 buffer,
                 name: file.name || 'video.mp4',
                 type: file.type || 'video/mp4',
                 size: file.size,
             };
+            _popoutLocalPayloadCache = { key: cacheKey, payload };
+            return payload;
         } catch (e) {
             console.warn('[Popout] no se pudo leer el archivo local:', e?.message || e);
             return null;
@@ -793,17 +827,23 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     }
 
     async function _pushLocalMediaToPopout() {
-        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
-        if (!media || media.kind !== 'local') return;
-        const file = await _resolveLocalFileForPopoutAsync();
-        if (!file) {
-            UI.toast('No se encontró el archivo de video local para el player externo', 'error');
-            return;
-        }
-        const payload = await _buildLocalPopoutPayload(file);
-        if (!payload) return;
-        if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
-        PopoutController.notifyMediaLoaded(payload);
+        if (_popoutLocalPushPromise) return _popoutLocalPushPromise;
+        _popoutLocalPushPromise = (async () => {
+            const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+            if (!media || media.kind !== 'local') return;
+            const file = await _resolveLocalFileForPopoutAsync();
+            if (!file) {
+                UI.toast('No se encontró el archivo de video local para el player externo', 'error');
+                return;
+            }
+            const payload = await _buildLocalPopoutPayload(file);
+            if (!payload) return;
+            if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
+            PopoutController.notifyMediaLoaded(payload);
+        })().finally(() => {
+            _popoutLocalPushPromise = null;
+        });
+        return _popoutLocalPushPromise;
     }
 
     function _popoutGetSnapshot() {
@@ -828,6 +868,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const base = _popoutGetSnapshot();
         const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
         if (!media || media.kind !== 'local') return base;
+        if (_popoutLocalPushPromise) await _popoutLocalPushPromise;
+        if (_popoutLocalPayloadCache?.payload) {
+            return { ...base, media: _popoutLocalPayloadCache.payload };
+        }
         const file = await _resolveLocalFileForPopoutAsync();
         if (!file) return base;
         const localPayload = await _buildLocalPopoutPayload(file);
@@ -930,8 +974,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             syncFullscreenClipRail();
             if (active) {
                 void _pushLocalMediaToPopout();
-                window.setTimeout(() => void _pushLocalMediaToPopout(), 400);
-                window.setTimeout(() => void _pushLocalMediaToPopout(), 1200);
+                window.setTimeout(() => void _pushLocalMediaToPopout(), 800);
                 window.setTimeout(() => syncFullscreenClipRail(), 600);
                 window.setTimeout(() => syncFullscreenClipRail(), 1800);
                 _popoutMirrorPlaying = YTPlayer.isPlaying ? !!YTPlayer.isPlaying() : false;
