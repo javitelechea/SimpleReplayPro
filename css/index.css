@@ -60,6 +60,13 @@
   /* Layout */
   --header-h: 56px;
   --panel-w: 340px;
+  --app-vh: 100dvh;
+}
+
+@supports not (height: 100dvh) {
+  :root {
+    --app-vh: 100vh;
+  }
 }
 
 /* ── Reset ── */
@@ -75,6 +82,9 @@ html {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  height: var(--app-vh);
+  overflow: hidden;
 }
 
 body {
@@ -82,8 +92,11 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   overflow: hidden;
-  height: 100vh;
-  width: 100vw;
+  width: 100%;
+  max-width: 100vw;
+  height: var(--app-vh);
+  min-height: var(--app-vh);
+  max-height: var(--app-vh);
 }
 
 button {
@@ -1267,7 +1280,9 @@ body.collection-only-mode .mode-slider {
    ═══════════════════════════════════════════ */
 #app-main {
   display: flex;
-  height: calc(100vh - var(--header-h));
+  height: calc(var(--app-vh) - var(--header-h));
+  min-height: 0;
+  max-height: calc(var(--app-vh) - var(--header-h));
   overflow: hidden;
 }
 
@@ -5165,31 +5180,29 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
 }
 
 /* ═══════════════════════════════════════════
-   MOBILE RESPONSIVENESS
+   MOBILE + TABLET (iPad, teléfonos)
    ═══════════════════════════════════════════ */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   :root {
-    --mobile-header-h: 52px;
-    --mobile-video-h: min(34dvh, calc(100vw * 9 / 16));
-  }
-  html {
-    height: auto;
+    --mobile-header-h: calc(52px + env(safe-area-inset-top, 0px));
+    --mobile-stack-h: calc(var(--app-vh) - var(--mobile-header-h) - env(safe-area-inset-bottom, 0px));
+    --mobile-video-h: min(38dvh, calc(var(--mobile-stack-h) * 0.44), calc(100vw * 9 / 16));
   }
 
   html,
   body {
     width: 100%;
     max-width: 100%;
-    overflow-x: hidden;
+    height: var(--app-vh);
+    min-height: var(--app-vh);
+    max-height: var(--app-vh);
+    overflow: hidden;
   }
 
-  /* Mobile app layout: header + video fixed; internal panel scroll only */
+  /* App apilada: header + video fijos; panel con scroll interno */
   body {
-    height: 100dvh;
-    min-height: 100dvh;
-    max-height: 100dvh;
-    overflow: hidden;
     -webkit-overflow-scrolling: auto;
+    overscroll-behavior: none;
   }
 
   #app-header,
@@ -5200,8 +5213,8 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
 
   /* Header adjustments */
   #app-header {
-    height: 52px;
-    padding: 0 8px;
+    padding-left: 8px;
+    padding-right: 8px;
     gap: 6px;
   }
 
@@ -5265,9 +5278,13 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     display: none !important;
   }
 
-  /* Modo Ver: sin timeline ni barra inferior (hueco tipo chat) */
+  /* Modo Ver: más espacio al video (sin timeline ni tag-bar) */
   body.mode-view {
-    --mobile-video-h: min(56dvh, calc(100vw * 9 / 16));
+    --mobile-video-h: min(50dvh, calc(var(--mobile-stack-h) * 0.52), calc(100vw * 9 / 16));
+  }
+
+  body.mode-analyze {
+    --mobile-video-h: min(42dvh, calc(var(--mobile-stack-h) * 0.46), calc(100vw * 9 / 16));
   }
 
   body.mode-view #custom-timeline,
@@ -5288,9 +5305,10 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
 
   #app-main {
     flex-direction: column;
-    height: 100dvh;
-    min-height: 100dvh;
-    max-height: 100dvh;
+    box-sizing: border-box;
+    height: var(--app-vh);
+    min-height: 0;
+    max-height: var(--app-vh);
     overflow: hidden;
     padding-top: calc(var(--mobile-header-h) + var(--mobile-video-h));
   }
@@ -5302,6 +5320,8 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     right: 0;
     z-index: 3100;
     height: var(--mobile-header-h);
+    padding-top: env(safe-area-inset-top, 0px);
+    box-sizing: border-box;
   }
 
   #video-area {
@@ -5314,6 +5334,8 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     min-width: 0;
     height: var(--mobile-video-h);
     max-height: var(--mobile-video-h);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
   }
 
@@ -5336,7 +5358,7 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     top: calc(var(--mobile-header-h) + var(--mobile-video-h));
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
     z-index: 2900;
     width: 100% !important;
     min-width: 0 !important;

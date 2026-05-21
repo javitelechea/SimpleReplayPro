@@ -360,7 +360,9 @@ export class VideoPlayer {
         if (this.type === 'youtube' && this.player && this.player.playVideo) {
             this.player.playVideo();
         } else if (this.type === 'local' && this.player) {
-            this.player.play();
+            if (this.player.readyState < 1) return;
+            const p = this.player.play();
+            if (p && typeof p.catch === 'function') p.catch(() => { /* sin fuente válida */ });
         }
     }
 

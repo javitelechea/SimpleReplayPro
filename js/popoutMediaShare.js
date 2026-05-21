@@ -53,6 +53,20 @@ export function buildLocalFilePopoutPayload(file) {
         file,
         name: file.name || 'video.mp4',
         type: file.type || 'video/mp4',
+        size: file.size,
+    };
+}
+
+/** Fallback si el File no se puede clonar entre ventanas (p. ej. Safari). */
+export async function buildLocalBufferPopoutPayload(file) {
+    if (!file || !file.size) return null;
+    const buffer = await file.arrayBuffer();
+    return {
+        kind: 'local-buffer',
+        buffer,
+        name: file.name || 'video.mp4',
+        type: file.type || 'video/mp4',
+        size: file.size,
     };
 }
 

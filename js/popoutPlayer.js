@@ -52,7 +52,15 @@ function _isBlobLikeFile(obj) {
 }
 
 function _localFileFromPayload(payload) {
-    if (!payload || payload.kind !== 'local') return null;
+    if (!payload) return null;
+    if (payload.kind === 'local-buffer' && payload.buffer instanceof ArrayBuffer && payload.buffer.byteLength > 0) {
+        return new File(
+            [payload.buffer],
+            payload.name || 'video.mp4',
+            { type: payload.type || 'video/mp4' }
+        );
+    }
+    if (payload.kind !== 'local') return null;
     if (_isBlobLikeFile(payload.file)) return payload.file;
     if (payload.buffer instanceof ArrayBuffer && payload.buffer.byteLength > 0) {
         return new File(
@@ -69,6 +77,9 @@ function _mediaKey(payload) {
     if (payload.kind === 'youtube' && payload.id) return `yt:${payload.id}`;
     if (payload.kind === 'local-opfs' && payload.shareId) {
         return `opfs:${payload.shareId}:${payload.name || ''}:${payload.size || 0}`;
+    }
+    if (payload.kind === 'local-buffer' && payload.buffer instanceof ArrayBuffer) {
+        return `local:buf:${payload.buffer.byteLength}:${payload.name || ''}:${payload.type || ''}`;
     }
     if (payload.kind === 'local') {
         if (payload.buffer instanceof ArrayBuffer) {
@@ -221,7 +232,7 @@ async function loadMedia(payload) {
         return;
     }
 
-    if (payload.kind === 'local') {
+    if (payload.kind === 'local' || payload.kind === 'local-buffer') {
         const file = _localFileFromPayload(payload);
         if (!file) {
             showStatus('Video local: datos no recibidos', 2500);
@@ -229,7 +240,15 @@ async function loadMedia(payload) {
         }
         const url = URL.createObjectURL(file);
         _currentObjectUrl = url;
-        await player.loadVideo({ type: 'local', url });
+        try {
+            await player.loadVideo({ type: 'local', url });
+        } catch (e) {
+            console.warn('[Popout] load local:', e?.message || e);
+            try { URL.revokeObjectURL(url); } catch (_) { /* noop */ }
+            _currentObjectUrl = null;
+            showStatus('No se pudo cargar el video local en el player externo', 5000);
+            return;
+        }
         _hasMedia = true;
         _currentMediaKey = key;
         _snapVolFromPlayer();

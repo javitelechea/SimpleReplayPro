@@ -17,7 +17,7 @@ import { toMillis } from './access.js';
 import { ButtonboardTemplates } from './buttonboardTemplates.js';
 import { createSessionGuard } from './sessionGuard.js';
 import { PopoutController } from './popoutController.js';
-import { buildLocalFilePopoutPayload } from './popoutMediaShare.js';
+import { buildLocalFilePopoutPayload, buildLocalBufferPopoutPayload } from './popoutMediaShare.js';
 import { LiveCaptureFacade } from './livecapture/LiveCaptureFacade.js';
 import {
     startLiveRecording,
@@ -43,6 +43,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     let latestUserDoc = null;
     let authMenuWired = false;
     let _localVideoFileForCurrentGame = null;
+    let _mainLocalObjectUrl = null;
     let _mainAudioBeforePopout = null;
     let _popoutMirrorPlaying = false;
     /** Ref para crear proyecto «Captura» antes de que existan otros puntos de entrada. */
@@ -749,38 +750,78 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         return null;
     }
 
-    async function _hydrateLocalVideoFileFromUrl(url) {
-        if (!url || AppState.getLocalVideoFile?.()) return AppState.getLocalVideoFile();
+    function _revokeMainLocalObjectUrl() {
+        if (!_mainLocalObjectUrl) return;
+        try { URL.revokeObjectURL(_mainLocalObjectUrl); } catch (_) { /* noop */ }
+        _mainLocalObjectUrl = null;
+    }
+
+    function _objectUrlFromFile(file) {
+        if (!file?.size) return null;
+        _revokeMainLocalObjectUrl();
+        _mainLocalObjectUrl = URL.createObjectURL(file);
+        return _mainLocalObjectUrl;
+    }
+
+    async function _blobUrlStillReadable(url) {
+        if (!url || !String(url).startsWith('blob:')) return false;
         try {
-            const blob = await fetch(url).then((r) => {
-                if (!r.ok) throw new Error('fetch failed');
-                return r.blob();
-            });
-            const file = new File([blob], 'local-video', { type: blob.type || 'video/mp4' });
-            AppState.setLocalVideoFile(file);
-            return file;
+            const r = await fetch(url);
+            return r.ok;
         } catch (_) {
-            return null;
+            return false;
         }
+    }
+
+    /** Asegura File + blob URL válidos en esta pestaña (los blob guardados en Firebase caducan al recargar). */
+    async function ensureLocalVideoReady(game) {
+        if (!game) return { url: null, file: null };
+
+        let file = AppState.getLocalVideoFile?.() || _localVideoFileForCurrentGame || null;
+        if (file?.size) {
+            const url = _objectUrlFromFile(file);
+            game.local_video_url = url;
+            AppState.setLocalVideoFile(file);
+            _localVideoFileForCurrentGame = file;
+            return { url, file };
+        }
+
+        const stored = game.local_video_url;
+        if (stored && (await _blobUrlStillReadable(stored))) {
+            try {
+                const blob = await fetch(stored).then((r) => r.blob());
+                file = new File([blob], 'local-video.mp4', { type: blob.type || 'video/mp4' });
+                AppState.setLocalVideoFile(file);
+                _localVideoFileForCurrentGame = file;
+                const url = _objectUrlFromFile(file);
+                game.local_video_url = url;
+                return { url, file };
+            } catch (_) { /* noop */ }
+        }
+
+        game.local_video_url = null;
+        return { url: null, file: null };
+    }
+
+    async function _hydrateLocalVideoFileFromUrl(url) {
+        const game = AppState.getCurrentGame();
+        const ready = await ensureLocalVideoReady(game || { local_video_url: url });
+        return ready.file;
     }
 
     async function _resolveLocalFileForPopoutAsync() {
         let file = _resolveLocalFileForPopout();
-        if (file) return file;
-        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
-        const url = media?.url || AppState.getCurrentGame()?.local_video_url || '';
-        if (!url) return null;
-        file = await _hydrateLocalVideoFileFromUrl(url);
-        if (file && url) YTPlayer.loadLocalVideo(url, file);
-        return file;
+        if (file?.size) return file;
+        const game = AppState.getCurrentGame();
+        if (!game) return null;
+        const ready = await ensureLocalVideoReady(game);
+        if (ready.url && ready.file) {
+            YTPlayer.loadLocalVideo(ready.url, ready.file);
+        }
+        return ready.file;
     }
 
     let _popoutMediaReady = false;
-
-    async function _buildLocalPopoutPayload() {
-        const file = await _resolveLocalFileForPopoutAsync();
-        return buildLocalFilePopoutPayload(file);
-    }
 
     function _postLocalPayloadToPopupWin(payload) {
         const win = PopoutController.getPopupWindow?.();
@@ -794,14 +835,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
     }
 
-    async function _pushLocalMediaToPopout() {
-        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
-        if (!media || media.kind !== 'local') return;
-        const payload = await _buildLocalPopoutPayload();
-        if (!payload) {
-            console.warn('[Popout] No se encontró el archivo de video local');
-            return;
-        }
+    function _deliverLocalPayloadToPopout(payload) {
+        if (!payload) return false;
         let delivered = false;
         if (PopoutController.isConnected && PopoutController.isConnected()) {
             try {
@@ -813,6 +848,27 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
         if (!delivered) {
             delivered = _postLocalPayloadToPopupWin(payload);
+        }
+        return delivered;
+    }
+
+    async function _pushLocalMediaToPopout() {
+        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+        if (!media || media.kind !== 'local') return;
+        const file = await _resolveLocalFileForPopoutAsync();
+        if (!file?.size) {
+            console.warn('[Popout] No se encontró el archivo de video local');
+            return;
+        }
+        let payload = buildLocalFilePopoutPayload(file);
+        let delivered = _deliverLocalPayloadToPopout(payload);
+        if (!delivered) {
+            try {
+                payload = await buildLocalBufferPopoutPayload(file);
+                delivered = _deliverLocalPayloadToPopout(payload);
+            } catch (e) {
+                console.warn('[Popout] buffer fallback:', e?.message || e);
+            }
         }
         if (delivered) _popoutMediaReady = true;
     }
@@ -1002,13 +1058,20 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
             if (t !== 'sr-popout-request-media' || !ev.source) return;
             void (async () => {
-                const payload = await _buildLocalPopoutPayload();
-                if (!payload) return;
+                const file = await _resolveLocalFileForPopoutAsync();
+                if (!file?.size) return;
+                let payload = buildLocalFilePopoutPayload(file);
                 try {
                     ev.source.postMessage({ type: 'sr-popout-media', payload }, ev.origin);
                     _popoutMediaReady = true;
                 } catch (e) {
-                    console.warn('[Popout] respuesta request-media:', e?.message || e);
+                    try {
+                        payload = await buildLocalBufferPopoutPayload(file);
+                        ev.source.postMessage({ type: 'sr-popout-media', payload }, ev.origin);
+                        _popoutMediaReady = true;
+                    } catch (e2) {
+                        console.warn('[Popout] respuesta request-media:', e2?.message || e2);
+                    }
                 }
             })();
         });
@@ -2882,23 +2945,25 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         UI.updateClipEditControls();
         syncAnalyzeLiveCaptureTabVisibility();
         if (game) {
-            if (game.local_video_url) {
-                YTPlayer.loadLocalVideo(game.local_video_url, AppState.getLocalVideoFile?.());
-                if (AppState.getLocalVideoFile?.()) {
-                    void _pushLocalMediaToPopout();
-                } else {
-                    _hydrateLocalVideoFileFromUrl(game.local_video_url).then((file) => {
-                        if (file) {
-                            YTPlayer.loadLocalVideo(game.local_video_url, file);
-                            void _pushLocalMediaToPopout();
-                        }
-                    });
-                }
+            if (game.local_video_url || AppState.getLocalVideoFile?.() || _localVideoFileForCurrentGame) {
+                void (async () => {
+                    const { url, file } = await ensureLocalVideoReady(game);
+                    if (url && file) {
+                        YTPlayer.loadLocalVideo(url, file);
+                        void _pushLocalMediaToPopout();
+                    } else if (game.local_video_url) {
+                        UI.toast('Volvé a vincular el video local (Menú → Vincular video).', 'warning');
+                    }
+                })();
             } else if (game.youtube_video_id) {
+                _revokeMainLocalObjectUrl();
                 YTPlayer.loadVideo(game.youtube_video_id);
             } else if (game.video_source === 'liveCapture') {
+                _revokeMainLocalObjectUrl();
                 const sid = `lc-${game.id}-${Date.now()}`;
                 YTPlayer.loadLiveCapture?.({ sessionId: sid });
+            } else {
+                _revokeMainLocalObjectUrl();
             }
         }
         setTimeout(updateLiveEdgeButton, 400);
@@ -3417,7 +3482,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         inputRelink.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const url = URL.createObjectURL(file);
+            const url = _objectUrlFromFile(file);
             const game = AppState.getCurrentGame();
             if (game) {
                 game.local_video_url = url;
