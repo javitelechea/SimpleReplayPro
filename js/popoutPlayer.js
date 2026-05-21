@@ -9,6 +9,11 @@ import {
     peekStagedPopoutDescriptor,
     readLocalFileForPopout,
 } from './popoutMediaShare.js';
+import {
+    paintLinePreview,
+    paintPenPreview,
+    paintStrokeList,
+} from './drawingMirror.js';
 
 const CHANNEL_NAME = 'simplereplay-popout';
 const RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
@@ -25,8 +30,12 @@ const emptyEl = document.getElementById('popout-empty');
 const statusEl = document.getElementById('popout-status');
 const clipRailEl = document.getElementById('popout-clip-rail');
 const clipRailToggle = document.getElementById('popout-clip-rail-toggle');
+const drawingCanvas = document.getElementById('popout-drawing-canvas');
+const drawingCtx = drawingCanvas ? drawingCanvas.getContext('2d') : null;
 
 let _currentObjectUrl = null;
+let _mirrorStrokes = [];
+let _mirrorPreview = null;
 let _hasMedia = false;
 let _statusTimer = null;
 let _currentMediaKey = '';
@@ -107,6 +116,45 @@ function showStatus(text, ms = 1200) {
 
 function hideEmpty() {
     if (emptyEl) emptyEl.classList.add('hidden');
+}
+
+function resizeDrawingCanvas() {
+    if (!drawingCanvas) return;
+    const stage = document.getElementById('popout-stage');
+    const rect = (stage || drawingCanvas.parentElement)?.getBoundingClientRect();
+    if (!rect?.width || !rect?.height) return;
+    drawingCanvas.width = Math.floor(rect.width);
+    drawingCanvas.height = Math.floor(rect.height);
+    redrawMirrorDrawing();
+}
+
+function redrawMirrorDrawing() {
+    if (!drawingCtx || !drawingCanvas) return;
+    const w = drawingCanvas.width || 1;
+    const h = drawingCanvas.height || 1;
+    drawingCtx.clearRect(0, 0, w, h);
+    paintStrokeList(drawingCtx, _mirrorStrokes, w, h, true);
+    if (_mirrorPreview?.kind === 'line') {
+        paintLinePreview(drawingCtx, _mirrorPreview, w, h);
+    } else if (_mirrorPreview?.kind === 'pen') {
+        paintPenPreview(drawingCtx, _mirrorPreview.stroke, w, h);
+    }
+}
+
+function applyMirrorDrawing(payload) {
+    if (!drawingCanvas || !drawingCtx) return;
+    if (!payload || !payload.active) {
+        _mirrorStrokes = [];
+        _mirrorPreview = null;
+        drawingCanvas.classList.remove('active');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        return;
+    }
+    _mirrorStrokes = Array.isArray(payload.strokes) ? payload.strokes : [];
+    _mirrorPreview = payload.preview || null;
+    resizeDrawingCanvas();
+    drawingCanvas.classList.add('active');
+    redrawMirrorDrawing();
 }
 
 function notifyOpenerHasMedia() {
@@ -305,6 +353,10 @@ channel.addEventListener('message', async (ev) => {
         applyPopoutClipRail(msg.payload);
         return;
     }
+    if (msg.type === 'drawing') {
+        applyMirrorDrawing(msg.payload);
+        return;
+    }
     try {
         switch (msg.type) {
             case 'sync':
@@ -397,6 +449,10 @@ async function bootstrap() {
 }
 
 void bootstrap();
+
+window.addEventListener('resize', () => {
+    if (drawingCanvas?.classList.contains('active')) resizeDrawingCanvas();
+});
 
 setInterval(() => {
     if (!_hasMedia) return;

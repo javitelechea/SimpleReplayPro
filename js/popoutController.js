@@ -252,6 +252,11 @@ export const PopoutController = (() => {
         send('rail', payload);
     }
 
+    function notifyDrawing(payload) {
+        if (!payload || typeof payload !== 'object') return;
+        send('drawing', payload);
+    }
+
     return {
         setProvider,
         setMirrorHandler,
@@ -268,6 +273,7 @@ export const PopoutController = (() => {
         notifySeek,
         notifySpeed,
         notifyVolume,
-        notifyRail
+        notifyRail,
+        notifyDrawing
     };
 })();

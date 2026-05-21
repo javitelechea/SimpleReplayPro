@@ -954,6 +954,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 void _pushLocalMediaToPopout();
                 window.setTimeout(() => void _pushLocalMediaToPopout(), 400);
                 window.setTimeout(() => void _pushLocalMediaToPopout(), 1200);
+                window.setTimeout(() => {
+                    if (typeof DrawingTool !== 'undefined' && DrawingTool.syncPopoutMirror) {
+                        DrawingTool.syncPopoutMirror();
+                    }
+                }, 500);
                 window.setTimeout(() => syncFullscreenClipRail(), 600);
                 window.setTimeout(() => syncFullscreenClipRail(), 1800);
                 _popoutMirrorPlaying = YTPlayer.isPlaying ? !!YTPlayer.isPlaying() : false;
@@ -986,6 +991,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const t = ev.data?.type;
             if (t === 'sr-popout-ready') {
                 void _pushLocalMediaToPopout();
+                if (typeof DrawingTool !== 'undefined' && DrawingTool.syncPopoutMirror) {
+                    DrawingTool.syncPopoutMirror();
+                }
                 return;
             }
             if (t === 'sr-popout-has-media') {
@@ -1217,9 +1225,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (!container) return;
         container.classList.add('sr-fs-controls-visible');
         clearTimeout(container._fsControlsHideTimer);
-        container._fsControlsHideTimer = setTimeout(() => {
-            hideFsControls(container);
-        }, autoHideMs);
+        if (autoHideMs > 0) {
+            container._fsControlsHideTimer = setTimeout(() => {
+                hideFsControls(container);
+            }, autoHideMs);
+        }
     }
 
     function hideFsControls(container) {
@@ -1318,17 +1328,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
     }
 
-    function tryIosLocalVideoFullscreen(container) {
-        const video = container.querySelector(
-            'video:not(#live-preview-video):not(#live-replay-video)'
-        );
-        if (video && typeof video.webkitEnterFullscreen === 'function') {
-            try {
-                video.webkitEnterFullscreen();
-                return true;
-            } catch (_) { /* noop */ }
-        }
-        return false;
+    function isLocalVideoSource() {
+        return typeof YTPlayer?.getSourceType === 'function' && YTPlayer.getSourceType() === 'local';
+    }
+
+    function revealFullscreenOverlays(container, autoHideMs = 8000) {
+        revealFsControls(container, autoHideMs);
+        syncFullscreenClipRail();
     }
 
     async function enterPlayerFullscreen() {
@@ -1337,13 +1343,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         hideAppOverlaysForFullscreen();
 
-        if (typeof YTPlayer?.getSourceType === 'function' && YTPlayer.getSourceType() === 'local') {
-            if (tryIosLocalVideoFullscreen(container)) {
-                onPlayerFullscreenChange();
-                return true;
-            }
-        }
-
         if (isMobileLayout()) {
             setFullscreenClipRailCollapsed(true);
             await ensureAppYoutubeControlsForMobileFs();
@@ -1351,20 +1350,25 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (!isIosDevice()) {
                 await requestDocumentFullscreen();
             }
-            revealFsControls(container, 6000);
+            revealFullscreenOverlays(container, 8000);
             onPlayerFullscreenChange();
             return true;
         }
 
         const nativeOk = await requestNativePlayerFullscreen(container);
         if (nativeOk) {
-            hideFsControls(container);
+            if (isLocalVideoSource()) {
+                revealFullscreenOverlays(container, 0);
+            } else {
+                hideFsControls(container);
+            }
             requestAnimationFrame(focusPlayerSurfaceForKeys);
             onPlayerFullscreenChange();
             return true;
         }
 
         enterPseudoPlayerFullscreen();
+        revealFullscreenOverlays(container, isLocalVideoSource() ? 0 : 8000);
         onPlayerFullscreenChange();
         return true;
     }
@@ -1423,9 +1427,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         syncPlayerChromeUi();
         syncFullscreenClipRail();
         if (shouldUseImmersiveFsControls()) {
-            hideFsControls(getPlayerContainer());
+            if (isLocalVideoSource()) {
+                revealFullscreenOverlays(getPlayerContainer(), 8000);
+            } else {
+                hideFsControls(getPlayerContainer());
+            }
         } else {
             requestAnimationFrame(focusPlayerSurfaceForKeys);
+            if (isLocalVideoSource()) {
+                revealFullscreenOverlays(getPlayerContainer(), 0);
+            }
         }
     }
 
@@ -2285,7 +2296,6 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const canHandleSurfaceGesture = (evTarget) => {
             if (!AppState.get('currentGameId')) return false;
             if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return false;
-            if (typeof YTPlayer.getSourceType === 'function' && YTPlayer.getSourceType() === 'local') return false;
             if (!evTarget) return false;
             if (evTarget.closest('#player-chrome')) return false;
             if (evTarget.closest('#clip-view-toolbar')) return false;
@@ -2294,7 +2304,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (evTarget.closest('#video-chat-panel')) return false;
             if (evTarget.closest('#drawing-preview-overlay')) return false;
             if (evTarget.closest('.drawing-auto-overlay')) return false;
-            if (evTarget.closest('video')) return false;
+            if (evTarget.closest('video')) {
+                if (isLocalVideoSource() && isPlayerFullscreen()) return false;
+                return false;
+            }
             if (evTarget.closest('button, a, input, textarea, select, [role="button"]')) return false;
             if (typeof DrawingTool !== 'undefined' && typeof DrawingTool.isActive === 'function' && DrawingTool.isActive()) return false;
             return true;
@@ -2318,9 +2331,17 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (Date.now() < suppressSingleClickUntil) return;
             // Only primary-button clicks; ignore modified clicks.
             if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return;
+            if (
+                isLocalVideoSource() &&
+                isPlayerFullscreen() &&
+                ev.target.closest('video')
+            ) {
+                revealFullscreenOverlays(container, 8000);
+                return;
+            }
             if (!canHandleSurfaceGesture(ev.target)) return;
             if (shouldUseImmersiveFsControls()) {
-                revealFsControls(container);
+                revealFullscreenOverlays(container, 8000);
             }
             if (typeof YTPlayer === 'undefined' || !YTPlayer.togglePlay) return;
             if (singleClickTimer) clearTimeout(singleClickTimer);
@@ -2349,11 +2370,19 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         });
 
         container.addEventListener('touchend', (ev) => {
-            if (!canHandleSurfaceGesture(ev.target)) return;
             const touch = ev.changedTouches && ev.changedTouches[0];
             if (!touch) return;
+            if (
+                isLocalVideoSource() &&
+                isPlayerFullscreen() &&
+                ev.target.closest('video')
+            ) {
+                revealFullscreenOverlays(container, 8000);
+                return;
+            }
+            if (!canHandleSurfaceGesture(ev.target)) return;
             if (shouldUseImmersiveFsControls()) {
-                revealFsControls(container);
+                revealFullscreenOverlays(container, 8000);
             }
             const now = Date.now();
             const dt = now - lastTapTs;

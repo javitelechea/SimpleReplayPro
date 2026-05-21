@@ -1295,6 +1295,8 @@ body.collection-only-mode .mode-slider {
 }
 
 #youtube-player {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
 }
@@ -1512,14 +1514,19 @@ html.sr-player-fs-active body.read-only-mode #video-area {
   display: none !important;
 }
 
-html.sr-player-fs-active #player-container.sr-fs-controls-visible .fullscreen-clip-rail:not(.hidden) {
+html.sr-player-fs-active #player-container.sr-fs-controls-visible .fullscreen-clip-rail:not(.hidden),
+html.sr-player-fs-active #player-container .fullscreen-clip-rail:not(.hidden) {
   display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 @media (min-width: 769px) {
   #player-container:fullscreen .fullscreen-clip-rail:not(.hidden),
   #player-container:-webkit-full-screen .fullscreen-clip-rail:not(.hidden) {
     display: flex !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
   }
 }
 

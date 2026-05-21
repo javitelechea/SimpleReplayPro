@@ -5,6 +5,8 @@
 
 import { AppState } from './state.js';
 import { YTPlayer } from './youtubePlayer.js';
+import { PopoutController } from './popoutController.js';
+import { normalizeStroke, normalizeStrokeList } from './drawingMirror.js';
 
 export const DrawingTool = (() => {
     'use strict';
@@ -35,6 +37,69 @@ export const DrawingTool = (() => {
     let _watchClipId = null;
     let _watchShownIds = new Set(); // drawing comment IDs already shown this session
     let _presentationMode = false;
+    let _popoutSyncScheduled = false;
+
+    function _popoutDrawingConnected() {
+        return !!(PopoutController && typeof PopoutController.isConnected === 'function' && PopoutController.isConnected());
+    }
+
+    function _buildPopoutPreview() {
+        const w = _canvas?.width || 1;
+        const h = _canvas?.height || 1;
+        if (_lineMode && _lineStart) {
+            const rect = _canvas.getBoundingClientRect();
+            return {
+                kind: 'line',
+                tool: _tool,
+                color: _color,
+                width: _lineWidth,
+                lineStart: { nx: _lineStart.x / w, ny: _lineStart.y / h },
+                point: null,
+            };
+        }
+        if (_currentStroke && _currentStroke.points.length > 0) {
+            return {
+                kind: 'pen',
+                stroke: normalizeStroke(_currentStroke, w, h),
+            };
+        }
+        return null;
+    }
+
+    function _syncDrawingToPopout(previewPoint = null) {
+        if (!_popoutDrawingConnected() || typeof PopoutController.notifyDrawing !== 'function') return;
+        if (!_active) {
+            PopoutController.notifyDrawing({ active: false });
+            return;
+        }
+        if (_popoutSyncScheduled) return;
+        _popoutSyncScheduled = true;
+        requestAnimationFrame(() => {
+            _popoutSyncScheduled = false;
+            if (!_active || !_canvas) return;
+            const w = _canvas.width || 1;
+            const h = _canvas.height || 1;
+            let preview = _buildPopoutPreview();
+            if (preview?.kind === 'line' && previewPoint) {
+                preview = {
+                    ...preview,
+                    point: { nx: previewPoint.x / w, ny: previewPoint.y / h },
+                };
+            }
+            PopoutController.notifyDrawing({
+                active: true,
+                sourceW: w,
+                sourceH: h,
+                strokes: normalizeStrokeList(_strokes, w, h),
+                preview,
+            });
+        });
+    }
+
+    function _clearPopoutDrawing() {
+        if (!_popoutDrawingConnected() || typeof PopoutController.notifyDrawing !== 'function') return;
+        PopoutController.notifyDrawing({ active: false });
+    }
 
     // ── Init (called once on app load) ──
     function init() {
@@ -185,6 +250,7 @@ export const DrawingTool = (() => {
 
         window.addEventListener('resize', _resizeCanvas);
         document.addEventListener('keydown', _onDrawingKeydown, true);
+        _syncDrawingToPopout();
     }
 
     // ── Close drawing mode (no save) ──
@@ -205,6 +271,7 @@ export const DrawingTool = (() => {
         if (descInput) descInput.value = '';
         const authorInput = _toolbar && _toolbar.querySelector('#draw-author');
         if (authorInput) authorInput.value = '';
+        _clearPopoutDrawing();
     }
 
     // ── Save drawing as comment ──
@@ -257,6 +324,7 @@ export const DrawingTool = (() => {
     function clearCanvas() {
         _strokes = [];
         _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
+        _syncDrawingToPopout();
     }
 
     // ── Undo last stroke ──
@@ -316,6 +384,7 @@ export const DrawingTool = (() => {
             }
         });
         _ctx.globalCompositeOperation = 'source-over';
+        _syncDrawingToPopout();
     }
 
     // ── Pointer events ──
@@ -377,6 +446,7 @@ export const DrawingTool = (() => {
                 _ctx.lineTo(x, y);
                 _ctx.stroke();
             }
+            _syncDrawingToPopout({ x, y });
             return;
         }
 
@@ -386,6 +456,7 @@ export const DrawingTool = (() => {
         _ctx.stroke();
         _ctx.beginPath();
         _ctx.moveTo(x, y);
+        _syncDrawingToPopout();
     }
 
     function _onPointerUp(e) {
@@ -413,10 +484,12 @@ export const DrawingTool = (() => {
 
         if (_currentStroke && _currentStroke.points.length > 1) {
             _strokes.push(_currentStroke);
+            _redraw();
         }
         _currentStroke = null;
         _lineMode = false;
         _lineStart = null;
+        _syncDrawingToPopout();
     }
 
     // ── Touch events (mobile/tablet) ──
@@ -598,7 +671,12 @@ export const DrawingTool = (() => {
         });
     }
 
-    return { init, open, openPresentation, close, save, isActive, showDrawingOverlay,
+    function syncPopoutMirror() {
+        if (_active) _syncDrawingToPopout();
+        else _clearPopoutDrawing();
+    }
+
+    return { init, open, openPresentation, close, save, isActive, syncPopoutMirror, showDrawingOverlay,
              startPlaybackWatch, stopPlaybackWatch, hasPlaybackOverlays, dismissPlaybackOverlays,
              dismissDrawingPreview };
 })();
