@@ -14,6 +14,7 @@ import {
     getVideoFrameMetricsFromElement,
     paintLinePreviewInFrame,
     paintPenPreviewInFrame,
+    paintCirclePreviewInFrame,
     paintStrokeListInFrame,
 } from './drawingMirror.js';
 
@@ -180,6 +181,8 @@ function redrawMirrorDrawing() {
     paintStrokeListInFrame(drawingCtx, _mirrorStrokes, frame, _mirrorSourceFrame);
     if (_mirrorPreview?.kind === 'line') {
         paintLinePreviewInFrame(drawingCtx, _mirrorPreview, frame, _mirrorSourceFrame);
+    } else if (_mirrorPreview?.kind === 'circle') {
+        paintCirclePreviewInFrame(drawingCtx, _mirrorPreview, frame, _mirrorSourceFrame);
     } else if (_mirrorPreview?.kind === 'pen') {
         paintPenPreviewInFrame(drawingCtx, _mirrorPreview.stroke, frame, _mirrorSourceFrame);
     }

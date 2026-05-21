@@ -7,14 +7,21 @@ import { AppState } from './state.js';
 import { YTPlayer } from './youtubePlayer.js';
 import { PopoutController } from './popoutController.js';
 import {
+    CIRCLE_FILL_OPACITY,
+    frameScaleFromWidth,
     getVideoFrameMetricsFromElement,
     normalizePointInFrame,
     normalizeStrokeInFrame,
     normalizeStrokeListInFrame,
+    paintOvalBBoxPreview,
+    paintOvalFromPoints,
+    paintStroke,
 } from './drawingMirror.js';
 
 export const DrawingTool = (() => {
     'use strict';
+
+    const OVAL_CLICK_STAMP_THRESHOLD_PX = 10;
 
     let _canvas = null;
     let _ctx = null;
@@ -28,7 +35,7 @@ export const DrawingTool = (() => {
     // Drawing state
     let _color = '#ff3b3b';
     let _lineWidth = 4;
-    let _tool = 'pen'; // 'pen' | 'eraser'
+    let _tool = 'pen'; // 'pen' | 'line' | 'arrow' | 'circle'
     let _strokes = []; // array of stroke objects for undo
     let _currentStroke = null;
 
@@ -53,8 +60,21 @@ export const DrawingTool = (() => {
         return getVideoFrameMetricsFromElement(container);
     }
 
+    function _ovalFrameScale() {
+        return frameScaleFromWidth(_mainVideoFrameMetrics().width);
+    }
+
     function _buildPopoutPreview(frame) {
         if (_lineMode && _lineStart) {
+            if (_tool === 'circle') {
+                return {
+                    kind: 'circle',
+                    color: _color,
+                    fillOpacity: CIRCLE_FILL_OPACITY,
+                    lineStart: normalizePointInFrame(_lineStart.x, _lineStart.y, frame),
+                    point: null,
+                };
+            }
             return {
                 kind: 'line',
                 tool: _tool,
@@ -76,10 +96,16 @@ export const DrawingTool = (() => {
     function _buildDrawingPopoutPayload(previewPoint = null) {
         const frame = _mainVideoFrameMetrics();
         let preview = _buildPopoutPreview(frame);
-        if (preview?.kind === 'line' && previewPoint) {
+        if ((preview?.kind === 'line' || preview?.kind === 'circle') && previewPoint) {
+            let stamp = false;
+            if (preview?.kind === 'circle' && _lineStart) {
+                const dist = Math.hypot(previewPoint.x - _lineStart.x, previewPoint.y - _lineStart.y);
+                stamp = dist < OVAL_CLICK_STAMP_THRESHOLD_PX;
+            }
             preview = {
                 ...preview,
-                point: normalizePointInFrame(previewPoint.x, previewPoint.y, frame),
+                point: stamp ? null : normalizePointInFrame(previewPoint.x, previewPoint.y, frame),
+                stamp,
             };
         }
         return {
@@ -148,31 +174,13 @@ export const DrawingTool = (() => {
 
         // Color swatches
         _toolbar.querySelectorAll('.draw-color-swatch').forEach(swatch => {
-            swatch.addEventListener('click', () => {
-                _color = swatch.dataset.color;
-                // Only switch to pen if coming from eraser; keep line/arrow as-is
-                if (_tool === 'eraser') _tool = 'pen';
-                _updateToolbar();
-            });
+            swatch.addEventListener('click', () => _selectColor(swatch.dataset.color));
         });
 
-        // Eraser
-        _toolbar.querySelector('[data-action="draw-eraser"]').addEventListener('click', () => {
-            _tool = _tool === 'eraser' ? 'pen' : 'eraser';
-            _updateToolbar();
-        });
-
-        // Line
-        _toolbar.querySelector('[data-action="draw-line"]').addEventListener('click', () => {
-            _tool = _tool === 'line' ? 'pen' : 'line';
-            _updateToolbar();
-        });
-
-        // Arrow
-        _toolbar.querySelector('[data-action="draw-arrow"]').addEventListener('click', () => {
-            _tool = _tool === 'arrow' ? 'pen' : 'arrow';
-            _updateToolbar();
-        });
+        _toolbar.querySelector('[data-action="draw-pen"]').addEventListener('click', () => _selectTool('pen'));
+        _toolbar.querySelector('[data-action="draw-line"]').addEventListener('click', () => _selectTool('line'));
+        _toolbar.querySelector('[data-action="draw-arrow"]').addEventListener('click', () => _selectTool('arrow'));
+        _toolbar.querySelector('[data-action="draw-circle"]').addEventListener('click', () => _selectTool('circle'));
 
         // Brush size
         const sizeSlider = _toolbar.querySelector('#draw-size');
@@ -203,11 +211,119 @@ export const DrawingTool = (() => {
         }
     }
 
+    const DRAW_SHORTCUT_COLORS = ['#ff3b3b', '#ffdd00', '#00d26a', '#0099ff', '#ffffff'];
+
+    function _isDrawTextInput(target) {
+        if (!target || typeof target.closest !== 'function') return false;
+        return !!target.closest('#draw-author, #draw-description');
+    }
+
+    function _selectColor(color) {
+        _color = color;
+        _updateToolbar();
+    }
+
+    function _cycleColor() {
+        const idx = DRAW_SHORTCUT_COLORS.indexOf(_color);
+        const next = idx < 0 ? 0 : (idx + 1) % DRAW_SHORTCUT_COLORS.length;
+        _selectColor(DRAW_SHORTCUT_COLORS[next]);
+    }
+
+    function _setTool(tool) {
+        _tool = tool;
+        _updateToolbar();
+    }
+
+    function _selectTool(tool) {
+        if (tool === 'line' || tool === 'arrow' || tool === 'circle') {
+            _tool = _tool === tool ? 'pen' : tool;
+        } else {
+            _tool = 'pen';
+        }
+        _updateToolbar();
+    }
+
+    function _adjustBrushSize(delta) {
+        const sizeSlider = _toolbar && _toolbar.querySelector('#draw-size');
+        const min = sizeSlider ? parseInt(sizeSlider.min, 10) : 2;
+        const max = sizeSlider ? parseInt(sizeSlider.max, 10) : 12;
+        _lineWidth = Math.min(max, Math.max(min, _lineWidth + delta));
+        if (sizeSlider) sizeSlider.value = String(_lineWidth);
+    }
+
     function _onDrawingKeydown(e) {
-        if (!_active || e.key !== 'Escape') return;
-        e.preventDefault();
-        e.stopPropagation();
-        close();
+        if (!_active) return;
+
+        const key = (e.key || '').toLowerCase();
+        const mod = e.metaKey || e.ctrlKey;
+
+        if (_isDrawTextInput(e.target)) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                close();
+                return;
+            }
+            if (mod && (key === 's' || e.key === 'Enter')) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                save();
+                return;
+            }
+            return;
+        }
+
+        let handled = false;
+
+        if (e.key === 'Escape') {
+            close();
+            handled = true;
+        } else if (mod && key === 's') {
+            save();
+            handled = true;
+        } else if (mod && e.key === 'Enter') {
+            save();
+            handled = true;
+        } else if (mod && !e.shiftKey && !e.altKey) {
+            if (key === '1') {
+                _cycleColor();
+                handled = true;
+            } else if (key === '2') {
+                _setTool('pen');
+                handled = true;
+            } else if (key === '3') {
+                _setTool('line');
+                handled = true;
+            } else if (key === '4') {
+                _setTool('arrow');
+                handled = true;
+            } else if (key === '5') {
+                _setTool('circle');
+                handled = true;
+            } else if (key === '6') {
+                undo();
+                handled = true;
+            } else if (key === '7') {
+                clearCanvas();
+                handled = true;
+            }
+        } else if (key === '[') {
+            _adjustBrushSize(-1);
+            handled = true;
+        } else if (key === ']') {
+            _adjustBrushSize(1);
+            handled = true;
+        }
+
+        // Bloquear 1–7 sueltos mientras dibujo activo (evita flags / atajos globales)
+        if (!handled && !mod && !e.shiftKey && !e.altKey && key >= '1' && key <= '7') {
+            handled = true;
+        }
+
+        if (handled) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }
     }
 
     /** Dibujo temporal para presentación (sin guardar en chat/playlist). */
@@ -269,7 +385,6 @@ export const DrawingTool = (() => {
         _applyToolbarMode();
 
         window.addEventListener('resize', _resizeCanvas);
-        document.addEventListener('keydown', _onDrawingKeydown, true);
         _flushDrawingToPopout();
         window.setTimeout(() => _flushDrawingToPopout(), 80);
     }
@@ -284,7 +399,6 @@ export const DrawingTool = (() => {
         _toolbar.classList.remove('presentation-mode');
         _applyToolbarMode();
         window.removeEventListener('resize', _resizeCanvas);
-        document.removeEventListener('keydown', _onDrawingKeydown, true);
         _strokes = [];
         _currentStroke = null;
         // Clear description field
@@ -378,31 +492,10 @@ export const DrawingTool = (() => {
     // ── Redraw all strokes ──
     function _redraw() {
         _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
+        const scale = _ovalFrameScale();
         _strokes.forEach(stroke => {
-            _ctx.beginPath();
-            _ctx.strokeStyle = stroke.color;
-            _ctx.lineWidth = stroke.width;
-            _ctx.lineCap = 'round';
-            _ctx.lineJoin = 'round';
-            _ctx.globalCompositeOperation = stroke.eraser ? 'destination-out' : 'source-over';
-
-            if (stroke.arrow && stroke.points.length >= 2) {
-                // Shorten line so it ends at the arrowhead base, not the tip
-                const from = stroke.points[0];
-                const to = stroke.points[stroke.points.length - 1];
-                const angle = Math.atan2(to.y - from.y, to.x - from.x);
-                const size = Math.max(12, stroke.width * 4);
-                _ctx.moveTo(from.x, from.y);
-                _ctx.lineTo(to.x - size * Math.cos(angle), to.y - size * Math.sin(angle));
-                _ctx.stroke();
-                _drawArrowhead(_ctx, from, to, stroke.color, stroke.width);
-            } else {
-                stroke.points.forEach((pt, i) => {
-                    if (i === 0) _ctx.moveTo(pt.x, pt.y);
-                    else _ctx.lineTo(pt.x, pt.y);
-                });
-                _ctx.stroke();
-            }
+            if (stroke.oval || stroke.circle) stroke._frameScale = scale;
+            paintStroke(_ctx, stroke);
         });
         _ctx.globalCompositeOperation = 'source-over';
         _syncDrawingToPopout();
@@ -416,8 +509,7 @@ export const DrawingTool = (() => {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        if ((e.shiftKey || _tool === 'line' || _tool === 'arrow') && _tool !== 'eraser') {
-            // Straight-line / arrow mode: record start and wait for mouseup
+        if (e.shiftKey || _tool === 'line' || _tool === 'arrow' || _tool === 'circle') {
             _lineMode = true;
             _lineStart = { x, y };
             return;
@@ -425,9 +517,9 @@ export const DrawingTool = (() => {
 
         _lineMode = false;
         _currentStroke = {
-            color: _tool === 'eraser' ? '#000' : _color,
-            width: _tool === 'eraser' ? _lineWidth * 3 : _lineWidth,
-            eraser: _tool === 'eraser',
+            color: _color,
+            width: _lineWidth,
+            eraser: false,
             points: [{ x, y }]
         };
         _ctx.beginPath();
@@ -446,26 +538,50 @@ export const DrawingTool = (() => {
         const y = e.clientY - rect.top;
 
         if (_lineMode && _lineStart) {
-            // Rubber-band preview: redraw saved strokes + temporary line/arrow
             _redraw();
-            _ctx.beginPath();
-            _ctx.strokeStyle = _color;
-            _ctx.lineWidth = _lineWidth;
-            _ctx.lineCap = 'round';
-            _ctx.lineJoin = 'round';
-            _ctx.globalCompositeOperation = 'source-over';
-            if (_tool === 'arrow') {
-                // Shorten preview line to stop at arrowhead base
-                const angle = Math.atan2(y - _lineStart.y, x - _lineStart.x);
-                const size = Math.max(12, _lineWidth * 4);
-                _ctx.moveTo(_lineStart.x, _lineStart.y);
-                _ctx.lineTo(x - size * Math.cos(angle), y - size * Math.sin(angle));
-                _ctx.stroke();
-                _drawArrowhead(_ctx, _lineStart, { x, y }, _color, _lineWidth);
+            if (_tool === 'circle') {
+                const dist = Math.hypot(x - _lineStart.x, y - _lineStart.y);
+                const stamp = dist < OVAL_CLICK_STAMP_THRESHOLD_PX;
+                if (stamp) {
+                    paintOvalFromPoints(
+                        _ctx,
+                        _lineStart,
+                        null,
+                        _color,
+                        CIRCLE_FILL_OPACITY,
+                        _ovalFrameScale(),
+                        true
+                    );
+                } else {
+                    paintOvalBBoxPreview(
+                        _ctx,
+                        _lineStart,
+                        { x, y },
+                        _color,
+                        CIRCLE_FILL_OPACITY,
+                        _ovalFrameScale(),
+                        false
+                    );
+                }
             } else {
-                _ctx.moveTo(_lineStart.x, _lineStart.y);
-                _ctx.lineTo(x, y);
-                _ctx.stroke();
+                _ctx.beginPath();
+                _ctx.strokeStyle = _color;
+                _ctx.lineWidth = _lineWidth;
+                _ctx.lineCap = 'round';
+                _ctx.lineJoin = 'round';
+                _ctx.globalCompositeOperation = 'source-over';
+                if (_tool === 'arrow') {
+                    const angle = Math.atan2(y - _lineStart.y, x - _lineStart.x);
+                    const size = Math.max(12, _lineWidth * 4);
+                    _ctx.moveTo(_lineStart.x, _lineStart.y);
+                    _ctx.lineTo(x - size * Math.cos(angle), y - size * Math.sin(angle));
+                    _ctx.stroke();
+                    _drawArrowhead(_ctx, _lineStart, { x, y }, _color, _lineWidth);
+                } else {
+                    _ctx.moveTo(_lineStart.x, _lineStart.y);
+                    _ctx.lineTo(x, y);
+                    _ctx.stroke();
+                }
             }
             _syncDrawingToPopout({ x, y });
             return;
@@ -489,15 +605,29 @@ export const DrawingTool = (() => {
             const rect = _canvas.getBoundingClientRect();
             const x = (e.clientX ?? _lineStart.x) - rect.left;
             const y = (e.clientY ?? _lineStart.y) - rect.top;
-            const lineStroke = {
-                color: _color,
-                width: _lineWidth,
-                eraser: false,
-                arrow: _tool === 'arrow',
-                points: [_lineStart, { x, y }]
-            };
-            _strokes.push(lineStroke);
-            _redraw();
+            if (_tool === 'circle') {
+                const dist = Math.hypot(x - _lineStart.x, y - _lineStart.y);
+                const stamp = dist < OVAL_CLICK_STAMP_THRESHOLD_PX;
+                _strokes.push({
+                    oval: true,
+                    stamp,
+                    color: _color,
+                    fillOpacity: CIRCLE_FILL_OPACITY,
+                    width: 0,
+                    eraser: false,
+                    points: stamp ? [{ x: _lineStart.x, y: _lineStart.y }] : [_lineStart, { x, y }],
+                });
+                _redraw();
+            } else {
+                _strokes.push({
+                    color: _color,
+                    width: _lineWidth,
+                    eraser: false,
+                    arrow: _tool === 'arrow',
+                    points: [_lineStart, { x, y }],
+                });
+                _redraw();
+            }
             _lineMode = false;
             _lineStart = null;
             return;
@@ -545,14 +675,16 @@ export const DrawingTool = (() => {
     // ── Update toolbar active states ──
     function _updateToolbar() {
         _toolbar.querySelectorAll('.draw-color-swatch').forEach(swatch => {
-            swatch.classList.toggle('active', swatch.dataset.color === _color && _tool === 'pen');
+            swatch.classList.toggle('active', swatch.dataset.color === _color);
         });
-        const eraserBtn = _toolbar.querySelector('[data-action="draw-eraser"]');
-        if (eraserBtn) eraserBtn.classList.toggle('active', _tool === 'eraser');
+        const penBtn = _toolbar.querySelector('[data-action="draw-pen"]');
+        if (penBtn) penBtn.classList.toggle('active', _tool === 'pen');
         const lineBtn = _toolbar.querySelector('[data-action="draw-line"]');
         if (lineBtn) lineBtn.classList.toggle('active', _tool === 'line');
         const arrowBtn = _toolbar.querySelector('[data-action="draw-arrow"]');
         if (arrowBtn) arrowBtn.classList.toggle('active', _tool === 'arrow');
+        const circleBtn = _toolbar.querySelector('[data-action="draw-circle"]');
+        if (circleBtn) circleBtn.classList.toggle('active', _tool === 'circle');
 
         const sizeSlider = _toolbar.querySelector('#draw-size');
         if (sizeSlider) sizeSlider.value = _lineWidth;
@@ -696,6 +828,9 @@ export const DrawingTool = (() => {
         if (_active) _flushDrawingToPopout();
         else _clearPopoutDrawing();
     }
+
+    // Capture antes que app.js: import de drawing.js ocurre al inicio de app.js
+    document.addEventListener('keydown', _onDrawingKeydown, true);
 
     return { init, open, openPresentation, close, save, isActive, syncPopoutMirror, showDrawingOverlay,
              startPlaybackWatch, stopPlaybackWatch, hasPlaybackOverlays, dismissPlaybackOverlays,

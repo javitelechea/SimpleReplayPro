@@ -73,7 +73,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         seekLeftFast: 'Shift+ArrowLeft',
         seekRightFast: 'Shift+ArrowRight',
     };
-    const QUICK_KEYS = ['q', 'w', 'e', 'r', 't', 'y', 'u'];
+    const QUICK_KEYS = ['1', '2', '3', '4', '5', '6', '7'];
     let _quickClipMenuOpen = false;
     let _quickPlaylistPickerOpen = false;
     let _nativeControlsToggleBusy = false;
@@ -230,7 +230,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             return;
         }
         if (!playlists.length) {
-            listEl.innerHTML = '<div class="quick-playlist-help">No hay playlists. Creá una con N.</div>';
+            listEl.innerHTML = '<div class="quick-playlist-help">No hay playlists. Creá una con 0.</div>';
             return;
         }
         listEl.innerHTML = playlists.map((pl, idx) => {
@@ -277,11 +277,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (!clip) return;
         const activePlaylistId = AppState.get('activePlaylistId');
         switch ((k || '').toLowerCase()) {
-            case 'q': AppState.toggleFlag(clip.id, 'bueno'); break;
-            case 'w': AppState.toggleFlag(clip.id, 'acorregir'); break;
-            case 'e': AppState.toggleFlag(clip.id, 'duda'); break;
-            case 'r': AppState.toggleFlag(clip.id, 'importante'); break;
-            case 't': {
+            case '1': AppState.toggleFlag(clip.id, 'bueno'); break;
+            case '2': AppState.toggleFlag(clip.id, 'acorregir'); break;
+            case '3': AppState.toggleFlag(clip.id, 'duda'); break;
+            case '4': AppState.toggleFlag(clip.id, 'importante'); break;
+            case '5': {
                 const text = prompt('Comentario rápido para este clip:');
                 if (!text || !text.trim()) break;
                 const playlists = AppState.get('playlists') || [];
@@ -295,8 +295,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 UI.toast('Comentario agregado', 'success');
                 break;
             }
-            case 'y': toggleQuickPlaylistPicker(); break;
-            case 'u':
+            case '6': toggleQuickPlaylistPicker(); break;
+            case '7':
                 if (confirm('¿Eliminar el último clip?')) {
                     AppState.deleteClip(clip.id);
                     UI.toast('Clip eliminado', 'success');
@@ -311,13 +311,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const menu = $('#quick-clip-menu');
         if (!menu || menu.dataset.wired) return;
         menu.dataset.wired = '1';
-        $('#quick-flag-bueno')?.addEventListener('click', () => quickActionByKey('q'));
-        $('#quick-flag-acorregir')?.addEventListener('click', () => quickActionByKey('w'));
-        $('#quick-flag-duda')?.addEventListener('click', () => quickActionByKey('e'));
-        $('#quick-flag-importante')?.addEventListener('click', () => quickActionByKey('r'));
-        $('#quick-chat')?.addEventListener('click', () => quickActionByKey('t'));
-        $('#quick-playlist')?.addEventListener('click', () => quickActionByKey('y'));
-        $('#quick-delete')?.addEventListener('click', () => quickActionByKey('u'));
+        $('#quick-flag-bueno')?.addEventListener('click', () => quickActionByKey('1'));
+        $('#quick-flag-acorregir')?.addEventListener('click', () => quickActionByKey('2'));
+        $('#quick-flag-duda')?.addEventListener('click', () => quickActionByKey('3'));
+        $('#quick-flag-importante')?.addEventListener('click', () => quickActionByKey('4'));
+        $('#quick-chat')?.addEventListener('click', () => quickActionByKey('5'));
+        $('#quick-playlist')?.addEventListener('click', () => quickActionByKey('6'));
+        $('#quick-delete')?.addEventListener('click', () => quickActionByKey('7'));
         $('#quick-playlist-create-btn')?.addEventListener('click', createQuickPlaylistAndSend);
         $('#quick-playlist-new-name')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -1686,6 +1686,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (typeof DrawingTool === 'undefined' || !DrawingTool.openPresentation) return;
         const clip = AppState.getCurrentClip();
         DrawingTool.openPresentation(null, clip?.id || null);
+    }
+
+    function canOpenClipDrawShortcut() {
+        if (typeof DrawingTool === 'undefined' || !DrawingTool.openPresentation) return false;
+        if (DrawingTool.isActive?.()) return false;
+        return true;
     }
 
     function syncHeaderDrawMenu() {
@@ -5087,7 +5093,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     if (pl) addCurrentQuickClipToPlaylist(pl.id);
                     return;
                 }
-                if (key === 'n') {
+                if (key === '0') {
                     e.preventDefault();
                     const input = $('#quick-playlist-new-name');
                     if (document.activeElement !== input) input?.focus();
@@ -5126,6 +5132,17 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
         // Mientras el editor/modal de ventanas de código está abierto, no ejecutar atajos globales.
         if (isBBModalOpen) return;
+
+        // Cmd/Ctrl + D: dibujar en cualquier modo (siempre consumir «d» de etiquetas)
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (canOpenClipDrawShortcut()) openPresentationDraw();
+            return;
+        }
+
+        // Herramienta de dibujo activa: atajos propios en drawing.js
+        if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive && DrawingTool.isActive()) return;
 
         // Don't handle shortcuts when typing in inputs
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
@@ -5180,13 +5197,15 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 return;
             }
 
-            // Check for tag hotkeys
-            const activeKey = e.key.toLowerCase();
-            const tagBtn = document.querySelector(`.tag-btn[data-hotkey="${activeKey}"]`);
-            if (tagBtn) {
-                e.preventDefault();
-                tagBtn.click();
-                return;
+            // Check for tag hotkeys (solo tecla suelta; no Cmd/Ctrl/Alt + letra)
+            if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+                const activeKey = e.key.toLowerCase();
+                const tagBtn = document.querySelector(`.tag-btn[data-hotkey="${activeKey}"]`);
+                if (tagBtn) {
+                    e.preventDefault();
+                    tagBtn.click();
+                    return;
+                }
             }
         }
 
@@ -5252,9 +5271,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 return;
             }
 
-            // Number keys 1-4: toggle flags
+            // Number keys 1-4: toggle flags (solo tecla suelta; no con dibujo activo ni Cmd/Ctrl)
             const clip = AppState.getCurrentClip();
-            if (clip) {
+            if (clip && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive?.()) return;
                 const flagMap = { '1': 'bueno', '2': 'acorregir', '3': 'duda', '4': 'importante' };
                 if (flagMap[e.key]) {
                     e.preventDefault();

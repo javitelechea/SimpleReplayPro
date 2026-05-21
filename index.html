@@ -90,7 +90,7 @@
           <button id="btn-import-xml" class="header-action-item header-action-item--tool" type="button" title="Importar proyecto desde XML"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M12 4v11M8 11l4 4 4-4M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Importar XML</span></button>
           <div class="header-action-group-label">Reproducción</div>
           <button id="btn-open-popout" class="header-action-item header-action-item--tool" type="button" title="Abrir player en ventana externa"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M14 13l5 5M14 18h5v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Player externo</span></button>
-          <button id="btn-header-draw" class="header-action-item header-action-item--tool" type="button" style="display:none;" title="Dibujar sobre el video (no se guarda)"><span class="header-action-icon" aria-hidden="true">🎨</span><span>Dibujar</span></button>
+          <button id="btn-header-draw" class="header-action-item header-action-item--tool" type="button" style="display:none;" title="Dibujar sobre el video (⌘D, no se guarda)"><span class="header-action-icon" aria-hidden="true">🎨</span><span>Dibujar</span></button>
           <button id="btn-relink-video" class="header-action-item header-action-item--tool" type="button" style="display:none;" title="Re-vincular video local"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M15 7h4v4M9 17H5v-4M19 11a7 7 0 0 0-12-3M5 13a7 7 0 0 0 12 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Vincular video</span></button>
           <div class="header-action-group-label">Sistema</div>
           <button id="btn-toggle-autosave" class="header-action-item header-action-item--tool" type="button" title="Activar auto-guardado"><span class="header-action-icon" aria-hidden="true"><svg class="header-action-svg header-action-svg--tool" viewBox="0 0 24 24" fill="none"><path d="M7 7h8a4 4 0 0 1 4 4v1M17 17H9a4 4 0 0 1-4-4v-1M16 4l3 3-3 3M8 20l-3-3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Auto-guardado</span><span id="autosave-menu-state" class="header-action-state">OFF</span></button>
@@ -157,7 +157,7 @@
         </div>
         <div id="fullscreen-clip-rail" class="fullscreen-clip-rail hidden" hidden aria-label="Cola de clips en pantalla completa">
           <div class="fullscreen-clip-rail__head">
-            <button type="button" id="fullscreen-clip-rail-draw" class="fullscreen-clip-rail__toggle fullscreen-clip-rail__toggle--draw" title="Dibujar (presentación, no se guarda)" aria-label="Dibujar">🎨</button>
+            <button type="button" id="fullscreen-clip-rail-draw" class="fullscreen-clip-rail__toggle fullscreen-clip-rail__toggle--draw" title="Dibujar (⌘D, presentación, no se guarda)" aria-label="Dibujar">🎨</button>
             <button type="button" id="fullscreen-clip-rail-toggle" class="fullscreen-clip-rail__toggle" aria-expanded="true" title="Ocultar cola de clips">
               <span class="fullscreen-clip-rail__toggle-label">Clips</span>
               <span class="fullscreen-clip-rail__toggle-icon" aria-hidden="true">▾</span>
@@ -190,7 +190,7 @@
         <!-- Drawing Toolbar -->
         <div id="drawing-toolbar" class="drawing-toolbar">
           <div class="draw-toolbar-group">
-            <span class="draw-color-swatch active" data-color="#ff3b3b" style="background:#ff3b3b;" title="Rojo"></span>
+            <span class="draw-color-swatch active" data-color="#ff3b3b" style="background:#ff3b3b;" title="Rojo — ⌘1 siguiente color"></span>
             <span class="draw-color-swatch" data-color="#ffdd00" style="background:#ffdd00;" title="Amarillo"></span>
             <span class="draw-color-swatch" data-color="#00d26a" style="background:#00d26a;" title="Verde"></span>
             <span class="draw-color-swatch" data-color="#0099ff" style="background:#0099ff;" title="Azul"></span>
@@ -198,31 +198,34 @@
               title="Blanco"></span>
           </div>
           <div class="draw-toolbar-group">
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-eraser" title="Borrador" aria-label="Borrador">
-              <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 15.5 13 7a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8l-5.9 5.9a2 2 0 0 1-1.4.6H7.3a2 2 0 0 1-1.4-.6l-1.4-1.4a2 2 0 0 1 0-2.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 19.5h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-pen" title="Mano alzada (⌘2)" aria-label="Mano alzada">
+              <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 5.5 14.5 15 5a2.2 2.2 0 0 1 3.1 0l.4.4a2.2 2.2 0 0 1 0 3.1L8.5 18.5 4 20Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 7 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             </button>
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-line" title="Línea recta (o Shift+drag)" aria-label="Línea recta">
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-line" title="Línea recta (⌘3 o Shift+arrastrar)" aria-label="Línea recta">
               <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 20 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4" cy="20" r="1.8" fill="currentColor"/><circle cx="20" cy="4" r="1.8" fill="currentColor"/></svg>
             </button>
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-arrow" title="Flecha" aria-label="Flecha">
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-arrow" title="Flecha (⌘4)" aria-label="Flecha">
               <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M14 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <input type="range" id="draw-size" min="2" max="12" value="4" class="draw-size-slider" title="Grosor" />
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-circle" title="Base jugador (⌘5) — clic = centro · arrastrá = caja" aria-label="Base jugador">
+              <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="9" ry="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+            </button>
+            <input type="range" id="draw-size" min="2" max="12" value="4" class="draw-size-slider" title="Grosor ([ más fino · ] más grueso)" />
           </div>
           <div class="draw-toolbar-group">
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-undo" title="Deshacer" aria-label="Deshacer">
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-undo" title="Deshacer (⌘6)" aria-label="Deshacer">
               <svg class="draw-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8 4 12l5 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             </button>
-            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-clear" title="Limpiar">🗑️</button>
+            <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-clear" title="Limpiar todo (⌘7)">🗑️</button>
           </div>
           <span class="draw-toolbar-presentation-hint hidden" id="draw-presentation-hint">Presentación — no se guarda</span>
           <div class="draw-toolbar-group draw-toolbar-actions">
             <input type="text" id="draw-author" class="draw-description-input draw-author-input" placeholder="Nombre" autocomplete="off" />
             <input type="text" id="draw-description" class="draw-description-input" placeholder="Descripción del dibujo…" autocomplete="off" />
-            <button class="btn btn-xs btn-primary" data-action="draw-save">💾 Guardar</button>
+            <button class="btn btn-xs btn-primary" data-action="draw-save" title="Guardar (⌘S)">💾 Guardar</button>
           </div>
           <div class="draw-toolbar-group draw-toolbar-close">
-            <button type="button" class="btn btn-xs btn-ghost draw-toolbar-close-btn" data-action="draw-cancel" title="Cerrar dibujo" aria-label="Cerrar dibujo">✕</button>
+            <button type="button" class="btn btn-xs btn-ghost draw-toolbar-close-btn" data-action="draw-cancel" title="Cerrar dibujo (Esc)" aria-label="Cerrar dibujo">✕</button>
           </div>
         </div>
         <!-- Focus View Overlay -->
@@ -938,21 +941,21 @@
   <div id="quick-clip-menu" class="quick-clip-menu hidden" aria-hidden="true">
     <div id="quick-clip-meta" class="quick-clip-menu__meta"></div>
     <div class="quick-clip-menu__row">
-      <button id="quick-flag-bueno" class="quick-clip-btn" type="button" title="Bueno"><span class="quick-clip-btn__icon">👍</span><small>Q</small></button>
-      <button id="quick-flag-acorregir" class="quick-clip-btn" type="button" title="A corregir"><span class="quick-clip-btn__icon">⚠️</span><small>W</small></button>
-      <button id="quick-flag-duda" class="quick-clip-btn" type="button" title="Duda"><span class="quick-clip-btn__icon">❓</span><small>E</small></button>
-      <button id="quick-flag-importante" class="quick-clip-btn" type="button" title="Importante"><span class="quick-clip-btn__icon">⭐</span><small>R</small></button>
-      <button id="quick-chat" class="quick-clip-btn" type="button" title="Chat"><span class="quick-clip-btn__icon">💬</span><small>T</small></button>
-      <button id="quick-playlist" class="quick-clip-btn" type="button" title="Enviar a playlist"><span class="quick-clip-btn__icon">📋</span><small>Y</small></button>
-      <button id="quick-delete" class="quick-clip-btn quick-clip-btn--danger" type="button" title="Eliminar"><span class="quick-clip-btn__icon">🗑</span><small>U</small></button>
+      <button id="quick-flag-bueno" class="quick-clip-btn" type="button" title="Bueno [1]"><span class="quick-clip-btn__icon">👍</span><small>1</small></button>
+      <button id="quick-flag-acorregir" class="quick-clip-btn" type="button" title="A corregir [2]"><span class="quick-clip-btn__icon">⚠️</span><small>2</small></button>
+      <button id="quick-flag-duda" class="quick-clip-btn" type="button" title="Duda [3]"><span class="quick-clip-btn__icon">❓</span><small>3</small></button>
+      <button id="quick-flag-importante" class="quick-clip-btn" type="button" title="Importante [4]"><span class="quick-clip-btn__icon">⭐</span><small>4</small></button>
+      <button id="quick-chat" class="quick-clip-btn" type="button" title="Chat [5]"><span class="quick-clip-btn__icon">💬</span><small>5</small></button>
+      <button id="quick-playlist" class="quick-clip-btn" type="button" title="Enviar a playlist [6]"><span class="quick-clip-btn__icon">📋</span><small>6</small></button>
+      <button id="quick-delete" class="quick-clip-btn quick-clip-btn--danger" type="button" title="Eliminar [7]"><span class="quick-clip-btn__icon">🗑</span><small>7</small></button>
     </div>
     <div id="quick-playlist-picker" class="quick-playlist-picker hidden">
       <div id="quick-playlist-list" class="quick-playlist-list"></div>
       <div class="quick-playlist-create">
         <input id="quick-playlist-new-name" class="input input-sm" type="text" placeholder="Nueva playlist…" />
-        <button id="quick-playlist-create-btn" class="btn btn-xs" type="button" title="Crear y enviar">N</button>
+        <button id="quick-playlist-create-btn" class="btn btn-xs" type="button" title="Crear y enviar [0]">0</button>
       </div>
-      <div class="quick-playlist-help">1..9 elegir · N crear nueva · Esc cerrar</div>
+      <div class="quick-playlist-help">1–9 elegir · 0 nueva playlist · Esc cerrar</div>
     </div>
   </div>
 
