@@ -19,7 +19,7 @@ import { createSessionGuard } from './sessionGuard.js';
 import { PopoutController } from './popoutController.js';
 import {
     canUsePopoutMediaShare,
-    writeLocalFileForPopout,
+    stageLocalFileForPopout,
 } from './popoutMediaShare.js';
 import { LiveCaptureFacade } from './livecapture/LiveCaptureFacade.js';
 import {
@@ -779,71 +779,48 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     }
 
     let _popoutLocalPayloadCache = null;
-    let _popoutLocalPushPromise = null;
+    let _popoutStagePromise = null;
 
-    /** OPFS compartido (mismo origin): evita arrayBuffer gigante que traba la app. */
-    async function _buildLocalPopoutPayload(file) {
-        if (!file) return null;
-        const gameId = AppState.get('currentGameId') || 'local';
-        const cacheKey = `${gameId}:${file.size}:${file.lastModified}:${file.name}`;
-        if (_popoutLocalPayloadCache?.key === cacheKey) {
-            return _popoutLocalPayloadCache.payload;
-        }
-
-        if (canUsePopoutMediaShare()) {
-            try {
-                const meta = await writeLocalFileForPopout(file, gameId);
-                const payload = { kind: 'local-opfs', ...meta };
-                _popoutLocalPayloadCache = { key: cacheKey, payload };
-                return payload;
-            } catch (e) {
-                console.warn('[Popout] OPFS share falló:', e?.message || e);
+    async function _stageLocalMediaForPopout() {
+        if (_popoutStagePromise) return _popoutStagePromise;
+        _popoutStagePromise = (async () => {
+            if (!canUsePopoutMediaShare()) {
+                throw new Error('Tu navegador no soporta almacenamiento para el player externo. Usá Chrome o Edge.');
             }
-        }
-
-        const maxInline = 8 * 1024 * 1024;
-        if (file.size > maxInline) {
-            UI.toast(
-                'El video es muy grande para el player externo sin OPFS. Usá Chrome/Edge actualizado.',
-                'error'
-            );
-            return null;
-        }
-        try {
-            const buffer = await file.arrayBuffer();
-            const payload = {
-                kind: 'local',
-                buffer,
-                name: file.name || 'video.mp4',
-                type: file.type || 'video/mp4',
-                size: file.size,
-            };
+            const file = await _resolveLocalFileForPopoutAsync();
+            if (!file) {
+                throw new Error('No se encontró el archivo de video local');
+            }
+            const gameId = AppState.get('currentGameId') || 'local';
+            const cacheKey = `${gameId}:${file.size}:${file.lastModified}:${file.name}`;
+            const payload = await stageLocalFileForPopout(file, gameId);
             _popoutLocalPayloadCache = { key: cacheKey, payload };
             return payload;
-        } catch (e) {
-            console.warn('[Popout] no se pudo leer el archivo local:', e?.message || e);
-            return null;
-        }
+        })().finally(() => {
+            _popoutStagePromise = null;
+        });
+        return _popoutStagePromise;
+    }
+
+    function _getCachedLocalPopoutPayload() {
+        return _popoutLocalPayloadCache?.payload || null;
     }
 
     async function _pushLocalMediaToPopout() {
-        if (_popoutLocalPushPromise) return _popoutLocalPushPromise;
-        _popoutLocalPushPromise = (async () => {
-            const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
-            if (!media || media.kind !== 'local') return;
-            const file = await _resolveLocalFileForPopoutAsync();
-            if (!file) {
-                UI.toast('No se encontró el archivo de video local para el player externo', 'error');
+        const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+        if (!media || media.kind !== 'local') return;
+        let payload = _getCachedLocalPopoutPayload();
+        if (!payload) {
+            try {
+                payload = await _stageLocalMediaForPopout();
+            } catch (e) {
+                console.warn('[Popout]', e?.message || e);
                 return;
             }
-            const payload = await _buildLocalPopoutPayload(file);
-            if (!payload) return;
-            if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
-            PopoutController.notifyMediaLoaded(payload);
-        })().finally(() => {
-            _popoutLocalPushPromise = null;
-        });
-        return _popoutLocalPushPromise;
+        }
+        if (!payload) return;
+        if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
+        PopoutController.notifyMediaLoaded(payload);
     }
 
     function _popoutGetSnapshot() {
@@ -866,17 +843,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
     async function _popoutGetSnapshotAsync() {
         const base = _popoutGetSnapshot();
+        const payload = _getCachedLocalPopoutPayload();
+        if (payload) return { ...base, media: payload };
         const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
-        if (!media || media.kind !== 'local') return base;
-        if (_popoutLocalPushPromise) await _popoutLocalPushPromise;
-        if (_popoutLocalPayloadCache?.payload) {
-            return { ...base, media: _popoutLocalPayloadCache.payload };
-        }
-        const file = await _resolveLocalFileForPopoutAsync();
-        if (!file) return base;
-        const localPayload = await _buildLocalPopoutPayload(file);
-        if (!localPayload) return base;
-        return { ...base, media: localPayload };
+        if (media?.kind !== 'local') return base;
+        return base;
     }
 
     function wirePopout() {
@@ -1002,9 +973,19 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
         });
 
+        window.addEventListener('message', (ev) => {
+            if (ev.origin !== window.location.origin) return;
+            if (ev.data?.type !== 'sr-popout-request-media') return;
+            const payload = _getCachedLocalPopoutPayload();
+            if (!payload || !ev.source) return;
+            try {
+                ev.source.postMessage({ type: 'sr-popout-media', payload }, ev.origin);
+            } catch (_) { /* noop */ }
+        });
+
         const openBtn = $('#btn-open-popout');
         if (openBtn) {
-            openBtn.addEventListener('click', () => {
+            openBtn.addEventListener('click', async () => {
                 if (!AppState.hasFeature(FEATURES.POPOUT_PLAYER)) {
                     UI.toast(getProFeatureMessage(), 'info');
                     return;
@@ -1013,6 +994,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 if (!game) {
                     UI.toast('Abrí o creá un proyecto primero', 'info');
                     return;
+                }
+                const lastMedia = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
+                if (lastMedia?.kind === 'local') {
+                    try {
+                        UI.toast('Preparando video para el player externo…', 'info');
+                        await _stageLocalMediaForPopout();
+                    } catch (e) {
+                        UI.toast(e?.message || 'No se pudo preparar el video local', 'error');
+                        return;
+                    }
                 }
                 const ok = PopoutController.open();
                 if (!ok) {
@@ -2816,6 +2807,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
     AppState.on('gameChanged', (game) => {
         closePopoutPlayer();
+        _popoutLocalPayloadCache = null;
         resetLiveProbe();
         try {
             DrawingTool.dismissDrawingPreview?.();

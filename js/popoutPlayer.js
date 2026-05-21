@@ -4,7 +4,10 @@
    ═══════════════════════════════════════════ */
 
 import { VideoPlayer } from './VideoPlayer.js';
-import { readLocalFileForPopout } from './popoutMediaShare.js';
+import {
+    consumeStagedPopoutDescriptor,
+    readLocalFileForPopout,
+} from './popoutMediaShare.js';
 
 const CHANNEL_NAME = 'simplereplay-popout';
 const RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
@@ -258,16 +261,42 @@ function wirePopoutClipRail() {
     });
 }
 
+function requestMediaFromOpener(timeoutMs = 8000) {
+    if (!window.opener || window.opener.closed) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+            window.removeEventListener('message', onMsg);
+            resolve(null);
+        }, timeoutMs);
+        const onMsg = (ev) => {
+            if (ev.source !== window.opener) return;
+            if (ev.origin !== window.location.origin) return;
+            if (ev.data?.type !== 'sr-popout-media') return;
+            clearTimeout(timer);
+            window.removeEventListener('message', onMsg);
+            resolve(ev.data.payload || null);
+        };
+        window.addEventListener('message', onMsg);
+        try {
+            window.opener.postMessage({ type: 'sr-popout-request-media' }, window.location.origin);
+        } catch (_) {
+            clearTimeout(timer);
+            window.removeEventListener('message', onMsg);
+            resolve(null);
+        }
+    });
+}
+
 channel.addEventListener('message', async (ev) => {
     const msg = ev.data || {};
     if (msg.type === 'rail') {
         applyPopoutClipRail(msg.payload);
         return;
     }
-    await player.playbackSilenced(async () => {
+    try {
         switch (msg.type) {
             case 'sync':
-                await applySync(msg.payload);
+                await player.playbackSilenced(() => applySync(msg.payload));
                 break;
             case 'load':
                 await loadMedia(msg.payload);
@@ -309,7 +338,10 @@ channel.addEventListener('message', async (ev) => {
             default:
                 break;
         }
-    });
+    } catch (err) {
+        console.error('[Popout]', err);
+        showStatus(err?.message || 'Error en el player', 5000);
+    }
 });
 
 window.addEventListener('beforeunload', () => {
@@ -319,9 +351,33 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-wirePopoutClipRail();
-channel.postMessage({ type: 'ready' });
-showStatus('Conectado a SimpleReplay');
+async function bootstrap() {
+    wirePopoutClipRail();
+
+    let staged = consumeStagedPopoutDescriptor();
+    if (!staged) {
+        staged = await requestMediaFromOpener();
+    }
+    if (staged) {
+        showStatus('Cargando video…', 20000);
+        try {
+            await loadMedia(staged);
+        } catch (e) {
+            console.error('[Popout] bootstrap load:', e);
+            showStatus(e?.message || 'No se pudo cargar el video', 6000);
+        }
+    }
+
+    channel.postMessage({ type: 'ready' });
+    try {
+        if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'sr-popout-ready' }, window.location.origin);
+        }
+    } catch (_) { /* noop */ }
+    showStatus(_hasMedia ? 'Conectado' : 'Conectado — sin video aún');
+}
+
+void bootstrap();
 
 setInterval(() => {
     if (!_hasMedia) return;

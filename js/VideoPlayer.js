@@ -285,17 +285,36 @@ export class VideoPlayer {
             });
         } else if (videoData.type === 'local') {
             this.type = 'local';
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 const video = document.createElement('video');
                 video.src = videoData.url;
                 video.controls = true;
+                video.playsInline = true;
+                video.preload = 'auto';
                 video.style.width = '100%';
                 video.style.height = '100%';
                 video.style.objectFit = 'contain';
 
-                video.addEventListener('loadedmetadata', () => {
-                    resolve();
-                });
+                let settled = false;
+                const timeoutId = setTimeout(
+                    () => finish(false, new Error('Tiempo de espera agotado al cargar el video')),
+                    30000
+                );
+                const finish = (ok, err) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeoutId);
+                    video.removeEventListener('loadedmetadata', onReady);
+                    video.removeEventListener('error', onError);
+                    if (ok) resolve();
+                    else reject(err || new Error('No se pudo cargar el video local'));
+                };
+                const onReady = () => finish(true);
+                const onError = () => finish(false, new Error('URL de video no válida en el player externo'));
+
+                video.addEventListener('loadedmetadata', onReady);
+                video.addEventListener('error', onError);
+                if (video.readyState >= 1) onReady();
 
                 video.addEventListener('play', () => {
                     this.isPlaying = true;
@@ -312,8 +331,7 @@ export class VideoPlayer {
                 this.container.appendChild(video);
                 this.player = video;
 
-                // Auto-play locally
-                video.play().catch(e => console.warn('Autoplay prevented', e));
+                video.play().catch(() => { /* autoplay bloqueado */ });
             });
         }
     }
