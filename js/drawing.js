@@ -6,7 +6,12 @@
 import { AppState } from './state.js';
 import { YTPlayer } from './youtubePlayer.js';
 import { PopoutController } from './popoutController.js';
-import { normalizeStroke, normalizeStrokeList } from './drawingMirror.js';
+import {
+    getVideoFrameMetricsFromElement,
+    normalizePointInFrame,
+    normalizeStrokeInFrame,
+    normalizeStrokeListInFrame,
+} from './drawingMirror.js';
 
 export const DrawingTool = (() => {
     'use strict';
@@ -43,44 +48,49 @@ export const DrawingTool = (() => {
         return !!(PopoutController && typeof PopoutController.isActive === 'function' && PopoutController.isActive());
     }
 
-    function _buildPopoutPreview() {
-        const w = _canvas?.width || 1;
-        const h = _canvas?.height || 1;
+    function _mainVideoFrameMetrics() {
+        const container = document.getElementById('player-container');
+        return getVideoFrameMetricsFromElement(container);
+    }
+
+    function _buildPopoutPreview(frame) {
         if (_lineMode && _lineStart) {
-            const rect = _canvas.getBoundingClientRect();
             return {
                 kind: 'line',
                 tool: _tool,
                 color: _color,
                 width: _lineWidth,
-                lineStart: { nx: _lineStart.x / w, ny: _lineStart.y / h },
+                lineStart: normalizePointInFrame(_lineStart.x, _lineStart.y, frame),
                 point: null,
             };
         }
         if (_currentStroke && _currentStroke.points.length > 0) {
             return {
                 kind: 'pen',
-                stroke: normalizeStroke(_currentStroke, w, h),
+                stroke: normalizeStrokeInFrame(_currentStroke, frame),
             };
         }
         return null;
     }
 
     function _buildDrawingPopoutPayload(previewPoint = null) {
-        const w = _canvas?.width || 1;
-        const h = _canvas?.height || 1;
-        let preview = _buildPopoutPreview();
+        const frame = _mainVideoFrameMetrics();
+        let preview = _buildPopoutPreview(frame);
         if (preview?.kind === 'line' && previewPoint) {
             preview = {
                 ...preview,
-                point: { nx: previewPoint.x / w, ny: previewPoint.y / h },
+                point: normalizePointInFrame(previewPoint.x, previewPoint.y, frame),
             };
         }
         return {
             active: true,
-            sourceW: w,
-            sourceH: h,
-            strokes: normalizeStrokeList(_strokes, w, h),
+            space: 'video',
+            videoAspect: frame.aspect,
+            sourceFrame: {
+                width: frame.width,
+                height: frame.height,
+            },
+            strokes: normalizeStrokeListInFrame(_strokes, frame),
             preview,
         };
     }

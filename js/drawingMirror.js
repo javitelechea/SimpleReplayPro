@@ -1,51 +1,146 @@
 /**
- * Utilidades para reflejar dibujos de la app principal en el player externo.
- * Coordenadas normalizadas (0–1) respecto al canvas de origen.
+ * Espejo de dibujos entre ventana principal y player externo.
+ * Coordenadas normalizadas al rectángulo visible del video (sin bandas negras).
  */
 
-export function normalizePoint(x, y, w, h) {
-    const width = Math.max(1, Number(w) || 1);
-    const height = Math.max(1, Number(h) || 1);
-    return { nx: x / width, ny: y / height };
+const DEFAULT_ASPECT = 16 / 9;
+
+/** @typedef {{ containerW: number, containerH: number, left: number, top: number, width: number, height: number, aspect: number }} VideoFrameMetrics */
+
+export function computeVideoFrameRect(containerW, containerH, videoAspect = DEFAULT_ASPECT) {
+    const cw = Math.max(1, containerW || 1);
+    const ch = Math.max(1, containerH || 1);
+    const ar = videoAspect > 0 ? videoAspect : DEFAULT_ASPECT;
+    const ca = cw / ch;
+    let fw;
+    let fh;
+    let left;
+    let top;
+    if (ca > ar) {
+        fh = ch;
+        fw = ch * ar;
+        left = (cw - fw) / 2;
+        top = 0;
+    } else {
+        fw = cw;
+        fh = cw / ar;
+        left = 0;
+        top = (ch - fh) / 2;
+    }
+    return {
+        containerW: cw,
+        containerH: ch,
+        left,
+        top,
+        width: fw,
+        height: fh,
+        aspect: ar,
+    };
 }
 
-export function denormalizePoint(pt, w, h) {
-    const width = Math.max(1, Number(w) || 1);
-    const height = Math.max(1, Number(h) || 1);
+/**
+ * Rectángulo del video renderizado dentro de un contenedor (object-fit / iframe).
+ * @param {HTMLElement} container — p. ej. #player-container o #popout-player
+ * @returns {VideoFrameMetrics}
+ */
+export function getVideoFrameMetricsFromElement(container) {
+    if (!container) {
+        return computeVideoFrameRect(1, 1, DEFAULT_ASPECT);
+    }
+    const cr = container.getBoundingClientRect();
+    const cw = cr.width || container.clientWidth || 1;
+    const ch = cr.height || container.clientHeight || 1;
+
+    const video = container.querySelector(
+        'video:not(#live-preview-video):not(#live-replay-video)'
+    );
+    if (video) {
+        const vr = video.getBoundingClientRect();
+        const w = Math.max(1, vr.width);
+        const h = Math.max(1, vr.height);
+        return {
+            containerW: cw,
+            containerH: ch,
+            left: vr.left - cr.left,
+            top: vr.top - cr.top,
+            width: w,
+            height: h,
+            aspect: w / h,
+        };
+    }
+
+    const iframe = container.querySelector('iframe');
+    if (iframe) {
+        const ir = iframe.getBoundingClientRect();
+        const iw = Math.max(1, ir.width);
+        const ih = Math.max(1, ir.height);
+        const inner = computeVideoFrameRect(iw, ih, DEFAULT_ASPECT);
+        return {
+            containerW: cw,
+            containerH: ch,
+            left: ir.left - cr.left + inner.left,
+            top: ir.top - cr.top + inner.top,
+            width: inner.width,
+            height: inner.height,
+            aspect: inner.aspect,
+        };
+    }
+
+    return computeVideoFrameRect(cw, ch, DEFAULT_ASPECT);
+}
+
+export function normalizePointInFrame(x, y, frame) {
+    const w = Math.max(1, frame?.width || 1);
+    const h = Math.max(1, frame?.height || 1);
+    return {
+        nx: (x - (frame?.left || 0)) / w,
+        ny: (y - (frame?.top || 0)) / h,
+    };
+}
+
+export function denormalizePointInFrame(pt, frame) {
+    const w = Math.max(1, frame?.width || 1);
+    const h = Math.max(1, frame?.height || 1);
     if (pt && typeof pt.nx === 'number' && typeof pt.ny === 'number') {
-        return { x: pt.nx * width, y: pt.ny * height };
+        return {
+            x: (frame?.left || 0) + pt.nx * w,
+            y: (frame?.top || 0) + pt.ny * h,
+        };
     }
     return { x: Number(pt?.x) || 0, y: Number(pt?.y) || 0 };
 }
 
-export function normalizeStroke(stroke, w, h) {
+export function normalizeStrokeInFrame(stroke, frame) {
     if (!stroke) return null;
     return {
         color: stroke.color,
         width: stroke.width,
         eraser: !!stroke.eraser,
         arrow: !!stroke.arrow,
-        points: (stroke.points || []).map((p) => normalizePoint(p.x, p.y, w, h)),
+        points: (stroke.points || []).map((p) => normalizePointInFrame(p.x, p.y, frame)),
     };
 }
 
-export function normalizeStrokeList(strokes, w, h) {
-    return (strokes || []).map((s) => normalizeStroke(s, w, h));
+export function normalizeStrokeListInFrame(strokes, frame) {
+    return (strokes || []).map((s) => normalizeStrokeInFrame(s, frame));
 }
 
-export function denormalizeStroke(stroke, w, h) {
+export function denormalizeStrokeInFrame(stroke, frame, sourceFrame = null) {
     if (!stroke) return null;
+    const scale = sourceFrame && sourceFrame.width > 0
+        ? frame.width / sourceFrame.width
+        : 1;
     return {
         color: stroke.color,
-        width: stroke.width,
+        width: Math.max(0.5, (stroke.width || 4) * scale),
         eraser: !!stroke.eraser,
         arrow: !!stroke.arrow,
-        points: (stroke.points || []).map((p) => denormalizePoint(p, w, h)),
+        points: (stroke.points || []).map((p) => denormalizePointInFrame(p, frame)),
     };
 }
 
-export function denormalizeStrokeList(strokes, w, h) {
-    return (strokes || []).map((s) => denormalizeStroke(s, w, h));
+export function denormalizeStrokeListInFrame(strokes, frame, sourceFrame = null) {
+    return (strokes || []).map((s) => denormalizeStrokeInFrame(s, frame, sourceFrame));
 }
 
 function drawArrowhead(ctx, from, to, color, width) {
@@ -94,19 +189,23 @@ export function paintStroke(ctx, stroke) {
     }
 }
 
-export function paintStrokeList(ctx, strokes, w, h, normalized = true) {
-    if (!ctx) return;
-    const list = normalized ? denormalizeStrokeList(strokes, w, h) : (strokes || []);
+/**
+ * Pinta trazos normalizados al frame de video del canvas.
+ */
+export function paintStrokeListInFrame(ctx, strokes, frame, sourceFrame = null) {
+    if (!ctx || !frame) return;
+    const list = denormalizeStrokeListInFrame(strokes, frame, sourceFrame);
     list.forEach((stroke) => paintStroke(ctx, stroke));
     ctx.globalCompositeOperation = 'source-over';
 }
 
-export function paintLinePreview(ctx, preview, w, h) {
-    if (!ctx || !preview?.lineStart || !preview.point) return;
-    const from = denormalizePoint(preview.lineStart, w, h);
-    const to = denormalizePoint(preview.point, w, h);
+export function paintLinePreviewInFrame(ctx, preview, frame, sourceFrame = null) {
+    if (!ctx || !preview?.lineStart || !preview.point || !frame) return;
+    const scale = sourceFrame?.width > 0 ? frame.width / sourceFrame.width : 1;
+    const from = denormalizePointInFrame(preview.lineStart, frame);
+    const to = denormalizePointInFrame(preview.point, frame);
     const color = preview.color || '#ff3b3b';
-    const lineWidth = preview.width || 4;
+    const lineWidth = Math.max(0.5, (preview.width || 4) * scale);
     const isArrow = preview.tool === 'arrow';
 
     ctx.beginPath();
@@ -130,9 +229,24 @@ export function paintLinePreview(ctx, preview, w, h) {
     }
 }
 
-export function paintPenPreview(ctx, previewStroke, w, h) {
+export function paintPenPreviewInFrame(ctx, previewStroke, frame, sourceFrame = null) {
     if (!ctx || !previewStroke) return;
-    const stroke = denormalizeStroke(previewStroke, w, h);
+    const stroke = denormalizeStrokeInFrame(previewStroke, frame, sourceFrame);
     if (!stroke || stroke.points.length < 2) return;
     paintStroke(ctx, stroke);
+}
+
+/** Compatibilidad con payloads viejos (normalización al canvas completo). */
+export function normalizeStrokeList(strokes, w, h) {
+    const frame = computeVideoFrameRect(w, h, w / h);
+    frame.left = 0;
+    frame.top = 0;
+    return normalizeStrokeListInFrame(strokes, frame);
+}
+
+export function normalizeStroke(stroke, w, h) {
+    const frame = computeVideoFrameRect(w, h, w / h);
+    frame.left = 0;
+    frame.top = 0;
+    return normalizeStrokeInFrame(stroke, frame);
 }

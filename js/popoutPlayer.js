@@ -10,9 +10,11 @@ import {
     readLocalFileForPopout,
 } from './popoutMediaShare.js';
 import {
-    paintLinePreview,
-    paintPenPreview,
-    paintStrokeList,
+    computeVideoFrameRect,
+    getVideoFrameMetricsFromElement,
+    paintLinePreviewInFrame,
+    paintPenPreviewInFrame,
+    paintStrokeListInFrame,
 } from './drawingMirror.js';
 
 const CHANNEL_NAME = 'simplereplay-popout';
@@ -36,6 +38,8 @@ const drawingCtx = drawingCanvas ? drawingCanvas.getContext('2d') : null;
 let _currentObjectUrl = null;
 let _mirrorStrokes = [];
 let _mirrorPreview = null;
+let _mirrorSourceFrame = null;
+let _mirrorVideoAspect = 16 / 9;
 let _hasMedia = false;
 let _statusTimer = null;
 let _currentMediaKey = '';
@@ -154,16 +158,30 @@ function resizeDrawingCanvas() {
     redrawMirrorDrawing();
 }
 
+function _popoutVideoFrameMetrics() {
+    const container = document.getElementById('popout-player');
+    const metrics = getVideoFrameMetricsFromElement(container);
+    if (metrics.width > 1 && metrics.height > 1) {
+        return metrics;
+    }
+    const cw = drawingCanvas?.width || window.innerWidth || 1;
+    const ch = drawingCanvas?.height || window.innerHeight || 1;
+    const aspect = _mirrorVideoAspect > 0 ? _mirrorVideoAspect : 16 / 9;
+    return computeVideoFrameRect(cw, ch, aspect);
+}
+
 function redrawMirrorDrawing() {
     if (!drawingCtx || !drawingCanvas) return;
     const w = drawingCanvas.width || 1;
     const h = drawingCanvas.height || 1;
     drawingCtx.clearRect(0, 0, w, h);
-    paintStrokeList(drawingCtx, _mirrorStrokes, w, h, true);
+
+    const frame = _popoutVideoFrameMetrics();
+    paintStrokeListInFrame(drawingCtx, _mirrorStrokes, frame, _mirrorSourceFrame);
     if (_mirrorPreview?.kind === 'line') {
-        paintLinePreview(drawingCtx, _mirrorPreview, w, h);
+        paintLinePreviewInFrame(drawingCtx, _mirrorPreview, frame, _mirrorSourceFrame);
     } else if (_mirrorPreview?.kind === 'pen') {
-        paintPenPreview(drawingCtx, _mirrorPreview.stroke, w, h);
+        paintPenPreviewInFrame(drawingCtx, _mirrorPreview.stroke, frame, _mirrorSourceFrame);
     }
 }
 
@@ -172,12 +190,21 @@ function applyMirrorDrawing(payload) {
     if (!payload || !payload.active) {
         _mirrorStrokes = [];
         _mirrorPreview = null;
+        _mirrorSourceFrame = null;
         drawingCanvas.classList.remove('active');
         drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
         return;
     }
     _mirrorStrokes = Array.isArray(payload.strokes) ? payload.strokes : [];
     _mirrorPreview = payload.preview || null;
+    if (typeof payload.videoAspect === 'number' && payload.videoAspect > 0) {
+        _mirrorVideoAspect = payload.videoAspect;
+    }
+    if (payload.sourceFrame?.width > 0 && payload.sourceFrame?.height > 0) {
+        _mirrorSourceFrame = payload.sourceFrame;
+    } else {
+        _mirrorSourceFrame = null;
+    }
     resizeDrawingCanvas();
     drawingCanvas.classList.add('active');
     redrawMirrorDrawing();
@@ -189,6 +216,12 @@ function notifyOpenerHasMedia() {
             window.opener.postMessage({ type: 'sr-popout-has-media' }, window.location.origin);
         }
     } catch (_) { /* noop */ }
+}
+
+function scheduleMirrorRedrawIfDrawing() {
+    if (drawingCanvas?.classList.contains('active')) {
+        requestAnimationFrame(redrawMirrorDrawing);
+    }
 }
 
 async function loadMedia(payload) {
@@ -214,6 +247,7 @@ async function loadMedia(payload) {
             hideEmpty();
             showStatus('Video local cargado');
             notifyOpenerHasMedia();
+            scheduleMirrorRedrawIfDrawing();
         } catch (e) {
             console.warn('[Popout] OPFS read:', e?.message || e);
             showStatus('No se pudo cargar el video (OPFS)', 4000);
@@ -229,6 +263,7 @@ async function loadMedia(payload) {
         hideEmpty();
         showStatus('YouTube cargado');
         notifyOpenerHasMedia();
+        scheduleMirrorRedrawIfDrawing();
         return;
     }
 
@@ -255,6 +290,7 @@ async function loadMedia(payload) {
         hideEmpty();
         showStatus('Video local cargado');
         notifyOpenerHasMedia();
+        scheduleMirrorRedrawIfDrawing();
         return;
     }
 }
