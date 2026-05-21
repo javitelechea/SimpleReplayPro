@@ -6,6 +6,7 @@
 import { VideoPlayer } from './VideoPlayer.js';
 import {
     consumeStagedPopoutDescriptor,
+    peekStagedPopoutDescriptor,
     readLocalFileForPopout,
 } from './popoutMediaShare.js';
 
@@ -13,7 +14,7 @@ const CHANNEL_NAME = 'simplereplay-popout';
 const RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
 const channel = new BroadcastChannel(CHANNEL_NAME);
 
-const player = new VideoPlayer('popout-player', { youtubeShowControls: false });
+const player = new VideoPlayer('popout-player', { youtubeShowControls: false, localNativeControls: true });
 player.setPlaybackActivityCallback((ev) => {
     if (!ev || !ev.action) return;
     try {
@@ -108,6 +109,14 @@ function hideEmpty() {
     if (emptyEl) emptyEl.classList.add('hidden');
 }
 
+function notifyOpenerHasMedia() {
+    try {
+        if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'sr-popout-has-media' }, window.location.origin);
+        }
+    } catch (_) { /* noop */ }
+}
+
 async function loadMedia(payload) {
     if (!payload) return;
     const key = _mediaKey(payload);
@@ -130,6 +139,7 @@ async function loadMedia(payload) {
             _snapVolFromPlayer();
             hideEmpty();
             showStatus('Video local cargado');
+            notifyOpenerHasMedia();
         } catch (e) {
             console.warn('[Popout] OPFS read:', e?.message || e);
             showStatus('No se pudo cargar el video (OPFS)', 4000);
@@ -144,6 +154,7 @@ async function loadMedia(payload) {
         _snapVolFromPlayer();
         hideEmpty();
         showStatus('YouTube cargado');
+        notifyOpenerHasMedia();
         return;
     }
 
@@ -161,6 +172,7 @@ async function loadMedia(payload) {
         _snapVolFromPlayer();
         hideEmpty();
         showStatus('Video local cargado');
+        notifyOpenerHasMedia();
         return;
     }
 }
@@ -261,7 +273,7 @@ function wirePopoutClipRail() {
     });
 }
 
-function requestMediaFromOpener(timeoutMs = 8000) {
+function requestMediaFromOpener(timeoutMs = 15000) {
     if (!window.opener || window.opener.closed) return Promise.resolve(null);
     return new Promise((resolve) => {
         const timer = setTimeout(() => {
@@ -351,10 +363,16 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
+window.addEventListener('message', (ev) => {
+    if (ev.origin !== window.location.origin) return;
+    if (ev.data?.type !== 'sr-popout-media' || !ev.data.payload) return;
+    void loadMedia(ev.data.payload);
+});
+
 async function bootstrap() {
     wirePopoutClipRail();
 
-    let staged = consumeStagedPopoutDescriptor();
+    let staged = peekStagedPopoutDescriptor();
     if (!staged) {
         staged = await requestMediaFromOpener();
     }
@@ -362,6 +380,7 @@ async function bootstrap() {
         showStatus('Cargando video…', 20000);
         try {
             await loadMedia(staged);
+            if (_hasMedia) consumeStagedPopoutDescriptor();
         } catch (e) {
             console.error('[Popout] bootstrap load:', e);
             showStatus(e?.message || 'No se pudo cargar el video', 6000);

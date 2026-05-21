@@ -49,7 +49,10 @@ export const YTPlayer = (() => {
     }
 
     function _buildVideoPlayerInstance() {
-        _videoPlayer = new VideoPlayer('youtube-player', { youtubeShowControls: _youtubeNativeControlsEnabled });
+        _videoPlayer = new VideoPlayer('youtube-player', {
+            youtubeShowControls: _youtubeNativeControlsEnabled,
+            localNativeControls: false,
+        });
         _videoPlayer.setPlaybackActivityCallback((ev) => {
             if (!ev || !ev.action) return;
             if (ev.action === 'play') _emit('play');

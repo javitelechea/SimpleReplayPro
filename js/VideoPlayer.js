@@ -14,6 +14,7 @@ export class VideoPlayer {
         this._onYoutubeResize = null;
         this._ytResizeObserver = null;
         this._youtubeShowControls = options.youtubeShowControls !== false;
+        this._localNativeControls = options.localNativeControls === true;
         this._preferredYoutubeQuality = 'default';
         this._qualityFallbackLockUntil = 0;
 
@@ -197,7 +198,7 @@ export class VideoPlayer {
             if (!nextUrl) return;
             if (this.type === 'local' && this.player instanceof HTMLVideoElement) {
                 const cur = this.player.currentSrc || this.player.src || '';
-                if (cur === nextUrl) return;
+                if (cur === nextUrl) return Promise.resolve();
             }
         }
 
@@ -288,7 +289,7 @@ export class VideoPlayer {
             return new Promise((resolve, reject) => {
                 const video = document.createElement('video');
                 video.src = videoData.url;
-                video.controls = true;
+                video.controls = !!this._localNativeControls;
                 video.playsInline = true;
                 video.preload = 'auto';
                 video.style.width = '100%';

@@ -17,10 +17,7 @@ import { toMillis } from './access.js';
 import { ButtonboardTemplates } from './buttonboardTemplates.js';
 import { createSessionGuard } from './sessionGuard.js';
 import { PopoutController } from './popoutController.js';
-import {
-    canUsePopoutMediaShare,
-    stageLocalFileForPopout,
-} from './popoutMediaShare.js';
+import { buildLocalFilePopoutPayload } from './popoutMediaShare.js';
 import { LiveCaptureFacade } from './livecapture/LiveCaptureFacade.js';
 import {
     startLiveRecording,
@@ -778,49 +775,46 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         return file;
     }
 
-    let _popoutLocalPayloadCache = null;
-    let _popoutStagePromise = null;
+    let _popoutMediaReady = false;
 
-    async function _stageLocalMediaForPopout() {
-        if (_popoutStagePromise) return _popoutStagePromise;
-        _popoutStagePromise = (async () => {
-            if (!canUsePopoutMediaShare()) {
-                throw new Error('Tu navegador no soporta almacenamiento para el player externo. Usá Chrome o Edge.');
-            }
-            const file = await _resolveLocalFileForPopoutAsync();
-            if (!file) {
-                throw new Error('No se encontró el archivo de video local');
-            }
-            const gameId = AppState.get('currentGameId') || 'local';
-            const cacheKey = `${gameId}:${file.size}:${file.lastModified}:${file.name}`;
-            const payload = await stageLocalFileForPopout(file, gameId);
-            _popoutLocalPayloadCache = { key: cacheKey, payload };
-            return payload;
-        })().finally(() => {
-            _popoutStagePromise = null;
-        });
-        return _popoutStagePromise;
+    async function _buildLocalPopoutPayload() {
+        const file = await _resolveLocalFileForPopoutAsync();
+        return buildLocalFilePopoutPayload(file);
     }
 
-    function _getCachedLocalPopoutPayload() {
-        return _popoutLocalPayloadCache?.payload || null;
+    function _postLocalPayloadToPopupWin(payload) {
+        const win = PopoutController.getPopupWindow?.();
+        if (!win || win.closed || !payload) return false;
+        try {
+            win.postMessage({ type: 'sr-popout-media', payload }, window.location.origin);
+            return true;
+        } catch (e) {
+            console.warn('[Popout] postMessage al popup:', e?.message || e);
+            return false;
+        }
     }
 
     async function _pushLocalMediaToPopout() {
         const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
         if (!media || media.kind !== 'local') return;
-        let payload = _getCachedLocalPopoutPayload();
+        const payload = await _buildLocalPopoutPayload();
         if (!payload) {
+            console.warn('[Popout] No se encontró el archivo de video local');
+            return;
+        }
+        let delivered = false;
+        if (PopoutController.isConnected && PopoutController.isConnected()) {
             try {
-                payload = await _stageLocalMediaForPopout();
+                PopoutController.notifyMediaLoaded(payload);
+                delivered = true;
             } catch (e) {
-                console.warn('[Popout]', e?.message || e);
-                return;
+                console.warn('[Popout] BroadcastChannel load:', e?.message || e);
             }
         }
-        if (!payload) return;
-        if (!(PopoutController.isConnected && PopoutController.isConnected())) return;
-        PopoutController.notifyMediaLoaded(payload);
+        if (!delivered) {
+            delivered = _postLocalPayloadToPopupWin(payload);
+        }
+        if (delivered) _popoutMediaReady = true;
     }
 
     function _popoutGetSnapshot() {
@@ -843,11 +837,17 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
     async function _popoutGetSnapshotAsync() {
         const base = _popoutGetSnapshot();
-        const payload = _getCachedLocalPopoutPayload();
-        if (payload) return { ...base, media: payload };
         const media = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
         if (media?.kind !== 'local') return base;
         return base;
+    }
+
+    function _popoutCommandsRouted() {
+        return !!(
+            PopoutController.isConnected &&
+            PopoutController.isConnected() &&
+            _popoutMediaReady
+        );
     }
 
     function wirePopout() {
@@ -858,7 +858,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             getSnapshotAsync: _popoutGetSnapshotAsync,
         });
         YTPlayer.setPopoutBridge?.({
-            isConnected: () => PopoutController.isConnected && PopoutController.isConnected(),
+            isConnected: () => _popoutCommandsRouted(),
             notifySeek: (seconds) => PopoutController.notifySeek(seconds),
             notifyPlay: () => {
                 PopoutController.notifyPlay();
@@ -943,9 +943,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         PopoutController.onActiveChange((active) => {
             if (pill) pill.hidden = !active;
             syncFullscreenClipRail();
+            if (!active) _popoutMediaReady = false;
             if (active) {
                 void _pushLocalMediaToPopout();
-                window.setTimeout(() => void _pushLocalMediaToPopout(), 800);
+                window.setTimeout(() => void _pushLocalMediaToPopout(), 400);
+                window.setTimeout(() => void _pushLocalMediaToPopout(), 1200);
                 window.setTimeout(() => syncFullscreenClipRail(), 600);
                 window.setTimeout(() => syncFullscreenClipRail(), 1800);
                 _popoutMirrorPlaying = YTPlayer.isPlaying ? !!YTPlayer.isPlaying() : false;
@@ -975,12 +977,26 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         window.addEventListener('message', (ev) => {
             if (ev.origin !== window.location.origin) return;
-            if (ev.data?.type !== 'sr-popout-request-media') return;
-            const payload = _getCachedLocalPopoutPayload();
-            if (!payload || !ev.source) return;
-            try {
-                ev.source.postMessage({ type: 'sr-popout-media', payload }, ev.origin);
-            } catch (_) { /* noop */ }
+            const t = ev.data?.type;
+            if (t === 'sr-popout-ready') {
+                void _pushLocalMediaToPopout();
+                return;
+            }
+            if (t === 'sr-popout-has-media') {
+                _popoutMediaReady = true;
+                return;
+            }
+            if (t !== 'sr-popout-request-media' || !ev.source) return;
+            void (async () => {
+                const payload = await _buildLocalPopoutPayload();
+                if (!payload) return;
+                try {
+                    ev.source.postMessage({ type: 'sr-popout-media', payload }, ev.origin);
+                    _popoutMediaReady = true;
+                } catch (e) {
+                    console.warn('[Popout] respuesta request-media:', e?.message || e);
+                }
+            })();
         });
 
         const openBtn = $('#btn-open-popout');
@@ -997,11 +1013,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 }
                 const lastMedia = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
                 if (lastMedia?.kind === 'local') {
-                    try {
-                        UI.toast('Preparando video para el player externo…', 'info');
-                        await _stageLocalMediaForPopout();
-                    } catch (e) {
-                        UI.toast(e?.message || 'No se pudo preparar el video local', 'error');
+                    const file = _resolveLocalFileForPopout();
+                    if (!file) {
+                        UI.toast('Cargá el video local en la app principal antes de abrir el player externo.', 'error');
                         return;
                     }
                 }
@@ -1009,6 +1023,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 if (!ok) {
                     UI.toast('No se pudo abrir la ventana. Permití popups para este sitio.', 'error');
                     return;
+                }
+                if (lastMedia?.kind === 'local') {
+                    window.setTimeout(() => void _pushLocalMediaToPopout(), 80);
                 }
                 UI.toast('Player externo abierto', 'success');
             });
@@ -1535,7 +1552,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     }
 
     function isPopoutPlayerConnected() {
-        return !!(PopoutController && PopoutController.isConnected && PopoutController.isConnected());
+        return _popoutCommandsRouted();
     }
 
     function closePopoutPlayer() {
@@ -1711,7 +1728,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (muteBtn && YTPlayer.isMuted) {
             const m = YTPlayer.isMuted();
             muteBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
-            const popoutConnected = PopoutController && PopoutController.isConnected && PopoutController.isConnected();
+            const popoutConnected = isPopoutPlayerConnected();
             muteBtn.disabled = !!popoutConnected;
             muteBtn.title = popoutConnected ? 'Audio solo en player externo' : 'Silenciar o activar sonido';
             muteBtn.innerHTML = m
@@ -2240,7 +2257,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         });
 
         $('#player-chrome-mute')?.addEventListener('click', () => {
-            if (PopoutController && PopoutController.isConnected && PopoutController.isConnected()) return;
+            if (isPopoutPlayerConnected()) return;
             if (YTPlayer.toggleMute) YTPlayer.toggleMute();
             syncPlayerChromeUi();
         });
@@ -2807,7 +2824,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
     AppState.on('gameChanged', (game) => {
         closePopoutPlayer();
-        _popoutLocalPayloadCache = null;
+        _popoutMediaReady = false;
         resetLiveProbe();
         try {
             DrawingTool.dismissDrawingPreview?.();

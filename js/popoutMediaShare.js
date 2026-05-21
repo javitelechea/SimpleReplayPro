@@ -29,15 +29,31 @@ export function writeStagedPopoutDescriptor(descriptor) {
     localStorage.setItem(POPOUT_STAGED_LS_KEY, JSON.stringify(descriptor));
 }
 
-export function consumeStagedPopoutDescriptor() {
+export function peekStagedPopoutDescriptor() {
     const raw = localStorage.getItem(POPOUT_STAGED_LS_KEY);
     if (!raw) return null;
-    localStorage.removeItem(POPOUT_STAGED_LS_KEY);
     try {
         return JSON.parse(raw);
     } catch {
         return null;
     }
+}
+
+export function consumeStagedPopoutDescriptor() {
+    const d = peekStagedPopoutDescriptor();
+    if (d) localStorage.removeItem(POPOUT_STAGED_LS_KEY);
+    return d;
+}
+
+/** Payload para postMessage / BroadcastChannel (File se clona sin copiar el blob). */
+export function buildLocalFilePopoutPayload(file) {
+    if (!file || !file.size) return null;
+    return {
+        kind: 'local',
+        file,
+        name: file.name || 'video.mp4',
+        type: file.type || 'video/mp4',
+    };
 }
 
 /**

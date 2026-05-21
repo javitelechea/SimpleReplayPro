@@ -52,6 +52,10 @@ export const PopoutController = (() => {
         return !!(_channel && _ready);
     }
 
+    function getPopupWindow() {
+        return _popupWindow && !_popupWindow.closed ? _popupWindow : null;
+    }
+
     function _ensureChannel() {
         if (_channel) return _channel;
         _channel = new BroadcastChannel(CHANNEL_NAME);
@@ -255,6 +259,7 @@ export const PopoutController = (() => {
         onActiveChange,
         isActive,
         isConnected,
+        getPopupWindow,
         open,
         close,
         notifyMediaLoaded,
