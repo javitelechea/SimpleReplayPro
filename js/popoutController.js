@@ -252,9 +252,34 @@ export const PopoutController = (() => {
         send('rail', payload);
     }
 
+    function ensureReady() {
+        if (!isActive()) return;
+        _ensureChannel();
+        if (_ready) return;
+        try {
+            _channel.postMessage({ type: 'ping' });
+        } catch (_) { /* noop */ }
+    }
+
     function notifyDrawing(payload) {
         if (!payload || typeof payload !== 'object') return;
-        send('drawing', payload);
+        if (!isActive()) return;
+        ensureReady();
+        if (_channel && _ready) {
+            try {
+                send('drawing', payload);
+            } catch (err) {
+                console.warn('[Popout] drawing (BC):', err?.message || err);
+            }
+        }
+        const win = getPopupWindow();
+        if (win && !win.closed) {
+            try {
+                win.postMessage({ type: 'sr-popout-drawing', payload }, window.location.origin);
+            } catch (err) {
+                console.warn('[Popout] drawing (postMessage):', err?.message || err);
+            }
+        }
     }
 
     return {
@@ -265,6 +290,7 @@ export const PopoutController = (() => {
         isActive,
         isConnected,
         getPopupWindow,
+        ensureReady,
         open,
         close,
         notifyMediaLoaded,

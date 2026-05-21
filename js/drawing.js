@@ -40,7 +40,7 @@ export const DrawingTool = (() => {
     let _popoutSyncScheduled = false;
 
     function _popoutDrawingConnected() {
-        return !!(PopoutController && typeof PopoutController.isConnected === 'function' && PopoutController.isConnected());
+        return !!(PopoutController && typeof PopoutController.isActive === 'function' && PopoutController.isActive());
     }
 
     function _buildPopoutPreview() {
@@ -66,6 +66,32 @@ export const DrawingTool = (() => {
         return null;
     }
 
+    function _buildDrawingPopoutPayload(previewPoint = null) {
+        const w = _canvas?.width || 1;
+        const h = _canvas?.height || 1;
+        let preview = _buildPopoutPreview();
+        if (preview?.kind === 'line' && previewPoint) {
+            preview = {
+                ...preview,
+                point: { nx: previewPoint.x / w, ny: previewPoint.y / h },
+            };
+        }
+        return {
+            active: true,
+            sourceW: w,
+            sourceH: h,
+            strokes: normalizeStrokeList(_strokes, w, h),
+            preview,
+        };
+    }
+
+    function _flushDrawingToPopout(previewPoint = null) {
+        if (!_popoutDrawingConnected() || typeof PopoutController.notifyDrawing !== 'function') return;
+        if (!_active || !_canvas) return;
+        if (typeof PopoutController.ensureReady === 'function') PopoutController.ensureReady();
+        PopoutController.notifyDrawing(_buildDrawingPopoutPayload(previewPoint));
+    }
+
     function _syncDrawingToPopout(previewPoint = null) {
         if (!_popoutDrawingConnected() || typeof PopoutController.notifyDrawing !== 'function') return;
         if (!_active) {
@@ -76,23 +102,7 @@ export const DrawingTool = (() => {
         _popoutSyncScheduled = true;
         requestAnimationFrame(() => {
             _popoutSyncScheduled = false;
-            if (!_active || !_canvas) return;
-            const w = _canvas.width || 1;
-            const h = _canvas.height || 1;
-            let preview = _buildPopoutPreview();
-            if (preview?.kind === 'line' && previewPoint) {
-                preview = {
-                    ...preview,
-                    point: { nx: previewPoint.x / w, ny: previewPoint.y / h },
-                };
-            }
-            PopoutController.notifyDrawing({
-                active: true,
-                sourceW: w,
-                sourceH: h,
-                strokes: normalizeStrokeList(_strokes, w, h),
-                preview,
-            });
+            _flushDrawingToPopout(previewPoint);
         });
     }
 
@@ -250,7 +260,8 @@ export const DrawingTool = (() => {
 
         window.addEventListener('resize', _resizeCanvas);
         document.addEventListener('keydown', _onDrawingKeydown, true);
-        _syncDrawingToPopout();
+        _flushDrawingToPopout();
+        window.setTimeout(() => _flushDrawingToPopout(), 80);
     }
 
     // ── Close drawing mode (no save) ──
@@ -672,7 +683,7 @@ export const DrawingTool = (() => {
     }
 
     function syncPopoutMirror() {
-        if (_active) _syncDrawingToPopout();
+        if (_active) _flushDrawingToPopout();
         else _clearPopoutDrawing();
     }
 

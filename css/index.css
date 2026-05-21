@@ -1411,7 +1411,6 @@ html.sr-player-fs-active .clip-chat-panel,
 html.sr-player-fs-active #export-progress,
 html.sr-player-fs-active #mobile-mode-menu,
 html.sr-player-fs-active #focus-overlay,
-html.sr-player-fs-active #drawing-toolbar,
 html.sr-player-fs-active #custom-timeline,
 html.sr-player-fs-active #clip-view-toolbar,
 html.sr-player-fs-active .tag-bar,
@@ -4810,12 +4809,25 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   font-weight: 700;
 }
 
-#player-container:fullscreen .drawing-toolbar.active {
-  z-index: 40;
+#player-container:fullscreen .drawing-toolbar.active,
+#player-container:-webkit-full-screen .drawing-toolbar.active,
+html.sr-player-fs-active #player-container .drawing-toolbar.active,
+html.sr-immersive-fs #player-container .drawing-toolbar.active {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) !important;
+  z-index: 50 !important;
 }
 
-#player-container:fullscreen .drawing-canvas.active {
-  z-index: 35;
+#player-container:fullscreen .drawing-canvas.active,
+#player-container:-webkit-full-screen .drawing-canvas.active,
+html.sr-player-fs-active #player-container .drawing-canvas.active,
+html.sr-immersive-fs #player-container .drawing-canvas.active {
+  z-index: 40 !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .draw-toolbar-group {

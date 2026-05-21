@@ -118,13 +118,28 @@ function hideEmpty() {
     if (emptyEl) emptyEl.classList.add('hidden');
 }
 
+let _drawingResizeRetries = 0;
+
 function resizeDrawingCanvas() {
     if (!drawingCanvas) return;
     const stage = document.getElementById('popout-stage');
     const rect = (stage || drawingCanvas.parentElement)?.getBoundingClientRect();
-    if (!rect?.width || !rect?.height) return;
-    drawingCanvas.width = Math.floor(rect.width);
-    drawingCanvas.height = Math.floor(rect.height);
+    let w = Math.floor(rect?.width || 0);
+    let h = Math.floor(rect?.height || 0);
+    if (w < 2 || h < 2) {
+        w = Math.floor(window.innerWidth || 0);
+        h = Math.floor(window.innerHeight || 0);
+    }
+    if (w < 2 || h < 2) {
+        if (_drawingResizeRetries < 12) {
+            _drawingResizeRetries += 1;
+            requestAnimationFrame(resizeDrawingCanvas);
+        }
+        return;
+    }
+    _drawingResizeRetries = 0;
+    drawingCanvas.width = w;
+    drawingCanvas.height = h;
     redrawMirrorDrawing();
 }
 
@@ -417,8 +432,14 @@ window.addEventListener('beforeunload', () => {
 
 window.addEventListener('message', (ev) => {
     if (ev.origin !== window.location.origin) return;
-    if (ev.data?.type !== 'sr-popout-media' || !ev.data.payload) return;
-    void loadMedia(ev.data.payload);
+    const t = ev.data?.type;
+    if (t === 'sr-popout-drawing') {
+        applyMirrorDrawing(ev.data.payload);
+        return;
+    }
+    if (t === 'sr-popout-media' && ev.data.payload) {
+        void loadMedia(ev.data.payload);
+    }
 });
 
 async function bootstrap() {
