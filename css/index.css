@@ -2992,7 +2992,7 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .new-project-source-picker {
@@ -3056,6 +3056,52 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   line-height: 1.2;
   hyphens: auto;
   overflow-wrap: anywhere;
+}
+
+/* ── Compact chip pickers (folder & template selectors) ── */
+.new-project-chip-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.new-project-chip-picker .np-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.03));
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.new-project-chip-picker .np-chip:hover {
+  border-color: color-mix(in srgb, var(--accent, #7c5cfc) 45%, var(--border));
+  background: rgba(124, 92, 252, 0.06);
+  color: var(--text-primary);
+}
+
+.new-project-chip-picker .np-chip.active {
+  border-color: color-mix(in srgb, var(--accent, #7c5cfc) 55%, transparent);
+  background: rgba(124, 92, 252, 0.15);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.new-project-chip-picker .np-chip .chip-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .new-project-capture-info {

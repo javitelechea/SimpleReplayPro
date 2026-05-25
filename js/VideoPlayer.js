@@ -230,7 +230,7 @@ export class VideoPlayer {
                         height: ytH,
                         videoId: videoData.id,
                         playerVars: {
-                            'autoplay': 1,
+                            'autoplay': 0,
                             'controls': showCtrls ? 1 : 0,
                             'disablekb': showCtrls ? 0 : 1,
                             'modestbranding': 1,
@@ -343,7 +343,7 @@ export class VideoPlayer {
                 this.container.appendChild(video);
                 this.player = video;
 
-                video.play().catch(() => { /* autoplay bloqueado */ });
+                video.pause();
             });
         }
     }

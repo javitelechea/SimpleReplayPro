@@ -2431,14 +2431,22 @@ export const UI = (() => {
 
     // Fills the <select> in the new-project modal with template options.
     function populateButtonboardSelector(allTemplates) {
-        const sel = $('#select-new-project-buttonboard');
-        if (!sel) return;
-        sel.innerHTML = '';
-        allTemplates.forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t.id;
-            opt.textContent = t.name + (t.isSystem ? '' : ' (mío)');
-            sel.appendChild(opt);
+        const container = $('#new-project-bb-chips');
+        if (!container) return;
+        container.innerHTML = '';
+        allTemplates.forEach((tmpl, idx) => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'np-chip' + (idx === 0 ? ' active' : '');
+            chip.dataset.templateId = tmpl.id;
+            chip.textContent = tmpl.name + (tmpl.isSystem ? '' : ` (${t('generic.mine')})`);
+            container.appendChild(chip);
+        });
+        container.addEventListener('click', (e) => {
+            const chip = e.target.closest('.np-chip');
+            if (!chip) return;
+            container.querySelectorAll('.np-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
         });
     }
 

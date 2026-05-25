@@ -3221,15 +3221,20 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     let activeCreateSource = 'yt';
 
     /** Ventana de código: solo en «Crear proyecto». */
+    function _getSelectedTemplateId() {
+        const active = document.querySelector('#new-project-bb-chips .np-chip.active');
+        return active?.dataset?.templateId || ButtonboardTemplates.BUILTIN_DEFAULT.id;
+    }
+
     function updateNewProjectButtonboardRowVisibility() {
-        const row = $('#new-project-buttonboard-row');
-        if (row) row.classList.toggle('hidden', activeMainTab !== 'create');
+        const bbRow = $('#new-project-buttonboard-row');
+        if (bbRow) bbRow.classList.toggle('hidden', activeMainTab !== 'create');
     }
 
     function syncNewProjectPrimaryButton() {
         const btn = $('#btn-save-game');
         if (!btn) return;
-        btn.textContent = activeMainTab === 'json' ? 'Importar proyecto' : 'Crear proyecto';
+        btn.textContent = activeMainTab === 'json' ? t('modal.importProject') : t('modal.createProject');
     }
 
     function syncNewProjectModalByPlan() {
@@ -3280,19 +3285,94 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     // New project modal
     let _newProjectTemplates = [];
 
+    let _newProjectFolderState = null;
+
+    async function _assignFolderToNewProject(projectId) {
+        const folderId = _selectedFolderId;
+        if (!folderId || !_newProjectFolderState) return;
+        const user = getCurrentUser();
+        const uid = user?.uid || AppState.get('userId');
+        if (!uid || uid === 'anonymous') return;
+        if (!_newProjectFolderState.projectMap) _newProjectFolderState.projectMap = {};
+        _newProjectFolderState.projectMap[projectId] = [folderId];
+        try {
+            await FirebaseData.saveUserProjectFolders(uid, _newProjectFolderState);
+        } catch (e) {
+            console.warn('Could not save folder assignment:', e);
+        }
+    }
+
+    let _selectedFolderId = '';
+
+    function _renderFolderChips(folders) {
+        const container = $('#new-project-folder-chips');
+        if (!container) return;
+        container.innerHTML = '';
+        const noFolderChip = document.createElement('button');
+        noFolderChip.type = 'button';
+        noFolderChip.className = 'np-chip active';
+        noFolderChip.dataset.folderId = '';
+        noFolderChip.textContent = t('modal.noFolder');
+        container.appendChild(noFolderChip);
+
+        folders.forEach(f => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'np-chip';
+            chip.dataset.folderId = f.id;
+            if (f.color) {
+                const dot = document.createElement('span');
+                dot.className = 'chip-dot';
+                dot.style.background = f.color;
+                chip.appendChild(dot);
+            }
+            chip.appendChild(document.createTextNode(f.name));
+            container.appendChild(chip);
+        });
+
+        _selectedFolderId = '';
+        container.addEventListener('click', (e) => {
+            const chip = e.target.closest('.np-chip');
+            if (!chip) return;
+            container.querySelectorAll('.np-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            _selectedFolderId = chip.dataset.folderId;
+        });
+    }
+
+    async function _loadFoldersForNewProject() {
+        const folderRow = $('#new-project-folder-row');
+        if (!folderRow) return;
+        folderRow.style.display = '';
+        const user = getCurrentUser();
+        const uid = user?.uid || AppState.get('userId');
+        const canUseFolders = !!uid && uid !== 'anonymous';
+        if (!canUseFolders) {
+            _newProjectFolderState = null;
+            _renderFolderChips([]);
+            return;
+        }
+        try {
+            _newProjectFolderState = await FirebaseData.loadUserProjectFolders(uid);
+        } catch (e) {
+            console.warn('Could not load folders for new project:', e);
+            _newProjectFolderState = { folders: [], projectMap: {} };
+        }
+        const folders = (_newProjectFolderState.folders || []).slice().sort((a, b) =>
+            String(a.name || '').localeCompare(String(b.name || ''), 'es', { sensitivity: 'base' })
+        );
+        _renderFolderChips(folders);
+    }
+
     $('#btn-new-game').addEventListener('click', async () => {
         syncNewProjectModalByPlan();
         $('#modal-new-game').classList.remove('hidden');
         ($('#input-game-title') || {}).focus?.();
 
         const hasTemplateChoice = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES);
-        const sel = $('#select-new-project-buttonboard');
-        const fixed = $('#input-new-project-buttonboard-fixed');
         const hintPro = $('#hint-new-project-buttonboard-pro');
         const hintFree = $('#hint-new-project-buttonboard-free');
 
-        if (sel) sel.classList.toggle('hidden', !hasTemplateChoice);
-        if (fixed) fixed.classList.toggle('hidden', hasTemplateChoice);
         if (hintPro) hintPro.classList.toggle('hidden', !hasTemplateChoice);
         if (hintFree) hintFree.classList.toggle('hidden', hasTemplateChoice);
 
@@ -3312,9 +3392,11 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             }
         } else {
             _newProjectTemplates = [ButtonboardTemplates.BUILTIN_DEFAULT];
+            UI.populateButtonboardSelector(_newProjectTemplates);
         }
         updateNewProjectButtonboardRowVisibility();
         syncNewProjectPrimaryButton();
+        _loadFoldersForNewProject();
     });
 
     $('#btn-cancel-game').addEventListener('click', () => {
@@ -3392,6 +3474,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 try {
                     const data = JSON.parse(e.target.result);
                     const game = AppState.importProjectData(data);
+                    _assignFolderToNewProject(game.id);
 
                     UI.hideModal('modal-new-game');
                     UI.toast(`Proyecto importado: ${game.title}`, 'success');
@@ -3445,11 +3528,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
             try {
                 const hasTemplateChoice = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES);
-                const sel = $('#select-new-project-buttonboard');
-                const selectedId = hasTemplateChoice && sel ? sel.value : ButtonboardTemplates.BUILTIN_DEFAULT.id;
-                const selectedTemplate = selectedId
-                    ? _newProjectTemplates.find(t => t.id === selectedId)
-                    : null;
+                const selectedId = _getSelectedTemplateId();
+                const selectedTemplate = _newProjectTemplates.find(t => t.id === selectedId);
                 const fallbackTemplate = selectedTemplate || ButtonboardTemplates.BUILTIN_DEFAULT;
                 if (fallbackTemplate) {
                     const copy = ButtonboardTemplates.cloneTemplateForProject(fallbackTemplate);
@@ -3459,6 +3539,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 console.warn('Could not apply buttonboard template:', e);
             }
 
+            _assignFolderToNewProject(game.id);
             UI.hideModal('modal-new-game');
             $('#input-game-title').value = '';
             $('#input-youtube-id').value = '';
@@ -3484,12 +3565,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         AppState.setCurrentGame(game.id);
 
         try {
-            const hasTemplateChoice = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES);
-            const sel = $('#select-new-project-buttonboard');
-            const selectedId = hasTemplateChoice && sel ? sel.value : ButtonboardTemplates.BUILTIN_DEFAULT.id;
-            const selectedTemplate = selectedId
-                ? _newProjectTemplates.find(t => t.id === selectedId)
-                : null;
+            const selectedId = _getSelectedTemplateId();
+            const selectedTemplate = _newProjectTemplates.find(t => t.id === selectedId);
             const fallbackTemplate = selectedTemplate || ButtonboardTemplates.BUILTIN_DEFAULT;
             if (fallbackTemplate) {
                 const copy = ButtonboardTemplates.cloneTemplateForProject(fallbackTemplate);
@@ -3499,6 +3576,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             console.warn('Could not apply buttonboard template:', e);
         }
 
+        _assignFolderToNewProject(game.id);
         UI.hideModal('modal-new-game');
 
         $('#input-game-title').value = '';

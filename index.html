@@ -759,12 +759,9 @@
           </p>
         </div>
 
-      <div id="new-project-buttonboard-row" class="form-label" style="margin-top: 15px;">
-        Ventana de código inicial
-        <select id="select-new-project-buttonboard" class="input hidden">
-          <option value="builtin-default">Default</option>
-        </select>
-        <input id="input-new-project-buttonboard-fixed" class="input" value="Default" disabled />
+      <div id="new-project-buttonboard-row" class="form-label" style="margin-top: 8px;">
+        <span class="new-project-source-label" data-i18n="modal.codeWindow">Ventana de código inicial</span>
+        <div id="new-project-bb-chips" class="new-project-chip-picker" role="group"></div>
         <span id="hint-new-project-buttonboard-pro" class="form-hint hidden" data-i18n="modal.codeCopiedHint">Se copia al proyecto — podés editarla después</span>
         <span id="hint-new-project-buttonboard-free" class="form-hint" data-i18n="modal.codeFixedFreeHint">Fija por defecto en Free (podés editarla después)</span>
       </div>
@@ -779,6 +776,11 @@
           <span data-i18n="modal.jsonFile">Archivo del proyecto (.json)</span>
           <input id="input-import-json" type="file" class="input" accept=".json" />
         </label>
+      </div>
+
+      <div id="new-project-folder-row" class="form-label" style="margin-top: 8px;">
+        <span class="new-project-source-label" data-i18n="modal.folder">Carpeta</span>
+        <div id="new-project-folder-chips" class="new-project-chip-picker" role="group"></div>
       </div>
 
       <div class="modal-actions" style="margin-top: 20px;">

@@ -31,10 +31,41 @@ function _resolvedBuiltinButtons() {
 
 const BUILTIN_DEFAULT = {
     id: 'builtin-default',
-    name: 'Hockey (Default)',
+    get name() { return t('bb.hockeyDefault'); },
     isSystem: true,
     order: 0,
     get buttons() { return _resolvedBuiltinButtons(); },
+};
+
+function _resolvedFootballButtons() {
+    return [
+        { id: 'fb-inicio',        key: 'fb_inicio',        label: getBuiltinTagLabel('fb_inicio'),        row: 'top',    pre_sec: 2,  post_sec: 12, order: 0  },
+        { id: 'fb-desarrollo',    key: 'fb_desarrollo',    label: getBuiltinTagLabel('fb_desarrollo'),    row: 'top',    pre_sec: 3,  post_sec: 8,  order: 1  },
+        { id: 'fb-llegadas',      key: 'fb_llegadas',      label: getBuiltinTagLabel('fb_llegadas'),      row: 'top',    pre_sec: 10, post_sec: 3,  order: 2  },
+        { id: 'fb-transicion',    key: 'fb_transicion',    label: getBuiltinTagLabel('fb_transicion'),    row: 'top',    pre_sec: 4,  post_sec: 8,  order: 3  },
+        { id: 'fb-gol',           key: 'fb_gol',           label: getBuiltinTagLabel('fb_gol'),           row: 'top',    pre_sec: 10, post_sec: 3,  order: 4  },
+        { id: 'fb-sda',           key: 'fb_sda',           label: getBuiltinTagLabel('fb_sda'),           row: 'top',    pre_sec: 2,  post_sec: 10, order: 5  },
+        { id: 'fb-corner',        key: 'fb_corner',        label: getBuiltinTagLabel('fb_corner'),        row: 'top',    pre_sec: 2,  post_sec: 6,  order: 6  },
+        { id: 'fb-tl',            key: 'fb_tl',            label: getBuiltinTagLabel('fb_tl'),            row: 'top',    pre_sec: 2,  post_sec: 6,  order: 7  },
+        { id: 'fb-lateral',       key: 'fb_lateral',       label: getBuiltinTagLabel('fb_lateral'),       row: 'top',    pre_sec: 2,  post_sec: 6,  order: 8  },
+        { id: 'fb-r-inicio',      key: 'fb_r_inicio',      label: getBuiltinTagLabel('fb_r_inicio'),      row: 'bottom', pre_sec: 2,  post_sec: 12, order: 9  },
+        { id: 'fb-r-desarrollo',  key: 'fb_r_desarrollo',  label: getBuiltinTagLabel('fb_r_desarrollo'),  row: 'bottom', pre_sec: 3,  post_sec: 8,  order: 10 },
+        { id: 'fb-r-llegadas',    key: 'fb_r_llegadas',    label: getBuiltinTagLabel('fb_r_llegadas'),    row: 'bottom', pre_sec: 10, post_sec: 3,  order: 11 },
+        { id: 'fb-r-transicion',  key: 'fb_r_transicion',  label: getBuiltinTagLabel('fb_r_transicion'),  row: 'bottom', pre_sec: 4,  post_sec: 8,  order: 12 },
+        { id: 'fb-r-gol',         key: 'fb_r_gol',         label: getBuiltinTagLabel('fb_r_gol'),         row: 'bottom', pre_sec: 10, post_sec: 3,  order: 13 },
+        { id: 'fb-r-sda',         key: 'fb_r_sda',         label: getBuiltinTagLabel('fb_r_sda'),         row: 'bottom', pre_sec: 2,  post_sec: 10, order: 14 },
+        { id: 'fb-r-corner',      key: 'fb_r_corner',      label: getBuiltinTagLabel('fb_r_corner'),      row: 'bottom', pre_sec: 2,  post_sec: 6,  order: 15 },
+        { id: 'fb-r-tl',          key: 'fb_r_tl',          label: getBuiltinTagLabel('fb_r_tl'),          row: 'bottom', pre_sec: 2,  post_sec: 6,  order: 16 },
+        { id: 'fb-r-lateral',     key: 'fb_r_lateral',     label: getBuiltinTagLabel('fb_r_lateral'),     row: 'bottom', pre_sec: 2,  post_sec: 6,  order: 17 },
+    ];
+}
+
+const BUILTIN_FOOTBALL = {
+    id: 'builtin-football',
+    get name() { return t('bb.footballDefault'); },
+    isSystem: true,
+    order: 1,
+    get buttons() { return _resolvedFootballButtons(); },
 };
 
 export const ButtonboardTemplates = (() => {
@@ -50,12 +81,12 @@ export const ButtonboardTemplates = (() => {
             const q = query(collection(db, 'buttonboard_templates'), orderBy('order', 'asc'));
             const snap = await getDocs(q);
             const results = snap.docs.map(d => ({ id: d.id, ...d.data(), isSystem: true }));
-            // Always ensure at least the built-in default is present
-            if (results.length === 0) return [BUILTIN_DEFAULT];
+            // Always ensure at least the built-in defaults are present
+            if (results.length === 0) return [BUILTIN_DEFAULT, BUILTIN_FOOTBALL];
             return results;
         } catch (e) {
-            console.warn('Could not load system templates from Firebase, using built-in default:', e);
-            return [BUILTIN_DEFAULT];
+            console.warn('Could not load system templates from Firebase, using built-in defaults:', e);
+            return [BUILTIN_DEFAULT, BUILTIN_FOOTBALL];
         }
     }
 
@@ -133,5 +164,6 @@ export const ButtonboardTemplates = (() => {
         cloneTemplateForProject,
         cloneButtons,
         BUILTIN_DEFAULT,
+        BUILTIN_FOOTBALL,
     };
 })();
