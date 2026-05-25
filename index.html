@@ -742,7 +742,6 @@
           <label class="form-label" style="margin-top: 15px;">
             <span data-i18n="modal.youtubeLink">Enlace de YouTube</span>
             <input id="input-youtube-id" type="text" class="input" placeholder="Pegá el link de YouTube acá" data-i18n-placeholder="modal.youtubePlaceholder" />
-            <span class="form-hint" data-i18n="modal.youtubeHint">Podés pegar el link completo o solo el ID del video</span>
           </label>
         </div>
 
@@ -762,8 +761,6 @@
       <div id="new-project-buttonboard-row" class="form-label" style="margin-top: 8px;">
         <span class="new-project-source-label" data-i18n="modal.codeWindow">Ventana de código inicial</span>
         <div id="new-project-bb-chips" class="new-project-chip-picker" role="group"></div>
-        <span id="hint-new-project-buttonboard-pro" class="form-hint hidden" data-i18n="modal.codeCopiedHint">Se copia al proyecto — podés editarla después</span>
-        <span id="hint-new-project-buttonboard-free" class="form-hint" data-i18n="modal.codeFixedFreeHint">Fija por defecto en Free (podés editarla después)</span>
       </div>
       </div>
 
@@ -779,8 +776,11 @@
       </div>
 
       <div id="new-project-folder-row" class="form-label" style="margin-top: 8px;">
-        <span class="new-project-source-label" data-i18n="modal.folder">Carpeta</span>
-        <div id="new-project-folder-chips" class="new-project-chip-picker" role="group"></div>
+        <button type="button" id="btn-toggle-folder-chips" class="new-project-collapsible-label">
+          <span class="collapsible-chevron">▸</span>
+          <span data-i18n="modal.folder">Carpeta</span>
+        </button>
+        <div id="new-project-folder-chips" class="new-project-chip-picker" role="group" style="display:none;"></div>
       </div>
 
       <div class="modal-actions" style="margin-top: 20px;">

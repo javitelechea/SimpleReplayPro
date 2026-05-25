@@ -3104,6 +3104,36 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   flex-shrink: 0;
 }
 
+.new-project-collapsible-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.new-project-collapsible-label:hover {
+  color: var(--text-secondary);
+}
+
+.new-project-collapsible-label .collapsible-chevron {
+  font-size: 0.7rem;
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+.new-project-collapsible-label.expanded .collapsible-chevron {
+  transform: rotate(90deg);
+}
+
 .new-project-capture-info {
   margin-top: 14px;
   padding: 12px 14px;

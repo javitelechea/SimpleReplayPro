@@ -3403,6 +3403,13 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         UI.hideModal('modal-new-game');
     });
 
+    $('#btn-toggle-folder-chips')?.addEventListener('click', () => {
+        const btn = $('#btn-toggle-folder-chips');
+        const chips = $('#new-project-folder-chips');
+        const expanded = btn.classList.toggle('expanded');
+        chips.style.display = expanded ? '' : 'none';
+    });
+
     // Close modals on backdrop click (modal-buttonboards se cierra en app.js con confirmación si hay cambios)
     document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
         backdrop.addEventListener('click', () => {
