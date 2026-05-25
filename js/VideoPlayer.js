@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 export class VideoPlayer {
     /**
      * @param {string} containerId
@@ -18,11 +20,11 @@ export class VideoPlayer {
         this._preferredYoutubeQuality = 'default';
         this._qualityFallbackLockUntil = 0;
 
-        // Ensure container is styled correctly
-        this.container.style.position = 'relative';
-        this.container.style.width = '100%';
-        this.container.style.height = '100%';
-        this.container.style.backgroundColor = '#000';
+        // Fondo negro; tamaño/posición vienen de CSS (#youtube-player, #popout-player).
+        // No usar position:relative inline: en #player-container (flex + center) el <video> local queda a 0px (pantalla negra, audio sí).
+        if (this.container && !this.container.style.backgroundColor) {
+            this.container.style.backgroundColor = '#000';
+        }
     }
 
     _youtubeContainerSize() {
@@ -298,7 +300,7 @@ export class VideoPlayer {
 
                 let settled = false;
                 const timeoutId = setTimeout(
-                    () => finish(false, new Error('Tiempo de espera agotado al cargar el video')),
+                    () => finish(false, new Error(t('error.videoLoadTimeout'))),
                     30000
                 );
                 const finish = (ok, err) => {
@@ -308,14 +310,23 @@ export class VideoPlayer {
                     video.removeEventListener('loadedmetadata', onReady);
                     video.removeEventListener('error', onError);
                     if (ok) resolve();
-                    else reject(err || new Error('No se pudo cargar el video local'));
+                    else reject(err || new Error(t('error.videoLoadFailed')));
                 };
-                const onReady = () => finish(true);
-                const onError = () => finish(false, new Error('URL de video no válida en el player externo'));
+                const onError = () => finish(false, new Error(t('error.videoUrlInvalid')));
+                const onReady = () => {
+                    if (video.videoWidth === 0 || video.videoHeight === 0) {
+                        finish(
+                            false,
+                            new Error(t('error.videoCodecUnsupported'))
+                        );
+                        return;
+                    }
+                    finish(true);
+                };
 
-                video.addEventListener('loadedmetadata', onReady);
-                video.addEventListener('error', onError);
-                if (video.readyState >= 1) onReady();
+                video.addEventListener('loadeddata', onReady, { once: true });
+                video.addEventListener('error', onError, { once: true });
+                if (video.readyState >= 2) onReady();
 
                 video.addEventListener('play', () => {
                     this.isPlaying = true;

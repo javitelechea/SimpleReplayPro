@@ -3,6 +3,8 @@
    Replaces Supabase for local development
    ═══════════════════════════════════════════ */
 
+import { getBuiltinTagLabel } from './i18n.js';
+
 export const DemoData = (() => {
     let _nextId = 1;
     function uuid() { return 'demo-' + (Date.now().toString(36)) + '-' + (_nextId++); }
@@ -10,19 +12,19 @@ export const DemoData = (() => {
     // ── Tag Types (seeded) ──
     // row: 'top' = own team, 'bottom' = rival (EC = equipo contrario)
     let tagTypes = [
-        { id: 'tag-start', key: 'start', label: 'Start', row: 'top', pre_sec: 0, post_sec: 1, order: 0 },
-        { id: 'tag-salida', key: 'salida', label: 'Salida', row: 'top', pre_sec: 3, post_sec: 8, order: 1 },
-        { id: 'tag-ataque', key: 'ataque', label: 'Ataque', row: 'top', pre_sec: 3, post_sec: 8, order: 2 },
-        { id: 'tag-area', key: 'area', label: 'Área', row: 'top', pre_sec: 3, post_sec: 8, order: 3 },
-        { id: 'tag-contragolpe', key: 'contragolpe', label: 'Contragolpe', row: 'top', pre_sec: 3, post_sec: 10, order: 4 },
-        { id: 'tag-cc-at', key: 'cc_at', label: 'CC AT', row: 'top', pre_sec: 3, post_sec: 8, order: 5 },
-        { id: 'tag-gol', key: 'gol', label: 'Gol', row: 'top', pre_sec: 5, post_sec: 10, order: 6 },
-        { id: 'tag-bloqueo', key: 'bloqueo', label: 'Bloqueo', row: 'bottom', pre_sec: 3, post_sec: 8, order: 7 },
-        { id: 'tag-defensa', key: 'defensa', label: 'Defensa', row: 'bottom', pre_sec: 3, post_sec: 8, order: 8 },
-        { id: 'tag-area-ec', key: 'area_ec', label: 'Área EC', row: 'bottom', pre_sec: 3, post_sec: 8, order: 9 },
-        { id: 'tag-contragolpe-ec', key: 'contragolpe_ec', label: 'Contragolpe EC', row: 'bottom', pre_sec: 3, post_sec: 10, order: 10 },
-        { id: 'tag-cc-def', key: 'cc_def', label: 'CC DEF', row: 'bottom', pre_sec: 3, post_sec: 8, order: 11 },
-        { id: 'tag-gol-ec', key: 'gol_ec', label: 'Gol EC', row: 'bottom', pre_sec: 5, post_sec: 10, order: 12 },
+        { id: 'tag-start', key: 'start', label: getBuiltinTagLabel('start'), row: 'top', pre_sec: 0, post_sec: 1, order: 0 },
+        { id: 'tag-salida', key: 'salida', label: getBuiltinTagLabel('salida'), row: 'top', pre_sec: 3, post_sec: 10, order: 1 },
+        { id: 'tag-ataque', key: 'ataque', label: getBuiltinTagLabel('ataque'), row: 'top', pre_sec: 3, post_sec: 8, order: 2 },
+        { id: 'tag-area', key: 'area', label: getBuiltinTagLabel('area'), row: 'top', pre_sec: 6, post_sec: 4, order: 3 },
+        { id: 'tag-contragolpe', key: 'contragolpe', label: getBuiltinTagLabel('contragolpe'), row: 'top', pre_sec: 5, post_sec: 7, order: 4 },
+        { id: 'tag-cc-at', key: 'cc_at', label: getBuiltinTagLabel('cc_at'), row: 'top', pre_sec: 3, post_sec: 8, order: 5 },
+        { id: 'tag-gol', key: 'gol', label: getBuiltinTagLabel('gol'), row: 'top', pre_sec: 10, post_sec: 3, order: 6 },
+        { id: 'tag-bloqueo', key: 'bloqueo', label: getBuiltinTagLabel('bloqueo'), row: 'bottom', pre_sec: 3, post_sec: 10, order: 7 },
+        { id: 'tag-defensa', key: 'defensa', label: getBuiltinTagLabel('defensa'), row: 'bottom', pre_sec: 3, post_sec: 8, order: 8 },
+        { id: 'tag-area-ec', key: 'area_ec', label: getBuiltinTagLabel('area_ec'), row: 'bottom', pre_sec: 6, post_sec: 4, order: 9 },
+        { id: 'tag-contragolpe-ec', key: 'contragolpe_ec', label: getBuiltinTagLabel('contragolpe_ec'), row: 'bottom', pre_sec: 5, post_sec: 7, order: 10 },
+        { id: 'tag-cc-def', key: 'cc_def', label: getBuiltinTagLabel('cc_def'), row: 'bottom', pre_sec: 3, post_sec: 8, order: 11 },
+        { id: 'tag-gol-ec', key: 'gol_ec', label: getBuiltinTagLabel('gol_ec'), row: 'bottom', pre_sec: 10, post_sec: 3, order: 12 },
     ];
 
     // ── In-memory stores ──

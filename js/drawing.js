@@ -6,6 +6,7 @@
 import { AppState } from './state.js';
 import { YTPlayer } from './youtubePlayer.js';
 import { PopoutController } from './popoutController.js';
+import { t } from './i18n.js';
 import {
     CIRCLE_FILL_OPACITY,
     frameScaleFromWidth,
@@ -206,8 +207,8 @@ export const DrawingTool = (() => {
         }
         if (cancelBtn) {
             cancelBtn.textContent = '✕';
-            cancelBtn.title = 'Cerrar dibujo';
-            cancelBtn.setAttribute('aria-label', 'Cerrar dibujo');
+            cancelBtn.title = t('draw.close');
+            cancelBtn.setAttribute('aria-label', t('draw.closeAria'));
         }
     }
 
@@ -284,6 +285,9 @@ export const DrawingTool = (() => {
         } else if (mod && e.key === 'Enter') {
             save();
             handled = true;
+        } else if (mod && key === 'z' && !e.shiftKey) {
+            undo();
+            handled = true;
         } else if (mod && !e.shiftKey && !e.altKey) {
             if (key === '1') {
                 _cycleColor();
@@ -299,9 +303,6 @@ export const DrawingTool = (() => {
                 handled = true;
             } else if (key === '5') {
                 _setTool('circle');
-                handled = true;
-            } else if (key === '6') {
-                undo();
                 handled = true;
             } else if (key === '7') {
                 clearCanvas();
@@ -358,7 +359,7 @@ export const DrawingTool = (() => {
         _toolbar.classList.add('active');
         const authorInput = _toolbar.querySelector('#draw-author');
         if (authorInput) {
-            const preferred = AppState.getPreferredChatName ? AppState.getPreferredChatName() : 'Anónimo';
+            const preferred = AppState.getPreferredChatName ? AppState.getPreferredChatName() : t('js.defaultAnonymous');
             authorInput.value = preferred === 'Anónimo' ? '' : preferred;
         }
 
@@ -373,12 +374,12 @@ export const DrawingTool = (() => {
                     saveBtn.disabled = false;
                     saveBtn.style.opacity = '1';
                     saveBtn.style.cursor = 'pointer';
-                    saveBtn.title = 'Guardar dibujo';
+                    saveBtn.title = t('js.drawingSaveTooltip');
                 } else {
                     saveBtn.disabled = true;
                     saveBtn.style.opacity = '0.35';
                     saveBtn.style.cursor = 'not-allowed';
-                    saveBtn.title = 'Agregá el clip a una playlist para poder guardar';
+                    saveBtn.title = t('js.drawingNeedPlaylist');
                 }
             }
         }
@@ -414,15 +415,15 @@ export const DrawingTool = (() => {
         if (!_active) return;
         if (_presentationMode) return;
         if (document.body.classList.contains('read-only-mode')) {
-            UI.toast('Solo lectura: no se puede guardar el dibujo.', 'error');
+            UI.toast(t('toast.readOnlyNoSaveDrawing'), 'error');
             return;
         }
         if (!_playlistId) {
-            UI.toast('Necesitás una playlist o una colección abierta para guardar el dibujo', 'warning');
+            UI.toast(t('toast.needPlaylistForDraw'), 'warning');
             return;
         }
         if (_strokes.length === 0) {
-            UI.toast('Dibujá algo antes de guardar', 'error');
+            UI.toast(t('toast.drawSomethingFirst'), 'error');
             return;
         }
 
@@ -432,11 +433,11 @@ export const DrawingTool = (() => {
         const isGuest = !AppState.get('authUser');
         const hasSavedChatName = (localStorage.getItem('sr_chat_name') || '').trim().length > 0;
         if (!savedName && isGuest && !hasSavedChatName) {
-            const asked = window.prompt('¿Con qué nombre querés aparecer en el chat?', '') || '';
+            const asked = window.prompt(t('prompt.chatName'), '') || '';
             savedName = asked.trim();
         }
         if (!savedName) {
-            savedName = AppState.getPreferredChatName ? AppState.getPreferredChatName() : (localStorage.getItem('sr_chat_name') || 'Anónimo');
+            savedName = AppState.getPreferredChatName ? AppState.getPreferredChatName() : (localStorage.getItem('sr_chat_name') || t('js.defaultAnonymous'));
         }
         if (savedName && savedName !== 'Anónimo') {
             localStorage.setItem('sr_chat_name', savedName);
@@ -444,7 +445,7 @@ export const DrawingTool = (() => {
 
         // Read description from toolbar input
         const descInput = _toolbar && _toolbar.querySelector('#draw-description');
-        const description = descInput && descInput.value.trim() ? descInput.value.trim() : '🎨 Dibujo';
+        const description = descInput && descInput.value.trim() ? descInput.value.trim() : t('js.drawingLabel');
 
         AppState.addComment(_playlistId, _clipId, savedName, description, dataUrl, _videoTimestamp);
 
@@ -452,7 +453,7 @@ export const DrawingTool = (() => {
         close();
         dismissPlaybackOverlays();
         dismissDrawingPreview();
-        UI.toast('Dibujo guardado y cerrado ✅', 'success');
+        UI.toast(t('toast.drawingSaved'), 'success');
     }
 
     // ── Clear canvas ──

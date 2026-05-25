@@ -19,6 +19,8 @@ export const YTPlayer = (() => {
     let _clipAutoPaused = false;
     let _lastMedia = null;
     let _commandListener = null;
+    /** @type {((message: string) => void)|null} */
+    let _mediaErrorHandler = null;
     let _suppressMirrorEchoUntil = 0;
     let _youtubeNativeControlsEnabled = false;
     let _lastSeekEmitAt = 0;
@@ -88,6 +90,13 @@ export const YTPlayer = (() => {
         _lastMedia = null;
     }
 
+    /** Tras LiveCapture, #youtube-player puede quedar con .hidden (video audible, pantalla negra). */
+    function _ensureYoutubeSlotVisible() {
+        document.getElementById('youtube-player')?.classList.remove('hidden');
+        document.getElementById('live-preview-video')?.classList.add('hidden');
+        document.getElementById('live-replay-video')?.classList.add('hidden');
+    }
+
     /** Sale del modo LiveCapture (descarga tracks / superficie). Idempotente. */
     function leaveLiveCapture() {
         _leaveLiveCaptureIfNeeded();
@@ -128,6 +137,10 @@ export const YTPlayer = (() => {
 
     function setCommandListener(fn) {
         _commandListener = typeof fn === 'function' ? fn : null;
+    }
+
+    function setMediaErrorHandler(fn) {
+        _mediaErrorHandler = typeof fn === 'function' ? fn : null;
     }
 
     function getLastMedia() {
@@ -204,6 +217,7 @@ export const YTPlayer = (() => {
         if (!id) return;
         if (getCurrentVideoId() === id && _videoPlayer.type === 'youtube') return;
         _leaveLiveCaptureIfNeeded();
+        _ensureYoutubeSlotVisible();
         _clipEndSec = null;
         _stopPoll();
 
@@ -227,10 +241,15 @@ export const YTPlayer = (() => {
             return;
         }
         _leaveLiveCaptureIfNeeded();
+        _ensureYoutubeSlotVisible();
         _clipEndSec = null;
         _stopPoll();
 
-        _videoPlayer.loadVideo({ type: 'local', url: u });
+        void _videoPlayer.loadVideo({ type: 'local', url: u }).catch((err) => {
+            console.warn('YTPlayer: loadLocalVideo', err);
+            const msg = err?.message || 'No se pudo cargar el video local';
+            if (_mediaErrorHandler) _mediaErrorHandler(msg);
+        });
         _lastMedia = { kind: 'local', url: u, file: resolvedFile };
         _emit('mediaLoaded', _lastMedia);
     }
@@ -621,6 +640,7 @@ export const YTPlayer = (() => {
         jumpToLiveEdge,
         isLiveStream,
         setCommandListener,
+        setMediaErrorHandler,
         setPopoutBridge,
         getLastMedia,
         mirrorRemotePlayback,

@@ -8,28 +8,33 @@ import {
     query, orderBy, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { db } from './firebaseClient.js';
+import { getBuiltinTagLabel, t } from './i18n.js';
 
 // ── Fallback: built-in default used when Firebase has no system templates ──
+function _resolvedBuiltinButtons() {
+    return [
+        { id: 'tag-start',          key: 'start',           label: getBuiltinTagLabel('start'),          row: 'top',    pre_sec: 0,  post_sec: 1,  order: 0  },
+        { id: 'tag-salida',         key: 'salida',          label: getBuiltinTagLabel('salida'),         row: 'top',    pre_sec: 3,  post_sec: 10, order: 1  },
+        { id: 'tag-ataque',         key: 'ataque',          label: getBuiltinTagLabel('ataque'),         row: 'top',    pre_sec: 3,  post_sec: 8,  order: 2  },
+        { id: 'tag-area',           key: 'area',            label: getBuiltinTagLabel('area'),           row: 'top',    pre_sec: 6,  post_sec: 4,  order: 3  },
+        { id: 'tag-contragolpe',    key: 'contragolpe',     label: getBuiltinTagLabel('contragolpe'),    row: 'top',    pre_sec: 5,  post_sec: 7,  order: 4  },
+        { id: 'tag-cc-at',          key: 'cc_at',           label: getBuiltinTagLabel('cc_at'),          row: 'top',    pre_sec: 3,  post_sec: 8,  order: 5  },
+        { id: 'tag-gol',            key: 'gol',             label: getBuiltinTagLabel('gol'),            row: 'top',    pre_sec: 10, post_sec: 3,  order: 6  },
+        { id: 'tag-bloqueo',        key: 'bloqueo',         label: getBuiltinTagLabel('bloqueo'),        row: 'bottom', pre_sec: 3,  post_sec: 10, order: 7  },
+        { id: 'tag-defensa',        key: 'defensa',         label: getBuiltinTagLabel('defensa'),        row: 'bottom', pre_sec: 3,  post_sec: 8,  order: 8  },
+        { id: 'tag-area-ec',        key: 'area_ec',         label: getBuiltinTagLabel('area_ec'),        row: 'bottom', pre_sec: 6,  post_sec: 4,  order: 9  },
+        { id: 'tag-contragolpe-ec', key: 'contragolpe_ec',  label: getBuiltinTagLabel('contragolpe_ec'), row: 'bottom', pre_sec: 5,  post_sec: 7,  order: 10 },
+        { id: 'tag-cc-def',         key: 'cc_def',          label: getBuiltinTagLabel('cc_def'),         row: 'bottom', pre_sec: 3,  post_sec: 8,  order: 11 },
+        { id: 'tag-gol-ec',         key: 'gol_ec',          label: getBuiltinTagLabel('gol_ec'),         row: 'bottom', pre_sec: 10, post_sec: 3,  order: 12 },
+    ];
+}
+
 const BUILTIN_DEFAULT = {
     id: 'builtin-default',
     name: 'Hockey (Default)',
     isSystem: true,
     order: 0,
-    buttons: [
-        { id: 'tag-start',          key: 'start',           label: 'Start',          row: 'top',    pre_sec: 0,  post_sec: 1,  order: 0  },
-        { id: 'tag-salida',         key: 'salida',          label: 'Salida',         row: 'top',    pre_sec: 3,  post_sec: 8,  order: 1  },
-        { id: 'tag-ataque',         key: 'ataque',          label: 'Ataque',         row: 'top',    pre_sec: 3,  post_sec: 8,  order: 2  },
-        { id: 'tag-area',           key: 'area',            label: 'Área',           row: 'top',    pre_sec: 3,  post_sec: 8,  order: 3  },
-        { id: 'tag-contragolpe',    key: 'contragolpe',     label: 'Contragolpe',    row: 'top',    pre_sec: 3,  post_sec: 10, order: 4  },
-        { id: 'tag-cc-at',          key: 'cc_at',           label: 'CC AT',          row: 'top',    pre_sec: 3,  post_sec: 8,  order: 5  },
-        { id: 'tag-gol',            key: 'gol',             label: 'Gol',            row: 'top',    pre_sec: 5,  post_sec: 10, order: 6  },
-        { id: 'tag-bloqueo',        key: 'bloqueo',         label: 'Bloqueo',        row: 'bottom', pre_sec: 3,  post_sec: 8,  order: 7  },
-        { id: 'tag-defensa',        key: 'defensa',         label: 'Defensa',        row: 'bottom', pre_sec: 3,  post_sec: 8,  order: 8  },
-        { id: 'tag-area-ec',        key: 'area_ec',         label: 'Área EC',        row: 'bottom', pre_sec: 3,  post_sec: 8,  order: 9  },
-        { id: 'tag-contragolpe-ec', key: 'contragolpe_ec',  label: 'Contragolpe EC', row: 'bottom', pre_sec: 3,  post_sec: 10, order: 10 },
-        { id: 'tag-cc-def',         key: 'cc_def',          label: 'CC DEF',         row: 'bottom', pre_sec: 3,  post_sec: 8,  order: 11 },
-        { id: 'tag-gol-ec',         key: 'gol_ec',          label: 'Gol EC',         row: 'bottom', pre_sec: 5,  post_sec: 10, order: 12 },
-    ],
+    get buttons() { return _resolvedBuiltinButtons(); },
 };
 
 export const ButtonboardTemplates = (() => {
@@ -76,7 +81,7 @@ export const ButtonboardTemplates = (() => {
     async function saveUserTemplate(uid, data) {
         if (!uid) throw new Error('No authenticated user');
         const payload = {
-            name: data.name || 'Sin nombre',
+            name: data.name || t('js.noName'),
             buttons: cloneButtons(data.buttons),
             updatedAt: serverTimestamp(),
         };
@@ -105,7 +110,7 @@ export const ButtonboardTemplates = (() => {
     async function duplicateTemplate(uid, template) {
         if (!uid) return;
         return saveUserTemplate(uid, {
-            name: (template.name || 'Template') + ' (copia)',
+            name: (template.name || 'Template') + ' ' + t('js.templateCopy'),
             buttons: cloneButtons(template.buttons),
         });
     }
@@ -114,7 +119,7 @@ export const ButtonboardTemplates = (() => {
     function cloneTemplateForProject(template) {
         return {
             id: 'bb-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7),
-            name: template.name || 'Ventana de código',
+            name: template.name || t('js.codeWindowDefault'),
             buttons: cloneButtons(template.buttons),
         };
     }

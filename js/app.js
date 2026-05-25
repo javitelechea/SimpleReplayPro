@@ -35,11 +35,19 @@ import {
 import { promoteStoppedSessionToLocal } from './livecapture/sessionConsolidate.js';
 import { canRunLiveCapture } from './livecapture/index.js';
 import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
+import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from './i18n.js';
 
 (function () {
     'use strict';
 
     const $ = UI.$;
+
+    function _resolveTagLabel(tag) {
+        const key = tag.id.replace('tag-', '').replace(/-/g, '_');
+        const translated = getBuiltinTagLabel(key);
+        return translated !== key ? translated : tag.label;
+    }
+
     let latestUserDoc = null;
     let authMenuWired = false;
     let _localVideoFileForCurrentGame = null;
@@ -85,7 +93,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         onConflict: async () => {
             _sessionConflictLocked = true;
             UI.showModal('modal-session-conflict');
-            UI.toast('Tu sesión fue reemplazada en otro dispositivo', 'error');
+            UI.toast(t('toast.sessionReplaced'), 'error');
             try {
                 await AppState.saveToCloud();
             } catch (_) { /* best effort */ }
@@ -124,12 +132,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const clip = getLastClip();
         const meta = $('#quick-clip-meta');
         if (!clip) {
-            if (meta) meta.textContent = 'Sin clip seleccionado';
+            if (meta) meta.textContent = t('quick.noClipSelected');
             return;
         }
         if (meta) {
             const tag = AppState.getTagType(clip.tag_type_id);
-            const label = tag ? tag.label : 'Clip';
+            const label = tag ? _resolveTagLabel(tag) : 'Clip';
             meta.textContent = `${label} · ${UI.formatTime(clip.start_sec)}-${UI.formatTime(clip.end_sec)}`;
         }
         const flags = AppState.getClipUserFlags(clip.id);
@@ -190,7 +198,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (mode !== 'analyze') return;
         const clip = getLastClip();
         if (!clip) {
-            UI.toast('No hay clips para editar', 'info');
+            UI.toast(t('toast.noClipsToEdit'), 'info');
             return;
         }
         const menu = $('#quick-clip-menu');
@@ -209,7 +217,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (!clip || !playlistId) return;
         const items = AppState.get('playlistItems')[playlistId] || [];
         if (items.includes(clip.id)) {
-            UI.toast('Ese clip ya está en la playlist', 'info');
+            UI.toast(t('toast.clipAlreadyInPlaylist'), 'info');
             closeQuickClipMenu();
             return;
         }
@@ -226,11 +234,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const clip = getLastClip();
         const playlists = getQuickPlaylists();
         if (!clip) {
-            listEl.innerHTML = '<div class="quick-playlist-help">Sin clip activo.</div>';
+            listEl.innerHTML = `<div class="quick-playlist-help">${t('quick.noClip')}</div>`;
             return;
         }
         if (!playlists.length) {
-            listEl.innerHTML = '<div class="quick-playlist-help">No hay playlists. Creá una con 0.</div>';
+            listEl.innerHTML = `<div class="quick-playlist-help">${t('quick.noPlaylists')}</div>`;
             return;
         }
         listEl.innerHTML = playlists.map((pl, idx) => {
@@ -264,7 +272,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const input = $('#quick-playlist-new-name');
         const name = (input?.value || '').trim();
         if (!name) {
-            UI.toast('Escribí un nombre de playlist', 'error');
+            UI.toast(t('toast.enterPlaylistName'), 'error');
             return;
         }
         const pl = AppState.addPlaylist(name);
@@ -282,24 +290,24 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             case '3': AppState.toggleFlag(clip.id, 'duda'); break;
             case '4': AppState.toggleFlag(clip.id, 'importante'); break;
             case '5': {
-                const text = prompt('Comentario rápido para este clip:');
+                const text = prompt(t('prompt.quickComment'));
                 if (!text || !text.trim()) break;
                 const playlists = AppState.get('playlists') || [];
                 const playlistId = activePlaylistId || (playlists[0] && playlists[0].id);
                 if (!playlistId) {
-                    UI.toast('Primero creá una playlist para usar chat', 'error');
+                    UI.toast(t('toast.needPlaylistForChat'), 'error');
                     break;
                 }
                 const name = (localStorage.getItem('sr_chat_name') || 'Analista').trim() || 'Analista';
                 AppState.addComment(playlistId, clip.id, name, text.trim());
-                UI.toast('Comentario agregado', 'success');
+                UI.toast(t('toast.commentAdded'), 'success');
                 break;
             }
             case '6': toggleQuickPlaylistPicker(); break;
             case '7':
-                if (confirm('¿Eliminar el último clip?')) {
+                if (confirm(t('confirm.deleteLastClip'))) {
                     AppState.deleteClip(clip.id);
-                    UI.toast('Clip eliminado', 'success');
+                    UI.toast(t('toast.clipDeleted'), 'success');
                 }
                 break;
             default: return;
@@ -366,7 +374,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const enabled = isAutoSaveEnabled();
         if (btn) {
             btn.classList.toggle('is-active', enabled);
-            btn.title = enabled ? 'Desactivar auto-guardado' : 'Activar auto-guardado';
+            btn.title = enabled ? t('js.autosaveDisable') : t('js.autosaveEnable');
         }
         if (state) {
             state.textContent = enabled ? 'ON' : 'OFF';
@@ -413,7 +421,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         $('#pref-seek-step').value = String(getSeekStep(false));
         $('#pref-seek-step-shift').value = String(getSeekStep(true));
         $('#pref-auto-save-enabled').checked = isAutoSaveEnabled();
+        _syncLangFlags(getLang());
         UI.showModal('modal-preferences');
+    }
+
+    function _syncLangFlags(lang) {
+        const group = $('#pref-language');
+        if (!group) return;
+        group.querySelectorAll('.lang-flag-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.lang === lang);
+        });
     }
 
     function closePreferencesModal() {
@@ -426,7 +443,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         return Math.min(60, Math.max(1, Math.round(n)));
     }
 
-    function savePreferences() {
+    async function savePreferences() {
         const normal = parseStepInput($('#pref-seek-step').value, DEFAULT_SEEK_STEP);
         const fast = parseStepInput($('#pref-seek-step-shift').value, DEFAULT_SEEK_STEP_SHIFT);
         localStorage.setItem(SEEK_STEP_KEY, String(normal));
@@ -434,8 +451,14 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         setAutoSaveEnabled(!!($('#pref-auto-save-enabled') && $('#pref-auto-save-enabled').checked));
 
+        const activeFlag = document.querySelector('#pref-language .lang-flag-btn.active');
+        if (activeFlag) {
+            const { setLang } = await import('./i18n.js');
+            setLang(activeFlag.dataset.lang);
+        }
+
         closePreferencesModal();
-        UI.toast('Preferencias guardadas ✅', 'success');
+        UI.toast(t('toast.prefsSaved'), 'success');
     }
 
     function resetPreferences() {
@@ -443,7 +466,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         localStorage.setItem(SEEK_STEP_SHIFT_KEY, String(DEFAULT_SEEK_STEP_SHIFT));
         setAutoSaveEnabled(false);
         openPreferencesModal();
-        UI.toast('Preferencias restablecidas', 'info');
+        UI.toast(t('toast.prefsReset'), 'info');
     }
 
     async function runAutoSaveTick() {
@@ -457,7 +480,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             await AppState.saveToCloud();
         } catch (e) {
             console.error('Auto-save failed:', e);
-            UI.toast('No se pudo auto-guardar (conexión).', 'error');
+            UI.toast(t('toast.autoSaveFailed'), 'error');
         } finally {
             _autoSaveInFlight = false;
         }
@@ -477,6 +500,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         $('#btn-pref-save')?.addEventListener('click', savePreferences);
         $('#btn-pref-reset')?.addEventListener('click', resetPreferences);
         modal.querySelector('.modal-backdrop')?.addEventListener('click', closePreferencesModal);
+
+        document.querySelectorAll('#pref-language .lang-flag-btn').forEach(btn => {
+            btn.addEventListener('click', () => _syncLangFlags(btn.dataset.lang));
+        });
         modal.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 e.preventDefault();
@@ -543,10 +570,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         // player readiness/duration fluctuates transiently near live edge.
         if (_liveControlPinned && !playerReady) {
             btn.classList.remove('hidden');
-            btn.textContent = '🔴 En vivo';
+            btn.textContent = t('js.liveIndicator');
             btn.classList.add('is-live');
             btn.disabled = true;
-            btn.title = 'En vivo';
+            btn.title = t('js.live');
             return;
         }
 
@@ -561,10 +588,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (!duration || !Number.isFinite(duration)) {
             if (_liveControlPinned) {
                 btn.classList.remove('hidden');
-                btn.textContent = '🔴 En vivo';
+                btn.textContent = t('js.liveIndicator');
                 btn.classList.add('is-live');
                 btn.disabled = true;
-                btn.title = 'En vivo';
+                btn.title = t('js.live');
             } else {
                 btn.classList.add('hidden');
             }
@@ -597,15 +624,15 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         btn.classList.remove('hidden');
         const lag = Math.max(0, duration - current);
         if (lag <= LIVE_EDGE_THRESHOLD_SEC) {
-            btn.textContent = '🔴 En vivo';
+            btn.textContent = t('js.liveIndicator');
             btn.classList.add('is-live');
             btn.disabled = true;
-            btn.title = 'Ya estás en vivo';
+            btn.title = t('js.alreadyLive');
         } else {
-            btn.textContent = '↩ Volver al vivo';
+            btn.textContent = t('js.backToLive');
             btn.classList.remove('is-live');
             btn.disabled = false;
-            btn.title = `Estás ${Math.round(lag)}s atrás`;
+            btn.title = t('js.lagBehind', { n: Math.round(lag) });
         }
     }
 
@@ -614,11 +641,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const expMs = toMillis(userDoc.grantExpiresAt);
         if (!expMs) return '';
         const farFuture = new Date('9999-12-31T23:59:59.999Z').getTime();
-        if (expMs >= farFuture - 120000) return 'Acceso: sin vencimiento';
+        if (expMs >= farFuture - 120000) return t('auth.grantNoExpiry');
         const diff = expMs - Date.now();
-        if (diff <= 0) return 'Acceso grant vencido';
+        if (diff <= 0) return t('auth.grantExpired');
         const days = Math.ceil(diff / 86400000);
-        return `Acceso grant: ${days} ${days === 1 ? 'día' : 'días'} restantes`;
+        return t('auth.grantRemaining', { n: days });
     }
 
     function updateAuthHeader(user) {
@@ -634,7 +661,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         const isLogged = !!user;
         trigger.classList.toggle('is-authenticated', isLogged);
-        const displayName = user ? (user.displayName || user.email || user.uid) : 'No logueado';
+        const displayName = user ? (user.displayName || user.email || user.uid) : t('auth.notLoggedIn');
         if (nameEl) {
             nameEl.textContent = displayName;
             nameEl.title = displayName;
@@ -646,10 +673,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
         if (helpEl) {
             helpEl.textContent = !isLogged
-                ? 'Iniciá sesión para ver tus proyectos y activar funciones PRO.'
+                ? t('auth.help')
                 : plan === 'pro'
-                    ? 'Tu cuenta PRO tiene todas las funciones activas.'
-                    : 'Actualizá a PRO para compartir, importar y usar video local.';
+                    ? t('auth.helpPro')
+                    : t('auth.helpFree');
         }
 
         const grantText = getGrantRemainingText(latestUserDoc);
@@ -708,11 +735,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         loginBtn?.addEventListener('click', async () => {
             try {
                 await loginWithGoogle();
-                UI.toast('Sesión iniciada', 'success');
+                UI.toast(t('toast.loggedIn'), 'success');
                 closeMenu();
             } catch (e) {
                 console.error(e);
-                UI.toast('No se pudo iniciar sesión', 'error');
+                UI.toast(t('toast.loginFailed'), 'error');
             }
         });
         logoutBtn?.addEventListener('click', async () => {
@@ -1085,26 +1112,26 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 }
                 const game = AppState.getCurrentGame();
                 if (!game) {
-                    UI.toast('Abrí o creá un proyecto primero', 'info');
+                    UI.toast(t('toast.openOrCreateProject'), 'info');
                     return;
                 }
                 const lastMedia = YTPlayer.getLastMedia ? YTPlayer.getLastMedia() : null;
                 if (lastMedia?.kind === 'local') {
                     const file = _resolveLocalFileForPopout();
                     if (!file) {
-                        UI.toast('Cargá el video local en la app principal antes de abrir el player externo.', 'error');
+                        UI.toast(t('toast.loadLocalVideoFirst'), 'error');
                         return;
                     }
                 }
                 const ok = PopoutController.open();
                 if (!ok) {
-                    UI.toast('No se pudo abrir la ventana. Permití popups para este sitio.', 'error');
+                    UI.toast(t('toast.popupBlocked'), 'error');
                     return;
                 }
                 if (lastMedia?.kind === 'local') {
                     window.setTimeout(() => void _pushLocalMediaToPopout(), 80);
                 }
-                UI.toast('Player externo abierto', 'success');
+                UI.toast(t('toast.popoutOpened'), 'success');
             });
         }
     }
@@ -1112,7 +1139,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     async function consolidateStoppedCaptureToProject() {
         const meta = getLastStoppedSession();
         if (!meta) {
-            UI.toast('No hay grabación para consolidar.', 'error');
+            UI.toast(t('toast.noRecordingToConsolidate'), 'error');
             return;
         }
         try {
@@ -1129,7 +1156,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                         delete game.video_source;
                     }
                 }
-                UI.toast('Video listo: descarga iniciada y cargado en el partido.', 'success');
+                UI.toast(t('toast.videoReadyDownloaded'), 'success');
                 UI.refreshAll();
                 syncAnalyzeLiveCaptureTabVisibility();
             }
@@ -1156,8 +1183,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         nativeBtn.classList.toggle('player-chrome__btn--primary', nativeOn);
         nativeBtn.textContent = nativeOn ? 'YT ON' : 'YT';
         nativeBtn.title = nativeOn
-            ? 'Desactivar controles nativos de YouTube'
-            : 'Activar controles nativos de YouTube (calidad, velocidad, etc.)';
+            ? t('player.disableYtNative')
+            : t('player.enableYtNative');
         nativeBtn.disabled = _nativeControlsToggleBusy;
     }
 
@@ -1455,7 +1482,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         } else {
             const ok = await enterPlayerFullscreen();
             if (!ok) {
-                UI.toast('No se pudo activar pantalla completa', 'error');
+                UI.toast(t('toast.fullscreenFailed'), 'error');
             }
         }
     }
@@ -1532,7 +1559,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
         const tag = AppState.getTagType(clip.tag_type_id);
         const num = AppState.getClipNumber(clip);
-        return tag ? `${tag.label} ${num}` : 'Clip';
+        return tag ? `${_resolveTagLabel(tag)} ${num}` : 'Clip';
     }
 
     function clipRailTimeRange(clip) {
@@ -1587,28 +1614,30 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         };
     }
 
-    function clipRailCompactLine(roleLabel, clip) {
+    function clipRailCompactLine(role, clip) {
         if (!clip) return '—';
         const label = clipRailLabel(clip);
-        const t = UI.formatTime(clip.start_sec);
-        if (roleLabel === 'Anterior') return `◀ ${label}`;
-        if (roleLabel === 'Siguiente') return `${label} ▶`;
-        return `${label} · ${t}`;
+        const fmtTime = UI.formatTime(clip.start_sec);
+        if (role === 'prev') return `◀ ${label}`;
+        if (role === 'next') return `${label} ▶`;
+        return `${label} · ${fmtTime}`;
     }
 
-    function fillFullscreenRailRow(rowEl, roleLabel, clip) {
+    function fillFullscreenRailRow(rowEl, role, clip) {
         if (!rowEl) return;
         const line = rowEl.querySelector('.fullscreen-clip-rail__line');
         if (!line) return;
+        const roleKey = role === 'prev' ? 'rail.prev' : role === 'next' ? 'rail.next' : 'rail.current';
+        const roleText = t(roleKey);
         if (isMobileLayout()) {
-            line.textContent = clipRailCompactLine(roleLabel, clip);
+            line.textContent = clipRailCompactLine(role, clip);
             return;
         }
         if (!clip) {
-            line.textContent = `${roleLabel} — —`;
+            line.textContent = `${roleText} — —`;
             return;
         }
-        line.textContent = `${roleLabel} — ${clipRailLabel(clip)} — ${clipRailTimeRange(clip)}`;
+        line.textContent = `${roleText} — ${clipRailLabel(clip)} — ${clipRailTimeRange(clip)}`;
     }
 
     const FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
@@ -1627,7 +1656,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         rail.classList.toggle('is-collapsed', collapsed);
         if (toggle) {
             toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-            toggle.title = collapsed ? 'Mostrar cola de clips' : 'Ocultar cola de clips';
+            toggle.title = collapsed ? t('rail.showClips') : t('rail.hideClips');
         }
     }
 
@@ -1654,18 +1683,18 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             collapsed: isFullscreenClipRailCollapsed(),
             prevLine: ctx.prev
                 ? (compact
-                    ? clipRailCompactLine('Anterior', ctx.prev)
-                    : `Anterior — ${clipRailLabel(ctx.prev)} — ${clipRailTimeRange(ctx.prev)}`)
+                    ? clipRailCompactLine('prev', ctx.prev)
+                    : `${t('rail.prev')} — ${clipRailLabel(ctx.prev)} — ${clipRailTimeRange(ctx.prev)}`)
                 : null,
             currentLine: ctx.current
                 ? (compact
-                    ? clipRailCompactLine('Actual', ctx.current)
-                    : `Actual — ${clipRailLabel(ctx.current)} — ${clipRailTimeRange(ctx.current)}`)
-                : 'Actual — —',
+                    ? clipRailCompactLine('current', ctx.current)
+                    : `${t('rail.current')} — ${clipRailLabel(ctx.current)} — ${clipRailTimeRange(ctx.current)}`)
+                : `${t('rail.current')} — —`,
             nextLine: ctx.next
                 ? (compact
-                    ? clipRailCompactLine('Siguiente', ctx.next)
-                    : `Siguiente — ${clipRailLabel(ctx.next)} — ${clipRailTimeRange(ctx.next)}`)
+                    ? clipRailCompactLine('next', ctx.next)
+                    : `${t('rail.next')} — ${clipRailLabel(ctx.next)} — ${clipRailTimeRange(ctx.next)}`)
                 : null,
             count: ctx.total > 0 ? `${ctx.idx + 1} / ${ctx.total}` : '',
             prevDisabled: !ctx.prev,
@@ -1737,9 +1766,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const currentRow = rail.querySelector('.fullscreen-clip-rail__row--current');
         const countEl = rail.querySelector('.fullscreen-clip-rail__count');
 
-        fillFullscreenRailRow(prevBtn, 'Anterior', ctx.prev);
+        fillFullscreenRailRow(prevBtn, 'prev', ctx.prev);
         fillFullscreenRailRow(currentRow, 'Actual', ctx.current);
-        fillFullscreenRailRow(nextBtn, 'Siguiente', ctx.next);
+        fillFullscreenRailRow(nextBtn, 'next', ctx.next);
 
         if (prevBtn) prevBtn.disabled = !ctx.prev;
         if (nextBtn) nextBtn.disabled = !ctx.next;
@@ -1807,7 +1836,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             playBtn.innerHTML = playing
                 ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h4v12H7zM13 6h4v12h-4z" fill="currentColor"/></svg>'
                 : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>';
-            playBtn.setAttribute('aria-label', playing ? 'Pausa' : 'Reproducir');
+            playBtn.setAttribute('aria-label', playing ? t('player.pause') : t('player.play'));
         }
 
         const muteBtn = $('#player-chrome-mute');
@@ -1816,7 +1845,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             muteBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
             const popoutConnected = isPopoutPlayerConnected();
             muteBtn.disabled = !!popoutConnected;
-            muteBtn.title = popoutConnected ? 'Audio solo en player externo' : 'Silenciar o activar sonido';
+            muteBtn.title = popoutConnected ? t('player.audioPopout') : t('player.muteUnmute');
             muteBtn.innerHTML = m
                 ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm10.8 2 2.9 2.9 1.4-1.4-2.9-2.9 2.9-2.9-1.4-1.4-2.9 2.9-2.9-2.9-1.4 1.4 2.9 2.9-2.9 2.9 1.4 1.4 2.9-2.9Z" fill="currentColor"/></svg>'
                 : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3Zm12.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 15.5 12Z" fill="currentColor"/></svg>';
@@ -1831,15 +1860,15 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             btnBack.disabled = !canNavigateClips;
             btnBack.setAttribute('aria-disabled', (!canNavigateClips).toString());
             btnBack.title = canNavigateClips
-                ? (viewClipNav ? 'Clip anterior' : `Retroceder ${seekStepSec} s`)
-                : 'Disponible en modo Ver';
+                ? (viewClipNav ? t('player.prevClip') : t('player.seekBackSec', { n: seekStepSec }))
+                : t('player.availableViewMode');
         }
         if (btnFwd) {
             btnFwd.disabled = !canNavigateClips;
             btnFwd.setAttribute('aria-disabled', (!canNavigateClips).toString());
             btnFwd.title = canNavigateClips
-                ? (viewClipNav ? 'Siguiente clip' : `Avanzar ${seekStepSec} s`)
-                : 'Disponible en modo Ver';
+                ? (viewClipNav ? t('player.nextClip') : t('player.seekFwdSec', { n: seekStepSec }))
+                : t('player.availableViewMode');
         }
 
         const fullscreenBtn = $('#player-chrome-fullscreen');
@@ -1850,8 +1879,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (container) {
                 const isFullscreen = isPlayerFullscreen();
                 fullscreenBtn.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
-                fullscreenBtn.setAttribute('aria-label', isFullscreen ? 'Salir de pantalla completa' : 'Entrar en pantalla completa');
-                fullscreenBtn.title = isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa';
+                fullscreenBtn.setAttribute('aria-label', isFullscreen ? t('player.exitFullscreen') : t('player.enterFullscreen'));
+                fullscreenBtn.title = isFullscreen ? t('player.exitFullscreen') : t('player.fullscreen');
                 fullscreenBtn.innerHTML = isFullscreen
                     ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5h2V5h3V3Zm13 0h-5v2h3v3h2V3ZM5 16H3v5h5v-2H5v-3Zm16 0h-2v3h-3v2h5v-5Z" fill="currentColor"/></svg>'
                     : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H3v4h2V5h2V3Zm14 0h-4v2h2v2h2V3ZM5 17H3v4h4v-2H5v-2Zm16 0h-2v2h-2v2h4v-4Z" fill="currentColor"/></svg>';
@@ -2062,7 +2091,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const recPaused = recOn && isLiveRecordingPaused();
                 btnRec.classList.toggle('livecapture-rec--recording', recOn && !recPaused);
                 btnRec.classList.toggle('livecapture-rec--recording-paused', recOn && recPaused);
-                btnRec.title = 'Iniciar grabación';
+                btnRec.title = t('live.startRec');
             }
             if (btnPause && btnStop) {
                 btnPause.disabled = block || !recording;
@@ -2072,14 +2101,14 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 btnPause.innerHTML = paused
                     ? '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>'
                     : '<svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h4v12H7zM13 6h4v12h-4z" fill="currentColor"/></svg>';
-                btnPause.setAttribute('aria-label', paused ? 'Reanudar grabación' : 'Pausar grabación');
-                btnPause.title = paused ? 'Reanudar grabación' : 'Pausar grabación';
+                btnPause.setAttribute('aria-label', paused ? t('live.resumeRec') : t('live.pauseRec'));
+                btnPause.title = paused ? t('live.resumeRec') : t('live.pauseRec');
             }
             if (btnBackLive) {
                 btnBackLive.disabled = block || !inReview;
                 btnBackLive.classList.toggle('livecapture-live-return--away', !!(!block && inReview));
                 btnBackLive.title =
-                    inReview && !block ? 'Volver al vivo' : 'Disponible cuando estés revisando el replay';
+                    inReview && !block ? t('live.backToLive') : t('live.availableOnReview');
             }
         }
 
@@ -2097,11 +2126,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (stepIp) stepIp.style.display = isUrlSource ? '' : 'none';
             if (fieldDevice) fieldDevice.style.display = isUrlSource ? 'none' : '';
             if (fieldStreamUrl) fieldStreamUrl.style.display = isUrlSource ? '' : 'none';
-            if (streamUrlLabel) streamUrlLabel.textContent = 'URL Cámara IP';
+            if (streamUrlLabel) streamUrlLabel.textContent = t('js.ipCameraUrl');
             if (inputStreamUrl) {
                 inputStreamUrl.placeholder = 'http://192.168.0.234:8889/live/gopro8';
             }
-            if (btnLoadUrl) btnLoadUrl.textContent = 'Conectar cámara IP';
+            if (btnLoadUrl) btnLoadUrl.textContent = t('js.connectIpCamera');
 
             if (selRes) selRes.disabled = !!recording;
             if (selDevice) selDevice.disabled = !!recording || isUrlSource;
@@ -2117,13 +2146,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
             const lines = [];
             if (!envOk) {
-                lines.push('Captura de cámara no disponible aquí.');
+                lines.push(t('live.cameraUnavailable'));
             } else if (!isCaptureProject) {
-                lines.push('No es proyecto de captura.');
+                lines.push(t('live.notCaptureProject'));
             } else if (recording) {
-                lines.push(mode === 'review' ? 'Grabando · revisión' : 'Grabando');
+                lines.push(mode === 'review' ? t('live.recordingReview') : t('live.recording'));
             } else if (isUrlSource) {
-                lines.push('Fuente Cámara IP activa.');
+                lines.push(t('live.ipCameraActive'));
             }
             if (statusEl) statusEl.innerHTML = lines.length ? lines.join('<br/>') : '';
         }
@@ -2136,16 +2165,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const sel = $('#livecapture-device');
                 const prev = sel?.value || '';
                 if (sel) {
-                    sel.innerHTML = '<option value="">Predeterminada del sistema</option>';
+                    sel.innerHTML = `<option value="">${t('live.systemDefault')}</option>`;
                     devices.forEach((d) => {
                         const opt = document.createElement('option');
                         opt.value = d.deviceId;
-                        opt.textContent = d.label || 'Cámara';
+                        opt.textContent = d.label || t('live.camera');
                         sel.appendChild(opt);
                     });
                     if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
                 }
-                UI.toast('Cámaras detectadas', 'success');
+                UI.toast(t('toast.camerasDetected'), 'success');
                 scheduleLivePreviewRefresh();
             } catch (e) {
                 UI.toast(e?.message || 'No se pudo acceder a la cámara', 'error');
@@ -2169,16 +2198,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         btnLoadUrl?.addEventListener('click', () => {
             const kind = getLiveSourceKind();
             if (kind !== 'ip') {
-                UI.toast('Elegí "Cámara IP" como fuente.', 'info');
+                UI.toast(t('toast.selectIpSource'), 'info');
                 return;
             }
             const rawUrl = (inputStreamUrl?.value || '').trim();
             if (!rawUrl) {
-                UI.toast('Ingresá una URL válida de stream.', 'warning');
+                UI.toast(t('toast.enterValidStreamUrl'), 'warning');
                 return;
             }
             if (!/^https?:\/\//i.test(rawUrl)) {
-                UI.toast('La URL debe comenzar con http:// o https://', 'warning');
+                UI.toast(t('toast.urlMustBeHttp'), 'warning');
                 return;
             }
             clearTimeout(_previewDebounce);
@@ -2193,13 +2222,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         btnRec?.addEventListener('click', async () => {
             if (typeof isLiveRecordingActive === 'function' && isLiveRecordingActive()) return;
             if (typeof isLivePreviewActive !== 'function' || !isLivePreviewActive()) {
-                UI.toast('Conectá una fuente antes de grabar.', 'info');
+                UI.toast(t('toast.connectSourceFirst'), 'info');
                 return;
             }
             if (!facade) return;
             const sid = facade.getSessionId?.();
             if (!sid) {
-                UI.toast('Sesión de captura no lista.', 'error');
+                UI.toast(t('toast.captureSessionNotReady'), 'error');
                 return;
             }
             const deviceId = ($('#livecapture-device')?.value || '').trim() || undefined;
@@ -2211,7 +2240,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     deviceId,
                     resolution,
                 });
-                UI.toast('Grabando', 'success');
+                UI.toast(t('toast.recording'), 'success');
             } catch (e) {
                 UI.toast(e?.message || 'No se pudo iniciar la grabación', 'error');
             }
@@ -2229,7 +2258,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         btnStop?.addEventListener('click', async () => {
             if (!isLiveRecordingActive()) return;
             const ok = window.confirm(
-                '¿Finalizar la grabación y consolidar el video?\n\nSe descargará una copia .webm y quedará cargada en este partido.'
+                t('live.confirmStopRec')
             );
             if (!ok) return;
             try {
@@ -2249,11 +2278,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         btnDownload?.addEventListener('click', () => {
             const f = AppState.getLocalVideoFile?.();
             if (!f) {
-                UI.toast('No hay video local para descargar (detené la grabación antes).', 'info');
+                UI.toast(t('toast.noLocalVideoToDownload'), 'info');
                 return;
             }
             downloadLocalCaptureFile(f);
-            UI.toast('Descarga iniciada', 'success');
+            UI.toast(t('toast.downloadStarted'), 'success');
         });
 
         setInterval(refreshLiveCapturePanelState, 1000);
@@ -2331,7 +2360,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             _nativeControlsToggleBusy = false;
             syncPlayerChromeUi();
             if (!ok) {
-                UI.toast('No se pudo cambiar a modo nativo de YouTube', 'error');
+                UI.toast(t('toast.ytNativeToggleFailed'), 'error');
                 return;
             }
             UI.toast(!current ? 'Modo YouTube nativo activado' : 'Modo controles de la app activado', 'success');
@@ -2592,7 +2621,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const urlParams = new URLSearchParams(window.location.search);
             const isReadOnly = urlParams.get('mode') === 'view';
             if (isReadOnly && mode !== 'view') {
-                UI.toast('Este enlace está en solo lectura', 'info');
+                UI.toast(t('toast.readOnlyLink'), 'info');
                 closeMenu();
                 return;
             }
@@ -2693,16 +2722,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             btnBB.style.display = '';
             btnBB.classList.toggle('is-pro-locked', !AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES));
             btnBB.title = AppState.hasFeature(FEATURES.BUTTONBOARD_TEMPLATES)
-                ? 'Ventanas de código'
-                : 'Ventanas de código — PRO';
+                ? t('bb.title')
+                : t('menu.codeWindowsPro');
         }
 
         const btnPopout = $('#btn-open-popout');
         if (btnPopout) {
             btnPopout.classList.toggle('is-pro-locked', !AppState.hasFeature(FEATURES.POPOUT_PLAYER));
             btnPopout.title = AppState.hasFeature(FEATURES.POPOUT_PLAYER)
-                ? 'Abrir player en ventana externa'
-                : 'Player externo — PRO';
+                ? t('menu.popout')
+                : t('menu.popoutPro');
         }
     }
 
@@ -2749,7 +2778,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         if (state === 'saving') {
             btn.textContent = '…';
-            btn.title = savingCollection ? 'Guardando colección' : 'Guardando proyecto';
+            btn.title = savingCollection ? t('save.savingCollection') : t('save.savingProject');
             btn.setAttribute('aria-label', btn.title);
             btn.classList.add('is-saving');
             return;
@@ -2757,7 +2786,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         if (state === 'saved') {
             btn.textContent = '✓';
-            btn.title = savingCollection ? 'Colección guardada' : 'Proyecto guardado';
+            btn.title = savingCollection ? t('save.savedCollection') : t('save.savedProject');
             btn.setAttribute('aria-label', btn.title);
             btn.classList.add('is-saved');
             _saveButtonResetTimer = setTimeout(() => setSaveButtonState(), 1400);
@@ -2766,9 +2795,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         btn.textContent = '💾';
         if (savingCollection) {
-            btn.title = hasUnsavedChanges ? 'Guardar cambios de la colección' : 'Guardar colección';
+            btn.title = hasUnsavedChanges ? t('save.unsavedCollection') : t('save.saveCollection');
         } else {
-            btn.title = hasUnsavedChanges ? 'Guardar cambios pendientes' : 'Guardar proyecto';
+            btn.title = hasUnsavedChanges ? t('save.unsavedProject') : t('save.saveProject');
         }
         btn.setAttribute('aria-label', btn.title);
         btn.classList.toggle('is-dirty', !!hasUnsavedChanges);
@@ -2958,7 +2987,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                         YTPlayer.loadLocalVideo(url, file);
                         void _pushLocalMediaToPopout();
                     } else if (game.local_video_url) {
-                        UI.toast('Volvé a vincular el video local (Menú → Vincular video).', 'warning');
+                        UI.toast(t('toast.relinkVideoHint'), 'warning');
                     }
                 })();
             } else if (game.youtube_video_id) {
@@ -3068,7 +3097,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         syncFullscreenClipRail();
         const currentVideoId = YTPlayer.getCurrentVideoId();
         if (item.youtubeVideoId && item.youtubeVideoId !== currentVideoId) {
-            UI.toast('Cargando video…', 'info');
+            UI.toast(t('toast.loadingVideo'), 'info');
             await YTPlayer.loadVideoAsync(item.youtubeVideoId);
         }
         YTPlayer.playClip(item.startSec, item.endSec);
@@ -3119,6 +3148,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     AppState.on('tagTypesUpdated', () => {
         UI.renderTagButtons();
         UI.renderViewSources();
+    });
+
+    onLangChange(() => {
+        if (typeof UI.renderTagButtons === 'function') UI.renderTagButtons();
+        if (typeof UI.renderAnalyzeClips === 'function') UI.renderAnalyzeClips();
+        if (typeof UI.renderViewClips === 'function') UI.renderViewClips();
+        if (typeof UI.renderAnalyzePlaylists === 'function') UI.renderAnalyzePlaylists();
     });
 
     AppState.on('clipCommentsUpdated', () => {
@@ -3204,7 +3240,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const jsonMainBtn = document.querySelector('#modal-new-game .tab-btn[data-main-tab="json"]');
         if (jsonMainBtn) {
             jsonMainBtn.classList.toggle('is-pro-locked', !hasImportData);
-            jsonMainBtn.title = hasImportData ? 'Importar JSON' : 'Importar JSON — PRO';
+            jsonMainBtn.title = hasImportData ? t('js.importJson') : t('js.importJsonPro');
         }
 
         if (!hasImportData && activeMainTab === 'json') {
@@ -3322,7 +3358,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 return;
             }
             if (src === 'capture' && (typeof canRunLiveCapture !== 'function' || !canRunLiveCapture())) {
-                UI.toast('La captura no está disponible en este entorno (HTTPS, navegador compatible).', 'info');
+                UI.toast(t('toast.captureNotAvailable'), 'info');
                 return;
             }
             activeCreateSource = src;
@@ -3349,7 +3385,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         if (activeMainTab === 'json') {
             if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const jsonFile = $('#input-import-json').files[0];
-            if (!jsonFile) { UI.toast('Seleccioná un archivo .json', 'error'); return; }
+            if (!jsonFile) { UI.toast(t('toast.selectJsonFile'), 'error'); return; }
 
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -3362,10 +3398,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     UI.refreshAll();
 
                     if (!game.youtube_video_id) {
-                        UI.toast('Recordá vincular el archivo de video local si es necesario', 'info');
+                        UI.toast(t('toast.rememberRelinkLocal'), 'info');
                     }
                 } catch (err) {
-                    UI.toast('Error al leer el archivo JSON', 'error');
+                    UI.toast(t('toast.jsonReadError'), 'error');
                     console.error(err);
                 }
             };
@@ -3379,25 +3415,25 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         if (activeCreateSource === 'yt') {
             const rawYtInput = ($('#input-youtube-id')?.value || '').trim();
-            if (!title) { UI.toast('Ingresá un título', 'error'); return; }
-            if (!rawYtInput) { UI.toast('Ingresá un link de YouTube', 'error'); return; }
+            if (!title) { UI.toast(t('toast.enterTitle'), 'error'); return; }
+            if (!rawYtInput) { UI.toast(t('toast.enterYoutubeLink'), 'error'); return; }
             ytId = extractYouTubeId(rawYtInput);
-            if (!ytId) { UI.toast('No se pudo extraer el Video ID de YouTube', 'error'); return; }
+            if (!ytId) { UI.toast(t('toast.youtubeIdError'), 'error'); return; }
 
         } else if (activeCreateSource === 'local') {
             if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const localVideoInput = $('#input-local-video')?.files?.[0];
-            if (!title) { UI.toast('Ingresá un título', 'error'); return; }
-            if (!localVideoInput) { UI.toast('Seleccioná un video local', 'error'); return; }
+            if (!title) { UI.toast(t('toast.enterTitle'), 'error'); return; }
+            if (!localVideoInput) { UI.toast(t('toast.selectLocalVideo'), 'error'); return; }
             localVideoUrl = URL.createObjectURL(localVideoInput);
             _localVideoFileForCurrentGame = localVideoInput;
 
         } else if (activeCreateSource === 'capture') {
             if (typeof canRunLiveCapture !== 'function' || !canRunLiveCapture()) {
-                UI.toast('La captura no está disponible en este entorno.', 'info');
+                UI.toast(t('toast.captureNotAvailableShort'), 'info');
                 return;
             }
-            if (!title) { UI.toast('Ingresá un título', 'error'); return; }
+            if (!title) { UI.toast(t('toast.enterTitle'), 'error'); return; }
 
             teardownPreviousPlayback();
             AppState.clearProject();
@@ -3498,7 +3534,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 _localVideoFileForCurrentGame = file;
                 AppState.setLocalVideoFile(file);
                 YTPlayer.loadLocalVideo(url, file);
-                UI.toast('Video re-vinculado ✅', 'success');
+                UI.toast(t('toast.videoRelinked'), 'success');
                 syncAnalyzeLiveCaptureTabVisibility();
             }
         });
@@ -3521,9 +3557,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             case 'out-minus': AppState.updateClipBounds(clipId, 'end_sec', -1); break;
             case 'out-plus': AppState.updateClipBounds(clipId, 'end_sec', 1); break;
             case 'delete-clip':
-                if (confirm('⚠️ ¿Eliminar este clip?\n\nEsta acción no se puede deshacer.')) {
+                if (confirm(t('confirm.deleteClip'))) {
                     AppState.deleteClip(clipId);
-                    UI.toast('Clip eliminado', 'success');
+                    UI.toast(t('toast.clipDeleted'), 'success');
                 }
                 break;
         }
@@ -3545,8 +3581,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     $('#btn-create-playlist').addEventListener('click', () => {
         const nameInput = $('#new-playlist-name');
         const name = nameInput.value.trim();
-        if (!name) { UI.toast('Ingresá un nombre', 'error'); return; }
-        if (!AppState.get('currentGameId')) { UI.toast('Primero seleccioná un partido', 'error'); return; }
+        if (!name) { UI.toast(t('toast.enterName'), 'error'); return; }
+        if (!AppState.get('currentGameId')) { UI.toast(t('toast.selectMatchFirst'), 'error'); return; }
         const newPl = AppState.addPlaylist(name);
         AppState.addActivity('playlist_created', { playlistName: name, playlistId: newPl.id });
         nameInput.value = '';
@@ -3559,8 +3595,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         btnViewCreatePl.addEventListener('click', () => {
             const nameInput = $('#view-new-playlist-name');
             const name = nameInput.value.trim();
-            if (!name) { UI.toast('Ingresá un nombre', 'error'); return; }
-            if (!AppState.get('currentGameId')) { UI.toast('Primero seleccioná un partido', 'error'); return; }
+            if (!name) { UI.toast(t('toast.enterName'), 'error'); return; }
+            if (!AppState.get('currentGameId')) { UI.toast(t('toast.selectMatchFirst'), 'error'); return; }
             const newPl = AppState.addPlaylist(name);
             AppState.addActivity('playlist_created', { playlistName: name, playlistId: newPl.id });
             nameInput.value = '';
@@ -3594,14 +3630,14 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (!playlistId) return;
             let projectId = AppState.get('currentProjectId');
             if (!projectId) {
-                UI.toast('Primero guardá el proyecto para compartir', 'error');
+                UI.toast(t('toast.saveProjectFirst'), 'error');
                 return;
             }
             const url = FirebaseData.getShareUrl(projectId, null, playlistId) + '&mode=view';
             navigator.clipboard.writeText(url).then(() => {
-                UI.toast('🔗 Link de Playlist copiado', 'success');
+                UI.toast(t('toast.playlistLinkCopied'), 'success');
             }).catch(() => {
-                prompt('Copiá este link:', url);
+                prompt(t('generic.copyThisLink'), url);
             });
         });
     }
@@ -3614,7 +3650,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (!playlistId) return;
             const projectId = AppState.get('currentProjectId');
             if (!projectId) {
-                UI.toast('Primero guardá el proyecto para compartir', 'error');
+                UI.toast(t('toast.saveProjectFirst'), 'error');
                 return;
             }
             const url = FirebaseData.getShareUrl(projectId, null, playlistId) + '&mode=view';
@@ -3631,7 +3667,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const playlists = AppState.get('playlists');
             const pl = playlists.find(p => p.id === playlistId);
             if (!pl) return;
-            const newName = prompt('Nuevo nombre para la playlist:', pl.name);
+            const newName = prompt(t('prompt.newPlaylistName'), pl.name);
             if (newName && newName.trim()) {
                 AppState.renamePlaylist(playlistId, newName.trim());
                 UI.toast(`Playlist renombrada: ${newName.trim()}`, 'success');
@@ -3647,7 +3683,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const playlists = AppState.get('playlists');
             const pl = playlists.find(p => p.id === playlistId);
             if (!pl) return;
-            if (confirm(`⚠️ ¿Eliminar la playlist "${pl.name}"?\n\nSe perderán todos los clips asociados a esta playlist.\nEsta acción no se puede deshacer.`)) {
+            if (confirm(t('confirm.deletePlaylist', { name: pl.name }))) {
                 AppState.clearPlaylistFilter();
                 AppState.deletePlaylist(playlistId);
                 UI.toast(`Playlist eliminada: ${pl.name}`, 'success');
@@ -3702,7 +3738,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         function _bbConfirmDiscardIfDirty() {
             if (!_bbIsEditorDirty()) return true;
-            return confirm('Tenés cambios sin guardar en este template. ¿Salir y descartarlos?');
+            return confirm(t('confirm.unsavedTemplate'));
         }
 
         _bbHideButtonboardsModal = function () {
@@ -3738,11 +3774,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             sel.innerHTML = '';
             const opt0 = document.createElement('option');
             opt0.value = '';
-            opt0.textContent = 'Empezar en blanco';
+            opt0.textContent = t('bb.startBlank');
             sel.appendChild(opt0);
             if ((_bbSystemTemplates || []).length) {
                 const ogSys = document.createElement('optgroup');
-                ogSys.label = 'Templates del sistema';
+                ogSys.label = t('bb.systemTemplates');
                 _bbSystemTemplates.forEach((tpl) => {
                     const o = document.createElement('option');
                     o.value = 's:' + encodeURIComponent(tpl.id);
@@ -3753,7 +3789,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
             if ((_bbUserTemplates || []).length) {
                 const ogUser = document.createElement('optgroup');
-                ogUser.label = 'Mis templates';
+                ogUser.label = t('bb.myTemplates');
                 _bbUserTemplates.forEach((tpl) => {
                     const o = document.createElement('option');
                     o.value = 'u:' + encodeURIComponent(tpl.id);
@@ -3798,17 +3834,17 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 onEdit: (tpl) => _bbOpenEditor('edit', tpl),
                 onDuplicate: async (tpl) => {
                     const uid = _bbGetUid();
-                    if (!uid) { UI.toast('Iniciá sesión para duplicar', 'error'); return; }
+                    if (!uid) { UI.toast(t('toast.loginToDuplicate'), 'error'); return; }
                     await ButtonboardTemplates.duplicateTemplate(uid, tpl);
-                    UI.toast('Template duplicado', 'success');
+                    UI.toast(t('toast.templateDuplicated'), 'success');
                     await _bbLoadAndRender();
                 },
                 onDelete: async (tpl) => {
-                    if (!confirm(`¿Borrar template "${tpl.name}"?`)) return;
+                    if (!confirm(t('confirm.deleteTemplate', { name: tpl.name }))) return;
                     const uid = _bbGetUid();
                     if (!uid) return;
                     await ButtonboardTemplates.deleteUserTemplate(uid, tpl.id);
-                    UI.toast('Template borrado', 'success');
+                    UI.toast(t('toast.templateDeleted'), 'success');
                     await _bbLoadAndRender();
                 },
             });
@@ -3822,7 +3858,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const nameEl = $('#bb-editor-name');
             const basedRow = $('#bb-editor-based-row');
             const basedSel = $('#bb-editor-based-on');
-            if (titleEl) titleEl.textContent = mode === 'edit' ? 'Editar template' : 'Nuevo template';
+            if (titleEl) titleEl.textContent = mode === 'edit' ? t('bb.editTemplate') : t('bb.newTemplate');
             if (nameEl) nameEl.value = template ? template.name : '';
             if (basedRow) basedRow.hidden = mode !== 'new';
             if (mode === 'new' && basedSel) {
@@ -3884,10 +3920,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         // Editor: save
         $('#btn-bb-editor-save') && $('#btn-bb-editor-save').addEventListener('click', async () => {
             const uid = _bbGetUid();
-            if (!uid) { UI.toast('Iniciá sesión para guardar', 'error'); return; }
+            if (!uid) { UI.toast(t('toast.loginToSave'), 'error'); return; }
             const nameEl = $('#bb-editor-name');
             const name = nameEl ? nameEl.value.trim() : '';
-            if (!name) { UI.toast('Ingresá un nombre', 'error'); return; }
+            if (!name) { UI.toast(t('toast.enterName'), 'error'); return; }
             const buttons = UI.readBBEditorButtons();
             const toSave = {
                 id: _bbEditorTemplate ? _bbEditorTemplate.id : undefined,
@@ -3900,7 +3936,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 _bbCloseEditor();
                 await _bbLoadAndRender();
             } catch (e) {
-                UI.toast('Error al guardar: ' + e.message, 'error');
+                UI.toast(t('toast.errorSaving') + e.message, 'error');
                 console.error(e);
             }
         });
@@ -3914,9 +3950,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         // Save current project board as template
         $('#btn-bb-save-as-template') && $('#btn-bb-save-as-template').addEventListener('click', async () => {
             const uid = _bbGetUid();
-            if (!uid) { UI.toast('Iniciá sesión para guardar templates', 'error'); return; }
+            if (!uid) { UI.toast(t('toast.loginToSaveTemplates'), 'error'); return; }
             const bbs = AppState.get('activeButtonboards');
-            if (!bbs || bbs.length === 0) { UI.toast('No hay ventana de código activa en el proyecto', 'error'); return; }
+            if (!bbs || bbs.length === 0) { UI.toast(t('toast.noActiveCodeWindow'), 'error'); return; }
             const current = bbs[0];
             try {
                 await ButtonboardTemplates.saveUserTemplate(uid, {
@@ -3926,7 +3962,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 UI.toast(`Ventana de código guardada como template: "${current.name}"`, 'success');
                 await _bbLoadAndRender();
             } catch (e) {
-                UI.toast('Error al guardar: ' + e.message, 'error');
+                UI.toast(t('toast.errorSaving') + e.message, 'error');
                 console.error(e);
             }
         });
@@ -3945,10 +3981,10 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
     $('#btn-add-selected-to-playlist').addEventListener('click', () => {
         const selected = UI.getSelectedClipIds();
-        if (selected.length === 0) { UI.toast('Seleccioná al menos un clip', 'error'); return; }
+        if (selected.length === 0) { UI.toast(t('toast.selectAtLeastOneClip'), 'error'); return; }
 
         const playlists = AppState.get('playlists');
-        if (playlists.length === 0) { UI.toast('Creá una playlist primero (o creala en el modal)', 'error'); }
+        if (playlists.length === 0) { UI.toast(t('toast.createPlaylistFirst'), 'error'); }
 
         UI.showAddToPlaylistModal(selected);
     });
@@ -3957,8 +3993,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     $('#btn-create-playlist-modal').addEventListener('click', () => {
         const nameInput = $('#new-playlist-name-modal');
         const name = nameInput.value.trim();
-        if (!name) { UI.toast('Ingresá un nombre', 'error'); return; }
-        if (!AppState.get('currentGameId')) { UI.toast('Primero seleccioná un partido', 'error'); return; }
+        if (!name) { UI.toast(t('toast.enterName'), 'error'); return; }
+        if (!AppState.get('currentGameId')) { UI.toast(t('toast.selectMatchFirst'), 'error'); return; }
 
         const newPl = AppState.addPlaylist(name);
         AppState.addActivity('playlist_created', { playlistName: name, playlistId: newPl.id });
@@ -3984,7 +4020,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         // Solo bloqueo de lectura: enlaces compartidos (típ. ?project=...&mode=view), no la vista Ver normal ni colección
         const isReadOnly = urlParams.get('mode') === 'view' && (!!urlParams.get('project') || !!urlParams.get('playlist'));
         if (isReadOnly) {
-            UI.toast('El explorador de proyectos no está disponible en modo lectura', 'info');
+            UI.toast(t('toast.projectsNotAvailableReadonly'), 'info');
             return;
         }
         if (isLiveRecordingActive()) {
@@ -4030,9 +4066,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
         updateSharedSectionUI();
 
-        listOwned.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Cargando...</p>';
+        listOwned.innerHTML = `<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">${t('generic.loading')}</p>`;
         if (listShared) {
-            listShared.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Cargando...</p>';
+            listShared.innerHTML = `<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">${t('generic.loading')}</p>`;
         }
 
         const sortAlpha = (arr, field) => arr.slice().sort((a, b) =>
@@ -4072,7 +4108,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     await FirebaseData.saveUserProjectFolders(folderUserId, folderState);
                 } catch (e) {
                     console.error('Save folder state error:', e);
-                    UI.toast('No se pudo guardar carpetas', 'error');
+                    UI.toast(t('toast.folderSaveError'), 'error');
                 } finally {
                     _folderSaveInFlight = false;
                     if (_folderSaveQueuedWhileBusy) {
@@ -4108,7 +4144,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (!name) return null;
             const exists = folderState.folders.some((f) => String(f.name).toLowerCase() === name.toLowerCase());
             if (exists) {
-                UI.toast('Esa carpeta ya existe', 'info');
+                UI.toast(t('toast.folderExists'), 'info');
                 return folderState.folders.find((f) => String(f.name).toLowerCase() === name.toLowerCase())?.id || null;
             }
             const folderId = `fld_${Date.now().toString(36)}`;
@@ -4137,7 +4173,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const renameFolder = async (folderId) => {
             const f = (folderState.folders || []).find((x) => x.id === folderId);
             if (!f) return;
-            const nextName = prompt('Nuevo nombre de la carpeta:', f.name);
+            const nextName = prompt(t('prompt.renameFolderName'), f.name);
             if (!nextName) return;
             const clean = String(nextName).trim();
             if (!clean || clean === f.name) return;
@@ -4145,7 +4181,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 x.id !== folderId && String(x.name || '').toLowerCase() === clean.toLowerCase()
             );
             if (duplicated) {
-                UI.toast('Ya existe una carpeta con ese nombre', 'error');
+                UI.toast(t('toast.folderExistsName'), 'error');
                 return;
             }
             f.name = clean;
@@ -4153,7 +4189,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             queueFolderStateSave();
             renderOwnedWithFolders();
             ensureProjectsSearchUI();
-            UI.toast('Carpeta renombrada', 'success');
+            UI.toast(t('toast.folderRenamed'), 'success');
         };
 
         const setFolderColor = (folderId, color) => {
@@ -4172,16 +4208,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const projectsInFolder = getOwnedProjectsInFolder(folderId);
             const count = projectsInFolder.length;
             const option = prompt(
-                `Eliminar carpeta "${folder.name}" (${count} proyecto${count === 1 ? '' : 's'}).\n\n` +
-                `1 = Dejar proyectos sin carpeta\n` +
-                `2 = Transferir proyectos a otra carpeta\n` +
-                `3 = Eliminar todos los proyectos de esta carpeta\n\n` +
-                `Escribí 1, 2 o 3`
+                t('prompt.folderAction', { name: folder.name })
             );
             if (!option) return;
             const choice = option.trim();
             if (!['1', '2', '3'].includes(choice)) {
-                UI.toast('Opción inválida. Escribí 1, 2 o 3.', 'error');
+                UI.toast(t('toast.invalidOption'), 'error');
                 return;
             }
 
@@ -4190,24 +4222,24 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 queueFolderStateSave();
                 renderOwnedWithFolders();
                 ensureProjectsSearchUI();
-                UI.toast('Carpeta eliminada. Proyectos movidos a "Sin carpeta".', 'success');
+                UI.toast(t('toast.folderDeletedMoved'), 'success');
                 return;
             }
 
             if (choice === '2') {
                 const candidates = (folderState.folders || []).filter((f) => f.id !== folderId);
                 if (!candidates.length) {
-                    UI.toast('No hay otra carpeta para transferir. Creá una primero.', 'info');
+                    UI.toast(t('toast.noOtherFolder'), 'info');
                     return;
                 }
                 const numbered = candidates.map((f, i) => `${i + 1} = ${f.name}`).join('\n');
                 const targetAnswer = prompt(
-                    `Elegí carpeta destino para "${folder.name}":\n\n${numbered}\n\nEscribí el número`
+                    t('prompt.folderTransfer', { options: numbered })
                 );
                 if (!targetAnswer) return;
                 const idx = Number(targetAnswer) - 1;
                 if (!Number.isInteger(idx) || idx < 0 || idx >= candidates.length) {
-                    UI.toast('Destino inválido.', 'error');
+                    UI.toast(t('toast.invalidDestination'), 'error');
                     return;
                 }
                 const target = candidates[idx];
@@ -4248,13 +4280,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (!panel || !list) return;
             if (panel.classList.contains('hidden')) return;
             if (!canUseFolders) {
-                list.innerHTML = '<p style="color:var(--text-muted);font-size:.78rem;">Iniciá sesión para administrar carpetas y guardarlas en la nube.</p>';
+                list.innerHTML = `<p style="color:var(--text-muted);font-size:.78rem;">${t('js.loginForFolders')}</p>`;
                 return;
             }
             const folders = sortedFolders();
             list.innerHTML = '';
             if (!folders.length) {
-                list.innerHTML = '<p style="color:var(--text-muted);font-size:.78rem;">No hay carpetas creadas todavía.</p>';
+                list.innerHTML = `<p style="color:var(--text-muted);font-size:.78rem;">${t('js.noFoldersYet')}</p>`;
                 return;
             }
             folders.forEach((folder) => {
@@ -4269,19 +4301,19 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const btnRename = document.createElement('button');
                 btnRename.type = 'button';
                 btnRename.className = 'btn btn-xs btn-ghost';
-                btnRename.textContent = 'Renombrar';
+                btnRename.textContent = t('generic.rename');
                 btnRename.addEventListener('click', () => renameFolder(folder.id));
                 const btnDelete = document.createElement('button');
                 btnDelete.type = 'button';
                 btnDelete.className = 'btn btn-xs btn-danger';
-                btnDelete.textContent = 'Eliminar';
+                btnDelete.textContent = t('generic.delete');
                 btnDelete.addEventListener('click', () => deleteFolderWithStrategy(folder.id));
                 const colorMenuWrap = document.createElement('div');
                 colorMenuWrap.style.cssText = 'position:relative;';
                 const btnColor = document.createElement('button');
                 btnColor.type = 'button';
                 btnColor.className = 'btn btn-xs btn-ghost';
-                btnColor.textContent = 'Color';
+                btnColor.textContent = t('projects.color');
                 const currentColor = getFolderColor(folder);
                 btnColor.style.borderColor = currentColor || 'var(--border)';
                 const colorMenu = document.createElement('div');
@@ -4391,7 +4423,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         const renderList = (container, arr, { withFolders = false } = {}) => {
             container.innerHTML = '';
             if (arr.length === 0) {
-                container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">No hay proyectos</p>';
+                container.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">${t('js.noProjects')}</p>`;
                 return;
             }
 
@@ -4478,9 +4510,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     addFolderBtn.type = 'button';
                     addFolderBtn.className = 'btn btn-xs btn-ghost';
                     addFolderBtn.style.cssText = 'display:flex;justify-content:flex-start;padding:6px 8px;border-radius:7px;';
-                    addFolderBtn.textContent = '+ Nueva carpeta...';
+                    addFolderBtn.textContent = t('js.addFolder');
                     addFolderBtn.addEventListener('click', async () => {
-                        const newName = prompt('Nombre de la nueva carpeta:');
+                        const newName = prompt(t('prompt.newFolderName'));
                         const newId = await createFolderFromInline(newName);
                         if (!newId) return;
                         const next = [...getProjectFolderIds(p.id), newId];
@@ -4498,7 +4530,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const shareBtn = document.createElement('button');
                 shareBtn.className = 'btn btn-xs btn-ghost project-share-btn';
                 shareBtn.innerHTML = actionIcons.share;
-                shareBtn.title = 'Compartir';
+                shareBtn.title = t('projects.share');
                 shareBtn.addEventListener('click', () => {
                     _pendingShareProjectId = p.id;
                     _pendingShareUrlBase = FirebaseData.getShareUrl(p.id);
@@ -4510,18 +4542,19 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const dupBtn = document.createElement('button');
                 dupBtn.className = 'btn btn-xs btn-ghost project-dup-btn';
                 dupBtn.innerHTML = actionIcons.duplicate;
-                dupBtn.title = 'Duplicar proyecto';
+                dupBtn.title = t('projects.duplicate');
                 dupBtn.addEventListener('click', async () => {
-                    UI.toast('Duplicando...', '');
+                    UI.toast(t('toast.duplicating'), '');
                     try {
                         const data = await FirebaseData.loadProject(p.id);
-                        if (!data) { UI.toast('Error al duplicar', 'error'); return; }
-                        data.title = (data.title || 'Proyecto') + ' (copia)';
+                        if (!data) { UI.toast(t('toast.duplicateError'), 'error'); return; }
+                        data.title = (data.title || t('js.defaultMatch')) + ` (${t('generic.copy')})`;
+
                         const newId = await FirebaseData.saveProject(null, data);
                         FirebaseData.addProjectLocally(newId, false);
-                        UI.toast('Proyecto duplicado ✅', 'success');
+                        UI.toast(t('toast.projectDuplicated'), 'success');
                         // Re-open projects modal to show new copy
-                        listOwned.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">Cargando...</p>';
+                        listOwned.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">${t('generic.loading')}</p>`;
                         const projects2 = await FirebaseData.listProjects(currentUser?.uid);
                         ownedProjectsCache = sortAlpha(projects2.filter(x => !x.isShared), 'title');
                         renderOwnedWithFolders();
@@ -4530,7 +4563,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                         renderList(listShared, refreshedSharedProjects);
                         updateSharedSectionUI();
                     } catch(e) {
-                        UI.toast('Error al duplicar', 'error');
+                        UI.toast(t('toast.duplicateError'), 'error');
                     }
                 });
 
@@ -4538,20 +4571,20 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const renameBtn = document.createElement('button');
                 renameBtn.className = 'btn btn-xs btn-ghost project-rename-btn';
                 renameBtn.innerHTML = actionIcons.rename;
-                renameBtn.title = 'Renombrar proyecto';
+                renameBtn.title = t('projects.rename');
                 renameBtn.addEventListener('click', async () => {
-                    const newName = prompt('Nuevo nombre del proyecto:', p.title);
+                    const newName = prompt(t('prompt.renameProjectName'), p.title);
                     if (!newName || !newName.trim() || newName.trim() === p.title) return;
                     try {
                         const data = await FirebaseData.loadProject(p.id);
-                        if (!data) { UI.toast('Error al renombrar', 'error'); return; }
+                        if (!data) { UI.toast(t('toast.renameError'), 'error'); return; }
                         data.title = newName.trim();
                         await FirebaseData.saveProject(p.id, data);
                         p.title = newName.trim();
                         info.querySelector('.project-title').textContent = p.title;
-                        UI.toast('Proyecto renombrado ✅', 'success');
+                        UI.toast(t('toast.projectRenamed'), 'success');
                     } catch(e) {
-                        UI.toast('Error al renombrar', 'error');
+                        UI.toast(t('toast.renameError'), 'error');
                     }
                 });
 
@@ -4559,7 +4592,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const loadBtn = document.createElement('button');
                 loadBtn.className = 'btn btn-xs btn-ghost project-load-btn';
                 loadBtn.innerHTML = p.isShared ? actionIcons.view : actionIcons.open;
-                loadBtn.title = 'Abrir proyecto';
+                loadBtn.title = t('projects.open');
                 const openProject = async () => {
                     UI.hideModal('modal-projects');
 
@@ -4568,7 +4601,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                         return;
                     }
 
-                    UI.toast('Cargando proyecto...', '');
+                    UI.toast(t('toast.loadingProject'), '');
                     const loaded = await AppState.loadFromCloud(p.id);
                     if (loaded) {
                         await Promise.all([
@@ -4576,12 +4609,12 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                             rememberLastProject(p.id),
                         ]);
                         FirebaseData.addProjectLocally(p.id, false);
-                        UI.toast('Proyecto cargado ✅', 'success');
+                        UI.toast(t('toast.projectLoaded'), 'success');
                         UI.refreshAll();
                         const url = FirebaseData.getShareUrl(p.id);
                         window.history.replaceState({}, '', url);
                     } else {
-                        UI.toast('Error al cargar', 'error');
+                        UI.toast(t('toast.loadError'), 'error');
                     }
                 };
                 loadBtn.addEventListener('click', openProject);
@@ -4602,21 +4635,18 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     }
 
                     const choice = prompt(
-                        `¿Qué querés hacer con "${p.title}"?\n\n` +
-                        `1 = Quitar solo de mi lista local\n` +
-                        `2 = Eliminar definitivamente de la nube\n\n` +
-                        `Escribí 1 o 2`
+                        t('prompt.projectAction', { title: p.title })
                     );
                     if (!choice) return;
 
                     if (choice.trim() === '1') {
                         FirebaseData.removeProjectLocally(p.id);
                         el.remove();
-                        UI.toast('Proyecto quitado de tu lista local.', 'success');
+                        UI.toast(t('toast.projectRemovedLocal'), 'success');
                         return;
                     }
                     if (choice.trim() !== '2') {
-                        UI.toast('Opción inválida. Escribí 1 o 2.', 'error');
+                        UI.toast(t('toast.invalidOption12'), 'error');
                         return;
                     }
 
@@ -4630,7 +4660,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     try {
                         await FirebaseData.deleteProjectCloud(p.id);
                         el.remove();
-                        UI.toast('Proyecto eliminado definitivamente de la nube.', 'success');
+                        UI.toast(t('toast.projectDeletedCloud'), 'success');
                     } catch (err) {
                         console.error('deleteProjectCloud error:', err);
                         UI.toast(`No se pudo eliminar de la nube: ${err.message || err}`, 'error');
@@ -4641,7 +4671,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     const moveBtn = document.createElement('button');
                     moveBtn.className = 'btn btn-xs btn-ghost project-move-btn';
                     moveBtn.innerHTML = actionIcons.move;
-                    moveBtn.title = 'Mover a carpeta';
+                    moveBtn.title = t('projects.moveFolder');
                     moveBtn.addEventListener('click', async () => {
                         document.querySelectorAll('.project-folder-picker-wrap').forEach((el2) => {
                             if (el2 !== info.querySelector('.project-folder-picker-wrap')) el2.style.display = 'none';
@@ -4712,7 +4742,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 : arr.filter((p) => normalizeText(p?.title).includes(needle));
 
             if (!filtered.length) {
-                container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">No hay proyectos para esa búsqueda</p>';
+                container.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">${t('js.noProjectsSearch')}</p>`;
                 return;
             }
 
@@ -4724,7 +4754,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const renderRecentSection = () => {
                 if (!recentRows.length) {
                     if (activeFolderFilterId === RECENT_FILTER_KEY) {
-                        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">No hay recientes</p>';
+                        container.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:16px;">${t('js.noRecent')}</p>`;
                         return true;
                     }
                     return false;
@@ -4792,7 +4822,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 title.className = 'project-group-title project-group-title--clickable';
                 const rowsInGroup = groups.get(key) || [];
                 const isCollapsed = collapsedFolderKeys.has(key);
-                title.innerHTML = `<span>${isCollapsed ? '▸' : '▾'} ${key === '__none__' ? 'Sin carpeta' : (folderById[key]?.name || 'Carpeta')}</span><span class="project-group-count">${rowsInGroup.length}</span>`;
+                title.innerHTML = `<span>${isCollapsed ? '▸' : '▾'} ${key === '__none__' ? t('js.noFolder') : (folderById[key]?.name || t('js.folder'))}</span><span class="project-group-count">${rowsInGroup.length}</span>`;
                 title.addEventListener('click', () => {
                     if (collapsedFolderKeys.has(key)) collapsedFolderKeys.delete(key);
                     else collapsedFolderKeys.add(key);
@@ -4815,8 +4845,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 };
                 foldersSummary.innerHTML = [
                     chip('', 'Todos', !activeFolderFilterId),
-                    chip(RECENT_FILTER_KEY, 'Recientes', activeFolderFilterId === RECENT_FILTER_KEY),
-                    chip(NO_FOLDER_FILTER_KEY, 'Sin carpeta', activeFolderFilterId === NO_FOLDER_FILTER_KEY),
+                    chip(RECENT_FILTER_KEY, t('js.recent'), activeFolderFilterId === RECENT_FILTER_KEY),
+                    chip(NO_FOLDER_FILTER_KEY, t('js.noFolder'), activeFolderFilterId === NO_FOLDER_FILTER_KEY),
                     ...folders.map((f) => chip(f.id, f.name, activeFolderFilterId === f.id, getFolderColor(f))),
                 ].join('');
                 foldersSummary.querySelectorAll('[data-folder-chip]').forEach((btn) => {
@@ -4849,9 +4879,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
         } catch (err) {
             console.error('[openProjectsModal] error:', err);
-            listOwned.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Error al conectar.</p>';
+            listOwned.innerHTML = `<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">${t('toast.connectionError')}</p>`;
             if (listShared) {
-                listShared.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Error al conectar.</p>';
+                listShared.innerHTML = `<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">${t('toast.connectionError')}</p>`;
             }
         }
     }
@@ -4882,7 +4912,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             return;
         }
         const list = $('#collection-list');
-        if (list) list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">Cargando...</p>';
+        if (list) list.innerHTML = `<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">${t('generic.loading')}</p>`;
         const cols = await FirebaseData.listUserCollections(uid);
         UI.renderCollectionsTab(cols);
         _wireCollectionTabButtons();
@@ -4894,16 +4924,16 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                 const colId = btn.dataset.colId;
                 UI.hideModal('modal-projects');
                 const data = await FirebaseData.loadCollection(colId);
-                if (!data) { UI.toast('No se pudo cargar la colección', 'error'); return; }
+                if (!data) { UI.toast(t('toast.collectionLoadError'), 'error'); return; }
                 AppState.openCollection(data);
             });
         });
         $('#collection-list')?.querySelectorAll('.col-delete-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const { colId, colName } = btn.dataset;
-                if (!confirm(`¿Eliminar la colección "${colName}"?\nEsta acción no se puede deshacer.`)) return;
+                if (!confirm(t('confirm.deletePlaylist', { name: colName }))) return;
                 await FirebaseData.deleteCollectionDoc(colId);
-                UI.toast('Colección eliminada', 'success');
+                UI.toast(t('toast.collectionDeleted'), 'success');
                 await _loadAndRenderCollections();
             });
         });
@@ -4913,7 +4943,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     $('#btn-create-collection')?.addEventListener('click', async () => {
         const input = $('#new-collection-name');
         const name = (input?.value || '').trim();
-        if (!name) { UI.toast('Ingresá un nombre', 'error'); return; }
+        if (!name) { UI.toast(t('toast.enterName'), 'error'); return; }
         const uid = AppState.get('userId');
         await FirebaseData.saveCollection(null, { name, ownerUid: uid === 'anonymous' ? null : uid, items: [] });
         if (input) input.value = '';
@@ -4930,21 +4960,21 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     $('#btn-collection-rename')?.addEventListener('click', async () => {
         const col = AppState.get('activeCollection');
         if (!col) return;
-        const name = prompt('Nuevo nombre:', col.name);
+        const name = prompt(t('prompt.renameCollectionName'), col.name);
         if (!name?.trim()) return;
         const updated = { ...col, name: name.trim() };
         await FirebaseData.saveCollection(col.id, updated);
         AppState.openCollection(updated, { clearProject: false });
-        UI.toast('Colección renombrada', 'success');
+        UI.toast(t('toast.collectionRenamed'), 'success');
     });
 
     $('#btn-collection-delete')?.addEventListener('click', async () => {
         const col = AppState.get('activeCollection');
         if (!col) return;
-        if (!confirm(`¿Eliminar la colección "${col.name}"?\nEsta acción no se puede deshacer.`)) return;
+        if (!confirm(t('confirm.deletePlaylist', { name: col.name }))) return;
         await FirebaseData.deleteCollectionDoc(col.id);
         AppState.closeCollection();
-        UI.toast('Colección eliminada', 'success');
+        UI.toast(t('toast.collectionDeleted'), 'success');
     });
 
     // ── Enviar playlist a colección ──
@@ -4980,11 +5010,11 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             return {
                 id: 'ci_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
                 sourceProjectId: AppState.get('currentProjectId') || '',
-                sourceProjectTitle: game ? (game.title || 'Partido') : 'Partido',
+                sourceProjectTitle: game ? (game.title || t('js.defaultMatch')) : t('js.defaultMatch'),
                 sourcePlaylistId: playlistId,
                 sourcePlaylistName: pl ? pl.name : '',
                 youtubeVideoId: game ? (game.youtube_video_id || '') : '',
-                tagLabel: tag ? tag.label : 'Clip',
+                tagLabel: tag ? _resolveTagLabel(tag) : 'Clip',
                 startSec: clip.start_sec,
                 endSec: clip.end_sec,
                 t_sec: clip.t_sec,
@@ -5015,7 +5045,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
     $('#btn-export-create-collection')?.addEventListener('click', async () => {
         const input = $('#export-new-collection-name');
         const name = (input?.value || '').trim();
-        if (!name) { UI.toast('Ingresá un nombre para la colección', 'error'); return; }
+        if (!name) { UI.toast(t('toast.enterCollectionName'), 'error'); return; }
         const uid = AppState.get('userId');
         const colId = await FirebaseData.saveCollection(null, { name, ownerUid: uid === 'anonymous' ? null : uid, items: [] });
         if (input) input.value = '';
@@ -5125,7 +5155,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const cancelled = AppState.cancelOpenManualClips();
             if (cancelled > 0) {
                 e.preventDefault();
-                UI.toast(`${cancelled} evento${cancelled > 1 ? 's' : ''} manual${cancelled > 1 ? 'es' : ''} cancelado${cancelled > 1 ? 's' : ''}`, 'info');
+                UI.toast(t('toast.manualCancelled', { n: cancelled }), 'info');
                 if (typeof UI.renderTagButtons === 'function') UI.renderTagButtons();
                 return;
             }
@@ -5356,7 +5386,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (isLockedPlaylist) {
                 AppState.clearTagFilters();
                 AppState.clearFilterFlags();
-                UI.toast('Se limpiaron los tags. La playlist compartida se mantiene.', 'info');
+                UI.toast(t('toast.tagsCleared'), 'info');
             } else {
                 AppState.clearAllFilters();
             }
@@ -5395,7 +5425,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (!AppState.hasFeature(FEATURES.EXPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             const xml = AppState.exportXML();
             if (!xml) {
-                UI.toast('No hay datos para exportar o no seleccionaste un partido', 'error');
+                UI.toast(t('toast.noDataToExport'), 'error');
                 return;
             }
 
@@ -5413,7 +5443,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         btnImportXml.addEventListener('click', () => {
             if (!AppState.hasFeature(FEATURES.IMPORT_DATA)) { UI.toast(getProFeatureMessage(), 'info'); return; }
             if (!AppState.get('currentGameId')) {
-                UI.toast('Primero creá o seleccioná un partido vacío adonde importar', 'error');
+                UI.toast(t('toast.createMatchToImport'), 'error');
                 return;
             }
             inputImportXml.click();
@@ -5475,7 +5505,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     const offsetMsg = offset !== 0 ? ` (Alineado: ${offset.toFixed(2)}s)` : "";
                     UI.toast(`¡Importado! ${res} clips agregados${offsetMsg}`, 'success');
                 } else {
-                    UI.toast('Error al leer el XML', 'error');
+                    UI.toast(t('toast.xmlReadError'), 'error');
                 }
             };
             reader.readAsText(file);
@@ -5493,13 +5523,13 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
         if (activeCollection) {
             if (document.body.classList.contains('read-only-mode')) {
-                UI.toast('Solo lectura: no podés guardar esta colección.', 'error');
+                UI.toast(t('toast.readOnlyNoSave'), 'error');
                 return;
             }
             setSaveButtonState('saving');
             try {
                 await FirebaseData.saveCollection(activeCollection.id, activeCollection);
-                UI.toast('Colección guardada ✅', 'success');
+                UI.toast(t('toast.collectionSaved'), 'success');
                 hasUnsavedChanges = false;
                 setSaveButtonState('saved');
             } catch (err) {
@@ -5530,7 +5560,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
 
             // First save nudge: offer enabling autosave so user doesn't forget future saves.
             if (!isAutoSaveEnabled() && !_autoSaveNudgeShown) {
-                const wantsAutoSave = confirm('Proyecto guardado ✅\n\n¿Querés activar Auto-guardar cada 60 segundos para este proyecto?');
+                const wantsAutoSave = confirm(t('confirm.autoSavePrompt'));
                 _autoSaveNudgeShown = true;
                 if (wantsAutoSave) {
                     setAutoSaveEnabled(true);
@@ -5554,9 +5584,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         UI.hideModal('modal-share-options');
         const url = _pendingShareUrlBase;
         navigator.clipboard.writeText(url).then(() => {
-            UI.toast('🔗 Link (Edición) copiado', 'success');
+            UI.toast(t('toast.linkEditCopied'), 'success');
         }).catch(() => {
-            prompt('Copiá este link:', url);
+            prompt(t('generic.copyThisLink'), url);
         });
     });
 
@@ -5564,9 +5594,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         UI.hideModal('modal-share-options');
         const url = _pendingShareUrlBase + '&mode=view';
         navigator.clipboard.writeText(url).then(() => {
-            UI.toast('🔗 Link (Solo Ver) copiado', 'success');
+            UI.toast(t('toast.linkViewCopied'), 'success');
         }).catch(() => {
-            prompt('Copiá este link:', url);
+            prompt(t('generic.copyThisLink'), url);
         });
     });
 
@@ -5624,9 +5654,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             UI.hideModal('modal-share-options');
             const url = _pendingShareUrlBase + '&playlist=' + plId + '&mode=view';
             navigator.clipboard.writeText(url).then(() => {
-                UI.toast('🔗 Link de Playlist copiado', 'success');
+                UI.toast(t('toast.playlistLinkCopied'), 'success');
             }).catch(() => {
-                prompt('Copiá este link:', url);
+                prompt(t('generic.copyThisLink'), url);
             });
         });
     }
@@ -5674,8 +5704,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const urls = getShareUrls();
             if (!urls) { UI.toast('Guardá el proyecto primero', 'error'); return; }
             navigator.clipboard.writeText(urls.collab).then(() => {
-                UI.toast('🔗 Link colaborativo copiado', 'success');
-            }).catch(() => prompt('Copiá este link:', urls.collab));
+                UI.toast(t('toast.linkCollabCopied'), 'success');
+            }).catch(() => prompt(t('generic.copyThisLink'), urls.collab));
         });
     }
 
@@ -5686,8 +5716,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const urls = getShareUrls();
             if (!urls) { UI.toast('Guardá el proyecto primero', 'error'); return; }
             navigator.clipboard.writeText(urls.readonly).then(() => {
-                UI.toast('🔗 Link solo lectura copiado', 'success');
-            }).catch(() => prompt('Copiá este link:', urls.readonly));
+                UI.toast(t('toast.linkReadonlyCopied'), 'success');
+            }).catch(() => prompt(t('generic.copyThisLink'), urls.readonly));
         });
     }
 
@@ -5723,8 +5753,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             if (!plId) { UI.toast('Seleccioná una playlist', 'error'); return; }
             const url = urls.base + '&playlist=' + plId + '&mode=view';
             navigator.clipboard.writeText(url).then(() => {
-                UI.toast('🔗 Link de Playlist copiado', 'success');
-            }).catch(() => prompt('Copiá este link:', url));
+                UI.toast(t('toast.playlistLinkCopied'), 'success');
+            }).catch(() => prompt(t('generic.copyThisLink'), url));
         });
     }
 
@@ -5773,8 +5803,8 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             const url = await ensureCollectionShareAndGetViewUrl();
             if (!url) return;
             navigator.clipboard.writeText(url).then(() => {
-                UI.toast('🔗 Enlace de colección copiado', 'success');
-            }).catch(() => prompt('Copiá este link:', url));
+                UI.toast(t('toast.linkCollectionCopied'), 'success');
+            }).catch(() => prompt(t('generic.copyThisLink'), url));
         });
     }
 
@@ -5862,15 +5892,15 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             }
 
             if (!projectId) {
-                UI.toast('Primero guardá el proyecto para compartir', 'error');
+                UI.toast(t('toast.saveProjectFirst'), 'error');
                 return;
             }
 
             const url = FirebaseData.getShareUrl(projectId, null, playlistId) + '&mode=view';
             navigator.clipboard.writeText(url).then(() => {
-                UI.toast('🔗 Link de Playlist copiado', 'success');
+                UI.toast(t('toast.playlistLinkCopied'), 'success');
             }).catch(() => {
-                prompt('Copiá este link:', url);
+                prompt(t('generic.copyThisLink'), url);
             });
             return;
         }
@@ -5882,7 +5912,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
             let projectId = AppState.get('currentProjectId');
 
             if (!projectId) {
-                UI.toast('Primero guardá el proyecto para compartir', 'error');
+                UI.toast(t('toast.saveProjectFirst'), 'error');
                 return;
             }
 
@@ -5920,6 +5950,9 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         // Así la consola puede probar loadLiveCapture sin esperar getUserDoc ni proyectos.
         try {
             await YTPlayer.init();
+            YTPlayer.setMediaErrorHandler?.((msg) => {
+                UI.toast(msg || t('toast.videoLoadError'), 'error');
+            });
         } catch (e) {
             console.warn('YouTube Player no se pudo iniciar inmediatamente (común en file://).', e);
         }
@@ -6024,7 +6057,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
 
         if (projectIdToLoad) {
-            UI.toast(projectIdFromUrl ? 'Cargando proyecto...' : 'Cargando último proyecto...', '');
+            UI.toast(projectIdFromUrl ? t('toast.loadingProject') : t('toast.loadingLastProject'), '');
             const loaded = await AppState.loadFromCloud(projectIdToLoad, {
                 initialPlaylistId: playlistIdFromUrl || '',
             });
@@ -6051,7 +6084,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
                     FirebaseData.markProjectOpened(projectIdToLoad),
                     rememberLastProject(projectIdToLoad),
                 ]);
-                UI.toast('Proyecto cargado ✅', 'success');
+                UI.toast(t('toast.projectLoaded'), 'success');
 
                 if (gameIdFromUrl) {
                     AppState.setCurrentGame(gameIdFromUrl);
@@ -6129,7 +6162,7 @@ import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
         }
 
         if (collectionIdFromUrl && !projectIdFromUrl) {
-            UI.toast('Cargando colección...', '');
+            UI.toast(t('toast.loadingCollection'), '');
             const colData = await FirebaseData.loadCollection(collectionIdFromUrl);
             if (colData) {
                 AppState.openCollection(colData);

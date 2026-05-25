@@ -3,6 +3,7 @@
    All DOM rendering and update functions
    ═══════════════════════════════════════════ */
 
+import { t, getLang, getBuiltinTagLabel } from './i18n.js';
 import { AppState } from './state.js';
 import { isLiveRecordingActive } from './livecapture/liveRecordingController.js';
 import { YTPlayer } from './youtubePlayer.js';
@@ -113,12 +114,7 @@ export const UI = (() => {
         importante: '⭐'
     };
 
-    const FLAG_LABELS = {
-        bueno: 'Bueno',
-        acorregir: 'A corregir',
-        duda: 'Duda',
-        importante: 'Importante'
-    };
+    function getFlagLabel(flag) { return t('flag.' + flag) || flag; }
     const FLAG_SHORTCUTS = {
         bueno: '1',
         acorregir: '2',
@@ -190,6 +186,12 @@ export const UI = (() => {
         postInput.title = isManual ? 'En modo manual, el evento se cierra tocando el botón de nuevo' : '';
     }
 
+    function _resolveTagDisplayLabel(tag) {
+        const builtinKey = tag.id.replace('tag-', '').replace(/-/g, '_');
+        const translated = getBuiltinTagLabel(builtinKey);
+        return translated !== builtinKey ? translated : tag.label;
+    }
+
     function renderTagButtons() {
         const containerTop = $('#tag-buttons-a');
         const containerBottom = $('#tag-buttons-b');
@@ -206,13 +208,13 @@ export const UI = (() => {
 
         function createTagBtn(tag) {
             const btn = document.createElement('button');
+            const displayLabel = _resolveTagDisplayLabel(tag);
             const isRival = tag.row === 'bottom';
             const captureMode = tag.captureMode === 'manual' ? 'manual' : 'fixed';
             const isManualOpen = captureMode === 'manual' && openManualTagIds.has(tag.id);
             let hotkey = '';
             const customHotkey = String(tag.hotkey || '').trim().toUpperCase();
 
-            // Skip hotkeys for special tags like "Start"
             if (!_tagEditMode && tag.id !== 'tag-start') {
                 if (customHotkey) {
                     hotkey = customHotkey;
@@ -233,10 +235,10 @@ export const UI = (() => {
             btn.dataset.captureMode = captureMode;
 
             if (hotkey) {
-                btn.innerHTML = `<span class="tag-label-main">${tag.label}</span><span class="tag-hotkey-hint" style="font-size:0.65rem; opacity:0.6; margin-left:4px;">[${hotkey}]</span>`;
+                btn.innerHTML = `<span class="tag-label-main">${displayLabel}</span><span class="tag-hotkey-hint" style="font-size:0.65rem; opacity:0.6; margin-left:4px;">[${hotkey}]</span>`;
                 btn.dataset.hotkey = hotkey.toLowerCase();
             } else {
-                btn.innerHTML = `<span class="tag-label-main">${tag.label}</span>`;
+                btn.innerHTML = `<span class="tag-label-main">${displayLabel}</span>`;
             }
             if (captureMode === 'manual') {
                 const dot = document.createElement('span');
@@ -245,9 +247,10 @@ export const UI = (() => {
                 btn.appendChild(dot);
             }
 
+            const modeLabel = captureMode === 'manual' ? t('js.manualMode') : t('js.fixedMode');
             btn.title = _tagEditMode
-                ? `Click para editar "${tag.label}"`
-                : `${tag.label} — ${captureMode === 'manual' ? 'Modo Manual' : 'Modo Fijo'} — Pre: ${tag.pre_sec}s | Post: ${tag.post_sec}s${hotkey ? ` | Hotkey: ${hotkey}` : ''}`;
+                ? `${t('js.clickToEdit')} "${displayLabel}"`
+                : `${displayLabel} — ${modeLabel} — Pre: ${tag.pre_sec}s | Post: ${tag.post_sec}s${hotkey ? ` | Hotkey: ${hotkey}` : ''}`;
 
             btn.addEventListener('click', () => {
                 if (_tagEditMode) {
@@ -256,7 +259,7 @@ export const UI = (() => {
                 }
                 // Normal mode: create clip
                 if (!AppState.get('currentGameId')) {
-                    toast('Primero seleccioná un partido', 'error');
+                    toast(t('toast.selectMatchFirst'), 'error');
                     return;
                 }
                 const tSec = Math.round(YTPlayer.getCurrentTime());
@@ -277,7 +280,7 @@ export const UI = (() => {
                 if (clip) {
                     btn.classList.add('tag-flash');
                     setTimeout(() => btn.classList.remove('tag-flash'), 500);
-                    toast(`Clip creado: ${tag.label} @ ${formatTime(tSec)}`, 'success');
+                    toast(t('toast.clipCreated', { label: _resolveTagDisplayLabel(tag), time: formatTime(tSec) }), 'success');
 
                     // Auto-scroll to the newly created clip
                     const clipEl = document.querySelector(`.clip-item[data-clip-id="${clip.id}"]`);
@@ -302,14 +305,14 @@ export const UI = (() => {
             const addBtnTop = document.createElement('button');
             addBtnTop.className = 'tag-btn tag-btn-add';
             addBtnTop.textContent = '+';
-            addBtnTop.title = 'Agregar tag (propio)';
+            addBtnTop.title = t('js.addTagOwn');
             addBtnTop.addEventListener('click', () => openTagInlineEditor(null, 'top'));
             containerTop.appendChild(addBtnTop);
 
             const addBtnBottom = document.createElement('button');
             addBtnBottom.className = 'tag-btn tag-btn-rival tag-btn-add';
             addBtnBottom.textContent = '+';
-            addBtnBottom.title = 'Agregar tag (rival)';
+            addBtnBottom.title = t('js.addTagRival');
             addBtnBottom.addEventListener('click', () => openTagInlineEditor(null, 'bottom'));
             containerBottom.appendChild(addBtnBottom);
         }
@@ -336,7 +339,7 @@ export const UI = (() => {
                 const currentFlags = AppState.getClipUserFlags(clipId);
                 popover.innerHTML = allFlags.map(flag => {
                     const isActive = currentFlags.includes(flag);
-                    return `<button class="flag-popover-btn${isActive ? ' active' : ''}" data-clip-id="${clipId}" data-flag="${flag}" title="${FLAG_LABELS[flag]} [${FLAG_SHORTCUTS[flag]}]">${FLAG_EMOJI[flag]}</button>`;
+                    return `<button class="flag-popover-btn${isActive ? ' active' : ''}" data-clip-id="${clipId}" data-flag="${flag}" title="${getFlagLabel(flag)} [${FLAG_SHORTCUTS[flag]}]">${FLAG_EMOJI[flag]}</button>`;
                 }).join('');
                 btn.parentElement.style.position = 'relative';
                 btn.parentElement.appendChild(popover);
@@ -389,7 +392,7 @@ export const UI = (() => {
         const comments = AppState.getComments(playlistId, clipId);
         const drawCount = comments.filter(c => c.drawing).length;
         const hasClass = drawCount > 0 ? ' has-drawings' : '';
-        return `<button class="clip-draw-btn${hasClass}" data-clip-id="${clipId}" data-playlist-id="${playlistId}" title="Dibujar (${drawCount})">🎨${drawCount > 0 ? drawCount : ''}</button>`;
+        return `<button class="clip-draw-btn${hasClass}" data-clip-id="${clipId}" data-playlist-id="${playlistId}" title="${t('js.draw')} (${drawCount})">🎨${drawCount > 0 ? drawCount : ''}</button>`;
     }
 
     function buildChatPanel(playlistId, clipId) {
@@ -459,7 +462,7 @@ export const UI = (() => {
             const sendMessage = () => {
                 const name = nameInput.value.trim();
                 const text = textInput.value.trim();
-                if (!name) { toast('Escribí tu nombre', 'error'); nameInput.focus(); return; }
+                if (!name) { toast(t('toast.chatWriteName'), 'error'); nameInput.focus(); return; }
                 if (!text) return;
                 localStorage.setItem('sr_chat_name', name);
                 AppState.addComment(playlistId, clipId, name, text);
@@ -568,12 +571,12 @@ export const UI = (() => {
         const nameInput = panel.querySelector('.chat-name-input');
         const sendMessage = () => {
             if (document.body.classList.contains('read-only-mode')) {
-                toast('Solo lectura: no se pueden agregar comentarios.', 'error');
+                toast(t('toast.readOnlyNoComment'), 'error');
                 return;
             }
             const name = nameInput.value.trim();
             const text = textInput.value.trim();
-            if (!name) { toast('Escribí tu nombre', 'error'); nameInput.focus(); return; }
+            if (!name) { toast(t('toast.chatWriteName'), 'error'); nameInput.focus(); return; }
             if (!text) return;
             localStorage.setItem('sr_chat_name', name);
             AppState.addComment(playlistId, clipId, name, text);
@@ -629,7 +632,7 @@ export const UI = (() => {
                 const clipId = btn.dataset.clipId;
                 const playlistId = btn.dataset.playlistId;
                 if (!playlistId) {
-                    toast('El clip debe estar en una Playlist para usar el Chat', 'warning');
+                    toast(t('toast.chatNeedPlaylist'), 'warning');
                     return;
                 }
                 // Select clip and play it
@@ -695,23 +698,23 @@ export const UI = (() => {
                 _showExportProgress,
                 AppState.getLocalVideoFile()
             );
-            toast('Clip exportado ✅', 'success');
+            toast(t('toast.clipExported'), 'success');
         } catch (err) {
             console.error('Export clip error:', err);
-            toast('Error al exportar clip', 'error');
+            toast(t('toast.clipExportError'), 'error');
         } finally {
             _showExportProgress(null);
             btn.disabled = false;
             btn.classList.remove('clip-export-busy');
             btn.textContent = origText;
-            btn.title = 'Exportar clip MP4';
+            btn.title = t('js.exportClipMp4');
         }
     }
 
     async function _handlePlaylistExport(btn, playlistId, playlistName) {
         if (btn.disabled) return;
         const items = AppState.get('playlistItems')[playlistId] || [];
-        if (items.length === 0) { toast('La playlist no tiene clips', 'error'); return; }
+        if (items.length === 0) { toast(t('toast.playlistEmpty'), 'error'); return; }
 
         btn.disabled = true;
         btn.classList.add('clip-export-busy');
@@ -731,16 +734,16 @@ export const UI = (() => {
                 _showExportProgress,
                 AppState.getLocalVideoFile()
             );
-            toast('Playlist exportada ✅', 'success');
+            toast(t('toast.playlistExported'), 'success');
         } catch (err) {
             console.error('Export playlist error:', err);
-            toast('Error al exportar playlist', 'error');
+            toast(t('toast.playlistExportError'), 'error');
         } finally {
             _showExportProgress(null);
             btn.disabled = false;
             btn.classList.remove('clip-export-busy');
             btn.textContent = origText;
-            btn.title = 'Exportar playlist MP4';
+            btn.title = t('js.exportPlaylistMp4');
         }
     }
 
@@ -755,7 +758,7 @@ export const UI = (() => {
         $('#clip-count').textContent = clips.length;
 
         if (clips.length === 0) {
-            container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">Sin clips. Usá los tags para crear.</p>';
+            container.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">${t('js.noClipsCreateWithTags')}</p>`;
             return;
         }
 
@@ -773,16 +776,17 @@ export const UI = (() => {
             const urlParams = new URLSearchParams(window.location.search);
             const isReadOnly = urlParams.get('mode') === 'view';
 
-            const tagLabel = tag ? `${tag.label} ${clipNum}` : '?';
+            const displayLabel = tag ? _resolveTagDisplayLabel(tag) : '?';
+            const tagLabel = tag ? `${displayLabel} ${clipNum}` : '?';
 
             let playlistBtnHtml = '';
             if (!isReadOnly) {
-                playlistBtnHtml = `<button class="clip-action-icon clip-add-playlist" data-clip-id="${clip.id}" title="Agregar a playlist">📋</button>`;
+                playlistBtnHtml = `<button class="clip-action-icon clip-add-playlist" data-clip-id="${clip.id}" title="${t('js.addToPlaylist')}">📋</button>`;
             }
 
             let exportBtnHtml = '';
             if (isLocal && !isReadOnly) {
-                exportBtnHtml = `<button class="clip-action-icon clip-export-btn" data-clip-id="${clip.id}" title="Exportar clip MP4">📥</button>`;
+                exportBtnHtml = `<button class="clip-action-icon clip-export-btn" data-clip-id="${clip.id}" title="${t('js.exportClipMp4')}">📥</button>`;
             }
 
             el.innerHTML = `
@@ -792,7 +796,7 @@ export const UI = (() => {
         ${flagBtnHtml}
         ${exportBtnHtml}
         ${playlistBtnHtml}
-        <button class="clip-action-icon clip-delete-btn" data-clip-id="${clip.id}" title="Eliminar clip">🗑️</button>
+        <button class="clip-action-icon clip-delete-btn" data-clip-id="${clip.id}" title="${t('js.deleteClip')}">🗑️</button>
       `;
 
             el.addEventListener('click', (e) => {
@@ -823,7 +827,7 @@ export const UI = (() => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 AppState.deleteClip(btn.dataset.clipId);
-                toast('Clip eliminado', 'success');
+                toast(t('toast.clipDeleted'), 'success');
             });
         });
 
@@ -857,7 +861,7 @@ export const UI = (() => {
                 </svg>
             </span>`;
         if (!collections || !collections.length) {
-            list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">No tenés colecciones todavía.</p>';
+            list.innerHTML = `<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px;">${t('js.noCollectionsYet')}</p>`;
             return;
         }
         list.innerHTML = '';
@@ -887,7 +891,7 @@ export const UI = (() => {
         const list = $('#export-collection-list');
         if (!list) return;
         if (!collections || !collections.length) {
-            list.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">No tenés colecciones. Creá una arriba.</p>';
+            list.innerHTML = `<p style="color:var(--text-muted);font-size:0.82rem;">${t('js.noCollectionsCreate')}</p>`;
             return;
         }
         list.innerHTML = '';
@@ -913,7 +917,7 @@ export const UI = (() => {
         $('#view-clip-count').textContent = items.length;
 
         if (!items.length) {
-            container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">Esta colección está vacía.</p>';
+            container.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">${t('js.collectionEmpty')}</p>`;
             return;
         }
 
@@ -926,10 +930,10 @@ export const UI = (() => {
 
             const gameLabel = item.sourceProjectTitle
                 ? (item.sourceProjectTitle.length > 20 ? item.sourceProjectTitle.slice(0, 19) + '…' : item.sourceProjectTitle)
-                : 'Partido';
+                : t('js.defaultMatch');
 
             const nChat = colId ? AppState.getComments(colId, item.id).length : 0;
-            const chatHint = nChat ? `${nChat} comentario(s)` : 'Sin comentarios';
+            const chatHint = nChat ? `${nChat} ${t('js.comments')}` : t('js.noComments');
             const chatIcon = `<span class="clip-flag-slot${nChat ? ' on' : ''}" title="${chatHint}">💬</span>`;
 
             el.innerHTML = `
@@ -937,7 +941,7 @@ export const UI = (() => {
                 <span class="clip-tag-badge">${item.tagLabel || 'Clip'}</span>
                 ${chatIcon}
                 <span class="collection-clip-time">${formatTime(item.startSec)} – ${formatTime(item.endSec)}</span>
-                <button class="clip-action-btn col-item-delete-btn" data-idx="${idx}" title="Quitar de colección">✕</button>
+                <button class="clip-action-btn col-item-delete-btn" data-idx="${idx}" title="${t('js.removeFromCollection')}">✕</button>
             `;
 
             el.addEventListener('click', (e) => {
@@ -1040,7 +1044,7 @@ export const UI = (() => {
         $('#view-clip-count').textContent = clips.length;
 
         if (clips.length === 0) {
-            container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">Sin clips para esta selección.</p>';
+            container.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">${t('js.noClipsForSelection')}</p>`;
             updateSelectionBar();
             return;
         }
@@ -1056,43 +1060,41 @@ export const UI = (() => {
 
             const isRival = tag && tag.row === 'bottom';
             const badgeClass = isRival ? 'clip-tag-badge rival' : 'clip-tag-badge';
-            const tagLabel = tag ? `${tag.label} ${clipNum}` : '?';
+            const displayLabel = tag ? _resolveTagDisplayLabel(tag) : '?';
+            const tagLabel = tag ? `${displayLabel} ${clipNum}` : '?';
             const checked = _selectedClipIds.has(clip.id) ? 'checked' : '';
 
-            // Compact flag indicator: first flag emoji + count if multiple
             const allFlagKeys = ['bueno', 'acorregir', 'duda', 'importante'];
             const activeFlags = allFlagKeys.filter(f => flags.includes(f));
             let flagSlotsHtml = '';
             if (activeFlags.length === 0) {
-                flagSlotsHtml = `<span class="clip-flag-slot" title="Sin flags"></span>`;
+                flagSlotsHtml = `<span class="clip-flag-slot" title="${t('js.noFlags')}"></span>`;
             } else if (activeFlags.length === 1) {
                 flagSlotsHtml = `<span class="clip-flag-slot on" title="${activeFlags[0]}">${FLAG_EMOJI[activeFlags[0]]}</span>`;
             } else {
                 flagSlotsHtml = `<span class="clip-flag-slot on" title="${activeFlags.map(f => FLAG_EMOJI[f]).join(' ')}">${FLAG_EMOJI[activeFlags[0]]}<sup style="font-size:0.6rem;vertical-align:top;margin-left:1px;">+${activeFlags.length - 1}</sup></span>`;
             }
 
-            // Chat indicator slot (always present if in playlist, visible if has comments)
             let chatSlotHtml = '';
             if (activePlaylistId) {
                 const comments = AppState.getComments(activePlaylistId, clip.id);
                 const hasComments = comments.length > 0;
-                chatSlotHtml = `<span class="clip-flag-slot${hasComments ? ' on' : ''}" title="${hasComments ? comments.length + ' comentario(s)' : 'Sin comentarios'}">💬</span>`;
+                chatSlotHtml = `<span class="clip-flag-slot${hasComments ? ' on' : ''}" title="${hasComments ? comments.length + ' ' + t('js.comments') : t('js.noComments')}">💬</span>`;
             }
 
-            // Action buttons (direct, not in tiny slots)
             let actionSlotsHtml = '';
             let dragHandleHtml = '';
             if (!isReadOnly) {
                 const exportBtn = isLocal
-                    ? `<button class="clip-action-btn clip-export-btn" data-clip-id="${clip.id}" title="Exportar clip MP4">📥</button>`
+                    ? `<button class="clip-action-btn clip-export-btn" data-clip-id="${clip.id}" title="${t('js.exportClipMp4')}">📥</button>`
                     : '';
                 actionSlotsHtml = `
                     ${exportBtn}
-                    <button class="clip-action-btn clip-add-playlist" data-clip-id="${clip.id}" title="Agregar a playlist">📋</button>
-                    <button class="clip-action-btn clip-delete-btn" data-clip-id="${clip.id}" title="${activePlaylistId ? 'Quitar de playlist' : 'Eliminar clip'}">🗑️</button>`;
+                    <button class="clip-action-btn clip-add-playlist" data-clip-id="${clip.id}" title="${t('js.addToPlaylist')}">📋</button>
+                    <button class="clip-action-btn clip-delete-btn" data-clip-id="${clip.id}" title="${activePlaylistId ? t('js.removeFromPlaylist') : t('js.deleteClip')}">🗑️</button>`;
                 
                 if (activePlaylistId) {
-                    dragHandleHtml = `<span class="drag-handle" title="Arrastrar para reordenar">≡</span>`;
+                    dragHandleHtml = `<span class="drag-handle" title="${t('js.dragToReorder')}">≡</span>`;
                     // Native HTML5 drag is very aggressive and hijacks clicks.
                     // We dynamically enable draggable ONLY when hovering the handle.
                     
@@ -1222,12 +1224,12 @@ export const UI = (() => {
                 if (activePlaylistId) {
                     if (confirm('¿Quitar este clip de la playlist?')) {
                         AppState.removeClipFromPlaylist(activePlaylistId, clipId);
-                        UI.toast('Clip quitado de la playlist', 'success');
+                        UI.toast(t('toast.clipRemovedFromPlaylist'), 'success');
                     }
                 } else {
                     if (confirm('⚠️ ¿Eliminar este clip?\n\nEsta acción no se puede deshacer.')) {
                         AppState.deleteClip(clipId);
-                        UI.toast('Clip eliminado', 'success');
+                        UI.toast(t('toast.clipDeleted'), 'success');
                     }
                 }
             });
@@ -1340,7 +1342,8 @@ export const UI = (() => {
                     } else {
                         const tagInfo = AppState.getTagType(currentClip.tag_type_id);
                         const clipNum = AppState.getClipNumber(currentClip);
-                        $('#toolbar-clip-name').textContent = tagInfo ? `${tagInfo.label} ${clipNum}` : `Clip ${clipNum}`;
+                        const dlabel = tagInfo ? _resolveTagDisplayLabel(tagInfo) : 'Clip';
+                        $('#toolbar-clip-name').textContent = `${dlabel} ${clipNum}`;
                     }
                 }
                 toolbarEl.style.setProperty('display', 'flex', 'important');
@@ -1348,8 +1351,8 @@ export const UI = (() => {
                 const flags = AppState.getClipUserFlags(currentClipId);
                 $$('.flag-btn-mini').forEach(btn => {
                     const flag = btn.dataset.flag;
-                    if (flag && FLAG_LABELS[flag]) {
-                        btn.title = `${FLAG_LABELS[flag]} [${FLAG_SHORTCUTS[flag] || ''}]`.trim();
+                    if (flag && getFlagLabel(flag)) {
+                        btn.title = `${getFlagLabel(flag)} [${FLAG_SHORTCUTS[flag] || ''}]`.trim();
                     }
                     if (flags.includes(btn.dataset.flag)) {
                         btn.classList.add('active');
@@ -1376,13 +1379,13 @@ export const UI = (() => {
                     } else {
                         chatBtn.style.setProperty('opacity', '0.3', 'important');
                         chatBtn.style.cursor = 'not-allowed';
-                        chatBtn.title = 'El chat requiere una playlist o una colección activa';
+                        chatBtn.title = t('js.chatRequiresPlaylist');
                     }
                 }
                 if (drawBtn) {
                     drawBtn.style.setProperty('opacity', '1', 'important');
                     drawBtn.style.cursor = 'pointer';
-                    drawBtn.title = 'Dibujar';
+                    drawBtn.title = t('js.draw');
                 }
             } else {
                 toolbarEl.style.display = 'none';
@@ -1526,7 +1529,7 @@ export const UI = (() => {
 
             btn.addEventListener('click', () => {
                 if (isLockedPlaylist) {
-                    UI.toast('Estás viendo una playlist compartida y no podés quitar el filtro', 'info');
+                    UI.toast(t('toast.sharedPlaylistFilterLocked'), 'info');
                     return; // Lock it
                 }
 
@@ -1547,7 +1550,7 @@ export const UI = (() => {
                 const shareBtn = document.createElement('button');
                 shareBtn.className = 'btn btn-xs btn-share pl-share-btn';
                 shareBtn.dataset.playlistId = pl.id;
-                shareBtn.title = 'Compartir playlist';
+                shareBtn.title = t('js.sharePlaylist');
                 shareBtn.textContent = '🔗';
                 shareBtn.style.padding = '4px 6px';
                 wrap.appendChild(shareBtn);
@@ -1555,7 +1558,7 @@ export const UI = (() => {
                 const waBtn = document.createElement('button');
                 waBtn.className = 'btn btn-xs pl-wa-btn share-wa-btn';
                 waBtn.dataset.playlistId = pl.id;
-                waBtn.title = 'Compartir por WhatsApp';
+                waBtn.title = t('js.shareWhatsApp');
                 waBtn.style.padding = '4px 5px';
                 waBtn.style.background = 'transparent';
                 waBtn.style.border = 'none';
@@ -1612,7 +1615,7 @@ export const UI = (() => {
             const chip = document.createElement('span');
             const isRival = tag.row === 'bottom';
             chip.className = 'filter-chip' + (isRival ? ' rival' : '');
-            chip.innerHTML = `${tag.label}<button class="filter-chip-x" data-remove-tag="${tag.id}" title="Quitar">✕</button>`;
+            chip.innerHTML = `${tag.label}<button class="filter-chip-x" data-remove-tag="${tag.id}" title="${t('view.removeFilter')}">✕</button>`;
             container.appendChild(chip);
         });
 
@@ -1693,22 +1696,23 @@ export const UI = (() => {
 
         // Build dropdown content
         let html = `<div class="novedades-header">
-            <h4>\ud83d\udece\ufe0f Novedades</h4>
-            <button id="btn-sync-novedades" class="btn btn-xs btn-ghost" title="Sincronizar">\u27f3 Sincronizar</button>
+            <h4>\ud83d\udece\ufe0f ${t('nov.title')}</h4>
+            <button id="btn-sync-novedades" class="btn btn-xs btn-ghost" title="${t('nov.sync')}">\u27f3 ${t('nov.sync')}</button>
         </div>`;
 
         if (recentItems.length === 0) {
-            html += '<div class="nov-empty">No hay novedades.</div>';
+            html += `<div class="nov-empty">${t('nov.empty')}</div>`;
         } else {
             recentItems.forEach((item, idx) => {
-                const timeStr = item.timestamp ? new Date(item.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
+                const locale = getLang() === 'en' ? 'en-US' : 'es-AR';
+                const timeStr = item.timestamp ? new Date(item.timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
 
                 if (item.kind === 'comment') {
                     const tag = AppState.getTagType(item.tagTypeId);
                     const tagLabel = tag ? `${tag.label} ${item.clipNumber}` : 'Clip';
                     html += `<div class="nov-item nov-chat" data-action="comment" data-playlist-id="${item.playlistId}" data-clip-id="${item.clipId}" data-start="${item.start_sec}" data-end="${item.end_sec}">
                         <div class="nov-meta">
-                            <span class="nov-label">\ud83d\udcac en \u00ab${item.playlistName}\u00bb \u00b7 [${tagLabel}]</span>
+                            <span class="nov-label">\ud83d\udcac ${t('nov.chatIn', { name: item.playlistName })} \u00b7 [${tagLabel}]</span>
                             <span class="nov-time">${timeStr}</span>
                         </div>
                         <div class="nov-body"><span class="chat-name">${item.name}:</span> ${highlightMentions(item.text)}</div>
@@ -1717,10 +1721,10 @@ export const UI = (() => {
                     let icon = '\ud83d\udccb', actionText = '';
                     if (item.type === 'playlist_created') {
                         icon = '\ud83d\udcc1';
-                        actionText = `cre\u00f3 playlist \u00ab${item.playlistName}\u00bb`;
+                        actionText = t('nov.createdPlaylist', { name: item.playlistName });
                     } else if (item.type === 'playlist_updated') {
                         icon = '\ud83d\udccb';
-                        actionText = `agreg\u00f3 ${item.clipCount} clip${item.clipCount > 1 ? 's' : ''} a \u00ab${item.playlistName}\u00bb`;
+                        actionText = t('nov.addedClips', { n: item.clipCount, name: item.playlistName });
                     }
                     const plId = item.playlistId || '';
                     html += `<div class="nov-item nov-activity" data-action="activity" data-playlist-id="${plId}">
@@ -1770,13 +1774,13 @@ export const UI = (() => {
         if (syncBtn) {
             syncBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                toast('Sincronizando...', 'info');
+                toast(t('toast.syncing'), 'info');
                 const success = await AppState.loadFromCloud(pid);
                 if (success) {
-                    toast('Novedades actualizadas \u2705', 'success');
+                    toast(t('toast.newsUpdated'), 'success');
                     renderNotifications();
                 } else if (!isLiveRecordingActive()) {
-                    toast('Error al sincronizar', 'error');
+                    toast(t('toast.syncError'), 'error');
                 }
             });
         }
@@ -1874,14 +1878,14 @@ export const UI = (() => {
             btnShareTab.classList.toggle('active', mode === 'share');
             btnShareTab.style.display = 'inline-flex';
             btnShareTab.classList.toggle('is-pro-locked', !AppState.hasFeature('share'));
-            btnShareTab.title = AppState.hasFeature('share') ? 'Compartir' : 'Compartir — PRO';
+            btnShareTab.title = AppState.hasFeature('share') ? t('js.modeShare') : t('js.sharePro');
         }
         if (mobileShareItem) {
             mobileShareItem.style.display = 'block';
             mobileShareItem.classList.toggle('is-pro-locked', !AppState.hasFeature('share'));
         }
         if (mobileModeLabel) {
-            const modeName = mode === 'analyze' ? 'Analizar' : mode === 'view' ? 'Ver' : 'Compartir';
+            const modeName = mode === 'analyze' ? t('js.modeAnalyze') : mode === 'view' ? t('js.modeView') : t('js.modeShare');
             mobileModeLabel.textContent = modeName;
         }
 
@@ -1949,7 +1953,7 @@ export const UI = (() => {
         if (mobileViewItem) mobileViewItem.style.display = 'block';
         if (mobileShareItem) mobileShareItem.style.display = isReadOnly ? 'none' : 'block';
         if (mobileModeLabel && isReadOnly) {
-            mobileModeLabel.textContent = 'Solo lectura';
+            mobileModeLabel.textContent = t('js.readOnlyLabel');
         }
 
         const btnSave = $('#btn-save-project');
@@ -1974,8 +1978,8 @@ export const UI = (() => {
                 btnImportXml.style.display = 'inline-flex';
                 btnImportXml.classList.toggle('is-pro-locked', !AppState.hasFeature('importData'));
                 btnImportXml.title = AppState.hasFeature('importData')
-                    ? 'Importar proyecto desde XML'
-                    : 'Importar XML — PRO';
+                    ? t('js.importXml')
+                    : t('js.importXmlPro');
             }
             if (btnExportXml) {
                 btnExportXml.style.display = AppState.hasFeature('exportData') ? 'inline-flex' : 'none';
@@ -2026,7 +2030,7 @@ export const UI = (() => {
         if (sel && hasProject) {
             const playlists = AppState.get('playlists');
             if (playlists.length === 0) {
-                sel.innerHTML = '<option value="">(Sin playlists)</option>';
+                sel.innerHTML = `<option value="">${t('js.noPlaylistsSelect')}</option>`;
                 sel.disabled = true;
                 const plBtn = $('#share-btn-playlist');
                 if (plBtn) plBtn.disabled = true;
@@ -2082,8 +2086,8 @@ export const UI = (() => {
                     const clipCount = _pendingClipsForPlaylist.length;
                     AppState.addActivity('playlist_updated', { playlistName: pl.name, playlistId: pl.id, clipCount });
                     const msg = clipCount > 1
-                        ? `${clipCount} clips agregados a "${pl.name}"`
-                        : `Clip agregado a "${pl.name}"`;
+                        ? t('toast.clipsAddedToPlaylist', { n: clipCount, name: pl.name })
+                        : t('toast.clipAddedToPlaylist', { name: pl.name });
                     toast(msg, 'success');
                     if (clipCount > 1) {
                         clearClipSelection();
@@ -2147,7 +2151,7 @@ export const UI = (() => {
         // Show/hide delete button
         $('#btn-delete-tag').style.display = isNewTag ? 'none' : 'inline-flex';
         // Change save label
-        $('#btn-save-tag').textContent = isNewTag ? '+ Crear' : 'Guardar';
+        $('#btn-save-tag').textContent = isNewTag ? t('js.createTag') : t('js.saveTag');
 
         inlineEditor.style.display = 'block';
         renderTagButtons(); // re-render to highlight the editing tag
@@ -2164,7 +2168,7 @@ export const UI = (() => {
 
     function saveTagFromEditor() {
         const label = $('#edit-tag-label').value.trim();
-        if (!label) { toast('Ingresá un nombre', 'error'); return; }
+        if (!label) { toast(t('toast.enterName'), 'error'); return; }
         const pre_sec = parseInt($('#edit-tag-pre').value, 10) || 3;
         const rawPost = parseInt($('#edit-tag-post').value, 10) || 8;
         const captureMode = $('#edit-tag-capture-mode').value === 'manual' ? 'manual' : 'fixed';
@@ -2186,7 +2190,7 @@ export const UI = (() => {
         if (_editingTagId && _editingTagId !== '__new__') {
             if (!confirm('⚠️ ¿Eliminar este tag?\n\nSe eliminarán también todos los clips asociados a este tag.\nEsta acción no se puede deshacer.')) return;
             AppState.deleteTagType(_editingTagId);
-            toast('Tag eliminado', 'success');
+            toast(t('toast.tagDeleted'), 'success');
         }
         closeTagInlineEditor();
     }
@@ -2298,7 +2302,7 @@ export const UI = (() => {
         else if (btn.id === 'btn-clip-chat') {
             const scopeId = getChatScopePlaylistId();
             if (!scopeId) {
-                UI.toast('Necesitás una playlist o una colección abierta para el chat', 'warning');
+                UI.toast(t('toast.needPlaylistForChat'), 'warning');
                 return;
             }
             // Toggle video chat overlay
@@ -2314,7 +2318,7 @@ export const UI = (() => {
                 if (typeof DrawingTool.openPresentation === 'function') {
                     DrawingTool.openPresentation(null, clipId);
                 } else {
-                    UI.toast('Solo lectura: no se puede dibujar.', 'error');
+                    UI.toast(t('toast.readOnlyNoDraw'), 'error');
                 }
                 return;
             }
@@ -2323,32 +2327,32 @@ export const UI = (() => {
         }
         else if (btn.id === 'btn-clip-mark-out') {
             if (clip._fromCollection) {
-                UI.toast('En colección no se pueden editar los límites del clip.', 'info');
+                UI.toast(t('toast.collectionInNoEditClip'), 'info');
                 return;
             }
             const t = YTPlayer.getCurrentTime();
             if (t > clip.start_sec) {
                 AppState.updateClipAbsoluteBounds(clipId, clip.start_sec, t);
-                UI.toast('OUT fijado', 'success');
+                UI.toast(t('toast.outSet'), 'success');
                 YTPlayer.pause();
                 if (typeof YTPlayer.clearAutoPause === 'function') YTPlayer.clearAutoPause();
             } else {
-                UI.toast('El tiempo es menor al IN', 'error');
+                UI.toast(t('toast.timeLessThanIn'), 'error');
             }
         }
         else if (btn.id === 'btn-clip-mark-in') {
             if (clip._fromCollection) {
-                UI.toast('En colección no se pueden editar los límites del clip.', 'info');
+                UI.toast(t('toast.collectionInNoEditClip'), 'info');
                 return;
             }
             const t = YTPlayer.getCurrentTime();
             if (t < clip.end_sec) {
                 AppState.updateClipAbsoluteBounds(clipId, t, clip.end_sec);
-                UI.toast('IN fijado', 'success');
+                UI.toast(t('toast.inSet'), 'success');
                 YTPlayer.pause();
                 if (typeof YTPlayer.clearAutoPause === 'function') YTPlayer.clearAutoPause();
             } else {
-                UI.toast('El tiempo es mayor al OUT', 'error');
+                UI.toast(t('toast.timeGreaterThanOut'), 'error');
             }
         }
         else if (btn.dataset.action === 'delete-clip') {
@@ -2367,15 +2371,15 @@ export const UI = (() => {
             const div = document.createElement('div');
             div.className = 'bb-item' + (isSystem ? ' bb-item--system' : ' bb-item--user');
             div.innerHTML = `
-                <span class="bb-item-name">${tpl.name || 'Sin nombre'}</span>
-                <span class="bb-item-count">${(tpl.buttons || []).length} botones</span>
+                <span class="bb-item-name">${tpl.name || t('js.noName')}</span>
+                <span class="bb-item-count">${t('bb.buttons', { n: (tpl.buttons || []).length })}</span>
                 <div class="bb-item-actions"></div>
             `;
             const actions = div.querySelector('.bb-item-actions');
 
             const useBtn = document.createElement('button');
             useBtn.className = 'btn btn-xs btn-primary';
-            useBtn.textContent = 'Usar';
+            useBtn.textContent = t('generic.use');
             useBtn.addEventListener('click', () => onUse && onUse(tpl));
             actions.appendChild(useBtn);
 
@@ -2383,14 +2387,14 @@ export const UI = (() => {
                 const editBtn = document.createElement('button');
                 editBtn.className = 'btn btn-xs btn-ghost';
                 editBtn.textContent = '✏️';
-                editBtn.title = 'Editar';
+                editBtn.title = t('bb.edit');
                 editBtn.addEventListener('click', () => onEdit && onEdit(tpl));
                 actions.appendChild(editBtn);
 
                 const dupBtn = document.createElement('button');
                 dupBtn.className = 'btn btn-xs btn-ghost';
                 dupBtn.textContent = '⧉';
-                dupBtn.title = 'Duplicar';
+                dupBtn.title = t('bb.duplicate');
                 dupBtn.addEventListener('click', () => onDuplicate && onDuplicate(tpl));
                 actions.appendChild(dupBtn);
 
@@ -2398,7 +2402,7 @@ export const UI = (() => {
                 delBtn.className = 'btn btn-xs btn-ghost';
                 delBtn.style.color = 'var(--danger)';
                 delBtn.textContent = '🗑️';
-                delBtn.title = 'Borrar';
+                delBtn.title = t('bb.delete');
                 delBtn.addEventListener('click', () => onDelete && onDelete(tpl));
                 actions.appendChild(delBtn);
             }
@@ -2410,7 +2414,7 @@ export const UI = (() => {
         if (sysList) {
             sysList.innerHTML = '';
             if (systemTemplates.length === 0) {
-                sysList.innerHTML = '<p class="bb-loading">Sin templates del sistema</p>';
+                sysList.innerHTML = `<p class="bb-loading">${t('bb.noSystemTemplates')}</p>`;
             } else {
                 systemTemplates.forEach(t => sysList.appendChild(buildItem(t, true)));
             }
@@ -2418,7 +2422,7 @@ export const UI = (() => {
         if (userList) {
             userList.innerHTML = '';
             if (userTemplates.length === 0) {
-                userList.innerHTML = '<p class="bb-loading" style="color:var(--text-muted);">Todavía no tenés templates propios.</p>';
+                userList.innerHTML = `<p class="bb-loading" style="color:var(--text-muted);">${t('bb.noUserTemplates')}</p>`;
             } else {
                 userTemplates.forEach(t => userList.appendChild(buildItem(t, false)));
             }
@@ -2550,7 +2554,7 @@ export const UI = (() => {
             createTop.type = 'button';
             createTop.className = 'bb-builder-card bb-builder-card--create';
             createTop.innerHTML = '<span class="bb-builder-plus">＋</span><span class="bb-builder-plus-label">Nuevo</span>';
-            createTop.title = 'Crear botón en Propio';
+            createTop.title = t('bb.createOwnBtn');
             createTop.addEventListener('click', () => {
                 _bbSpotlightEditorColumnNextRender = true;
                 _bbEditorCreateRow = 'top';
@@ -2563,7 +2567,7 @@ export const UI = (() => {
             createBottom.type = 'button';
             createBottom.className = 'bb-builder-card bb-builder-card--create';
             createBottom.innerHTML = '<span class="bb-builder-plus">＋</span><span class="bb-builder-plus-label">Nuevo</span>';
-            createBottom.title = 'Crear botón en Rival';
+            createBottom.title = t('bb.createRivalBtn');
             createBottom.addEventListener('click', () => {
                 _bbSpotlightEditorColumnNextRender = true;
                 _bbEditorCreateRow = 'bottom';
@@ -2704,11 +2708,11 @@ export const UI = (() => {
                     'cursor:default',
                 ].join(';');
                 const topPreview = topButtons
-                    .map(b => `<span style="${basePreviewBtnStyle}">${b.label || 'Botón'}</span>`)
+                    .map(b => `<span style="${basePreviewBtnStyle}">${b.label || t('bb.button')}</span>`)
                     .join('');
                 const bottomPreviewStyle = basePreviewBtnStyle + ';border-color:rgba(239, 68, 68, 0.35);color:#fca5a5;';
                 const bottomPreview = bottomButtons
-                    .map(b => `<span style="${bottomPreviewStyle}">${b.label || 'Botón'}</span>`)
+                    .map(b => `<span style="${bottomPreviewStyle}">${b.label || t('bb.button')}</span>`)
                     .join('');
 
                 detail.innerHTML = `
@@ -2730,18 +2734,18 @@ export const UI = (() => {
                             <button type="button" class="bb-toggle-btn ${selectedMode === 'manual' ? 'active' : ''}" data-value="manual">Manual</button>
                         </div>
                         <div class="bb-toggle-group" data-target-input="bb-field-row">
-                            <button type="button" class="bb-toggle-btn ${selectedRow === 'top' ? 'active' : ''}" data-value="top">Propio</button>
-                            <button type="button" class="bb-toggle-btn ${selectedRow === 'bottom' ? 'active' : ''}" data-value="bottom">Rival</button>
+                            <button type="button" class="bb-toggle-btn ${selectedRow === 'top' ? 'active' : ''}" data-value="top">${t('bb.ownRow')}</button>
+                            <button type="button" class="bb-toggle-btn ${selectedRow === 'bottom' ? 'active' : ''}" data-value="bottom">${t('bb.rivalRow')}</button>
                         </div>
                         <input type="hidden" class="bb-field-mode" value="${selectedMode}" />
                         <input type="hidden" class="bb-field-row" value="${selectedRow}" />
                         <button type="button" class="btn btn-xs bb-hotkey-capture bb-field-hotkey" data-hotkey="" title=""></button>
-                        <button type="button" class="btn btn-xs btn-outline bb-field-create-inline bb-field-update-inline" id="bb-builder-apply-edit" title="Actualizar">💾</button>
+                        <button type="button" class="btn btn-xs btn-outline bb-field-create-inline bb-field-update-inline" id="bb-builder-apply-edit" title="${t('bb.update')}">💾</button>
                     </div>
                     <div class="bb-builder-preview">
-                        <div class="bb-preview-label">Vista previa</div>
-                        <div class="bb-preview-row" style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start;justify-content:flex-start;">${topPreview || '<span class="bb-pill">Sin botones propios</span>'}</div>
-                        <div class="bb-preview-row" style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start;justify-content:flex-start;">${bottomPreview || '<span class="bb-pill">Sin botones rivales</span>'}</div>
+                        <div class="bb-preview-label">${t('bb.preview')}</div>
+                        <div class="bb-preview-row" style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start;justify-content:flex-start;">${topPreview || `<span class="bb-pill">${t('bb.noOwnButtons')}</span>`}</div>
+                        <div class="bb-preview-row" style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start;justify-content:flex-start;">${bottomPreview || `<span class="bb-pill">${t('bb.noRivalButtons')}</span>`}</div>
                     </div>
                 `;
 
@@ -2896,7 +2900,7 @@ export const UI = (() => {
 
     return {
         $, $$, toast, formatTime,
-        FLAG_EMOJI, FLAG_LABELS,
+        FLAG_EMOJI, getFlagLabel,
         updateProjectTitle, renderTagButtons,
         renderAnalyzeClips, renderViewClips,
         updateClipEditControls,
