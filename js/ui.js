@@ -186,6 +186,21 @@ export const UI = (() => {
         postInput.title = isManual ? 'En modo manual, el evento se cierra tocando el botón de nuevo' : '';
     }
 
+    function _wireTagEditorToggleGroup(inputId) {
+        const group = document.querySelector(`.tag-editor-toggle-group[data-target-input="${inputId}"]`);
+        if (!group) return;
+        group.querySelectorAll('.tag-editor-toggle-btn').forEach((btn) => {
+            if (btn.dataset.wired === '1') return;
+            btn.dataset.wired = '1';
+            btn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                _setTagEditorToggleValue(inputId, btn.dataset.value || '');
+                if (inputId === 'edit-tag-capture-mode') _syncTagEditorFieldState();
+            });
+        });
+    }
+
     function _resolveTagDisplayLabel(tag) {
         const custom = (tag?.label || '').trim();
         if (custom) return custom;
@@ -2204,6 +2219,8 @@ export const UI = (() => {
         $('#edit-tag-post').value = tag ? tag.post_sec : 8;
         _setTagEditorToggleValue('edit-tag-capture-mode', (tag && tag.captureMode === 'manual') ? 'manual' : 'fixed');
         _setTagEditorToggleValue('edit-tag-row', tag ? tag.row : (defaultRow || 'top'));
+        _wireTagEditorToggleGroup('edit-tag-capture-mode');
+        _wireTagEditorToggleGroup('edit-tag-row');
         _syncTagEditorFieldState();
 
         // Show/hide delete button
