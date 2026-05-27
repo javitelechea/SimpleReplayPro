@@ -1313,7 +1313,21 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         }
     }
 
+    function dismissActiveClipForFullscreen() {
+        if (!AppState.get('currentClipId')) return;
+        try {
+            if (typeof YTPlayer !== 'undefined') YTPlayer.clearClipEnd?.();
+        } catch (_) { /* noop */ }
+        AppState.setCurrentClip(null);
+        try {
+            if (typeof YTPlayer !== 'undefined' && typeof YTPlayer.play === 'function') {
+                YTPlayer.play();
+            }
+        } catch (_) { /* noop */ }
+    }
+
     function hideAppOverlaysForFullscreen() {
+        dismissActiveClipForFullscreen();
         const chatPanel = $('#video-chat-panel');
         if (chatPanel) {
             chatPanel.style.display = 'none';

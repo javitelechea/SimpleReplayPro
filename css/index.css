@@ -2085,6 +2085,11 @@ html.sr-analyze-fs #quick-clip-menu:not(.hidden) {
   visibility: visible !important;
   pointer-events: auto !important;
   z-index: 10080 !important;
+  background: color-mix(in srgb, var(--bg-elevated) 48%, transparent 52%);
+  border-color: color-mix(in srgb, var(--border) 38%, transparent 62%);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 html.sr-analyze-fs #player-container:not(:fullscreen) .fullscreen-analyze-rail,
