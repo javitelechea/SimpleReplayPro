@@ -1432,7 +1432,7 @@ html.sr-player-fs-active .btn-expand,
 html.sr-player-fs-active #nav-arrows,
 html.sr-player-fs-active #toast-container,
 html.sr-player-fs-active #video-chat-panel,
-html.sr-player-fs-active #quick-clip-menu,
+html.sr-player-fs-active:not(.sr-analyze-fs) #quick-clip-menu,
 html.sr-player-fs-active .clip-chat-panel,
 html.sr-player-fs-active #export-progress,
 html.sr-player-fs-active #mobile-mode-menu,
@@ -2078,6 +2078,13 @@ html.sr-analyze-fs .player-chrome.is-fs-collapsed .analyze-fs-panel-toggle__icon
 .analyze-fs-clip-toast.is-visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+html.sr-analyze-fs #quick-clip-menu:not(.hidden) {
+  display: block !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  z-index: 10080 !important;
 }
 
 html.sr-analyze-fs #player-container:not(:fullscreen) .fullscreen-analyze-rail,

@@ -158,18 +158,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function positionQuickClipMenu() {
         const menu = $('#quick-clip-menu');
         if (!menu || menu.classList.contains('hidden')) return;
-        const list = $('#analyze-clip-list');
-        const activeClipId = AppState.get('currentClipId');
-        let anchorEl = null;
-        if (list && activeClipId) {
-            anchorEl = list.querySelector(`.clip-item[data-clip-id="${activeClipId}"]`);
-        }
-        if (!anchorEl && list) {
-            const lastClip = getLastClip();
-            if (lastClip) {
-                anchorEl = list.querySelector(`.clip-item[data-clip-id="${lastClip.id}"]`);
-            }
-        }
 
         const vw = window.innerWidth;
         const vh = window.innerHeight;
@@ -182,10 +170,44 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         let left = margin;
         let top = 78;
 
-        if (anchorEl) {
-            const r = anchorEl.getBoundingClientRect();
-            left = r.left;
-            top = r.bottom + 6;
+        const inAnalyzeFs = document.documentElement.classList.contains('sr-analyze-fs');
+
+        if (inAnalyzeFs) {
+            const tagBar = $('#tag-bar.tag-bar--analyze-overlay');
+            if (tagBar && !tagBar.classList.contains('hidden')) {
+                const r = tagBar.getBoundingClientRect();
+                left = (vw - menuW) / 2;
+                top = r.top - menuH - 8;
+                if (top < margin) top = r.bottom + 8;
+            } else {
+                const rail = $('#fullscreen-analyze-rail');
+                if (rail && !rail.classList.contains('hidden')) {
+                    const r = rail.getBoundingClientRect();
+                    left = Math.max(margin, r.left - menuW - 8);
+                    top = r.top;
+                } else {
+                    left = (vw - menuW) / 2;
+                    top = Math.max(margin, vh - menuH - 100);
+                }
+            }
+        } else {
+            const list = $('#analyze-clip-list');
+            const activeClipId = AppState.get('currentClipId');
+            let anchorEl = null;
+            if (list && activeClipId) {
+                anchorEl = list.querySelector(`.clip-item[data-clip-id="${activeClipId}"]`);
+            }
+            if (!anchorEl && list) {
+                const lastClip = getLastClip();
+                if (lastClip) {
+                    anchorEl = list.querySelector(`.clip-item[data-clip-id="${lastClip.id}"]`);
+                }
+            }
+            if (anchorEl) {
+                const r = anchorEl.getBoundingClientRect();
+                left = r.left;
+                top = r.bottom + 6;
+            }
         }
 
         left = Math.max(margin, Math.min(left, vw - menuW - margin));
