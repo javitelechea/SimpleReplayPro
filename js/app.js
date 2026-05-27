@@ -43,9 +43,11 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     const $ = UI.$;
 
     function _resolveTagLabel(tag) {
+        const custom = (tag?.label || '').trim();
+        if (custom) return custom;
         const key = tag.id.replace('tag-', '').replace(/-/g, '_');
         const translated = getBuiltinTagLabel(key);
-        return translated !== key ? translated : tag.label;
+        return translated !== key ? translated : 'Tag';
     }
 
     let latestUserDoc = null;
@@ -1193,6 +1195,59 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     const PSEUDO_FS_CLASS = 'sr-player-fs-active';
+    /** True while our container or document is in the browser Fullscreen API (not pseudo-FS alone). */
+    let _playerFsNativeActive = false;
+
+    function setPlayerNativeFsActive(active) {
+        _playerFsNativeActive = !!active;
+    }
+
+    function isOurNativeFullscreenElement(el) {
+        if (!el) return false;
+        const container = getPlayerContainer();
+        return el === container || el === document.documentElement;
+    }
+
+    function completePlayerFullscreenExit() {
+        setPlayerNativeFsActive(false);
+        if (isPseudoPlayerFullscreen()) exitPseudoPlayerFullscreen();
+        document.body.classList.remove('sr-analyze-fs');
+        cleanupFullscreenState();
+        syncAnalyzeFsUi();
+        syncPlayerChromeUi();
+        syncFullscreenClipRail();
+        if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive?.()) {
+            DrawingTool.close();
+        }
+    }
+
+    function syncAnalyzeFsUi(opts = {}) {
+        const on = AppState.get('mode') === 'analyze'
+            && !!AppState.get('currentGameId')
+            && (isPlayerFullscreen() || isPseudoPlayerFullscreen());
+        const entering = on && !_analyzeFsSessionActive;
+        document.documentElement.classList.toggle('sr-analyze-fs', on);
+        document.body.classList.toggle('sr-analyze-fs', on);
+        mountAnalyzeFsTagBar(on);
+        if (on) {
+            applyAnalyzeFsCollapsedUi({ expandTags: entering || opts.expandTags === true });
+            syncAnalyzeFsPanelLayout();
+            syncFullscreenAnalyzeRail();
+            _analyzeFsSessionActive = true;
+        } else {
+            document.documentElement.style.removeProperty('--sr-analyze-fs-rail-bottom');
+            $('#tag-bar')?.classList.remove('is-fs-collapsed');
+            $('#player-chrome')?.classList.remove('is-fs-collapsed');
+            _analyzeFsTagBarAnchor = null;
+            _analyzeFsSessionActive = false;
+        }
+    }
+
+    function readAnalyzeFsCollapsedPref(storageKey, mobileDefaultCollapsed = false) {
+        const stored = localStorage.getItem(storageKey);
+        if (stored === null && mobileDefaultCollapsed && isMobileLayout()) return true;
+        return stored === '1';
+    }
 
     function getNativeFullscreenElement() {
         return document.fullscreenElement || document.webkitFullscreenElement || null;
@@ -1398,6 +1453,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         document.documentElement.classList.add(PSEUDO_FS_CLASS);
         document.body.classList.add(PSEUDO_FS_CLASS);
         syncImmersiveFsUi();
+        if (AppState.get('mode') === 'analyze') syncAnalyzeFsUi();
         hideFsControls(getPlayerContainer());
         wirePseudoFsViewport();
         syncPseudoFsViewport();
@@ -1412,6 +1468,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function exitPseudoPlayerFullscreen() {
         document.documentElement.classList.remove(PSEUDO_FS_CLASS);
         document.body.classList.remove(PSEUDO_FS_CLASS);
+        document.body.classList.remove('sr-analyze-fs');
         stopPseudoFsViewportWatch();
         hideFsControls(getPlayerContainer());
         clearPseudoFsViewportStyles();
@@ -1432,21 +1489,39 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         if (!container) return false;
 
         hideAppOverlaysForFullscreen();
+        const mode = AppState.get('mode');
+        const useImmersiveStack = isMobileLayout() || mode === 'analyze';
 
-        if (isMobileLayout()) {
-            setFullscreenClipRailCollapsed(true);
+        if (useImmersiveStack) {
+            if (isMobileLayout()) {
+                setFullscreenClipRailCollapsed(true);
+            }
             await ensureAppYoutubeControlsForMobileFs();
             enterPseudoPlayerFullscreen();
             if (!isIosDevice()) {
-                await requestDocumentFullscreen();
+                setPlayerNativeFsActive(await requestDocumentFullscreen());
+            } else {
+                setPlayerNativeFsActive(false);
             }
-            revealFullscreenOverlays(container, 8000);
+            if (mode === 'analyze') {
+                revealFsControls(container, 0);
+            } else {
+                revealFullscreenOverlays(container, 8000);
+            }
+            syncAnalyzeFsUi({ expandTags: true });
+            syncFullscreenAnalyzeRail();
+            syncPlayerChromeUi();
+            requestAnimationFrame(() => {
+                syncFullscreenAnalyzeRail();
+                syncPlayerChromeUi();
+            });
             onPlayerFullscreenChange();
             return true;
         }
 
         const nativeOk = await requestNativePlayerFullscreen(container);
         if (nativeOk) {
+            setPlayerNativeFsActive(true);
             if (isLocalVideoSource()) {
                 revealFullscreenOverlays(container, 0);
             } else {
@@ -1457,6 +1532,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             return true;
         }
 
+        setPlayerNativeFsActive(false);
         enterPseudoPlayerFullscreen();
         revealFullscreenOverlays(container, isLocalVideoSource() ? 0 : 8000);
         onPlayerFullscreenChange();
@@ -1467,12 +1543,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         try {
             await exitNativePlayerFullscreen();
         } catch (_) { /* noop */ }
-        if (isPseudoPlayerFullscreen()) {
-            exitPseudoPlayerFullscreen();
-        }
-        cleanupFullscreenState();
-        syncPlayerChromeUi();
-        syncFullscreenClipRail();
+        completePlayerFullscreenExit();
     }
 
     async function togglePlayerFullscreen() {
@@ -1501,21 +1572,30 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function onPlayerFullscreenChange() {
+        const nativeEl = getNativeFullscreenElement();
+        const nativeIsOurs = isOurNativeFullscreenElement(nativeEl);
+
+        // Browser Esc / UI exited native FS while pseudo-FS (or chrome state) is still active.
+        if (_playerFsNativeActive && !nativeIsOurs) {
+            completePlayerFullscreenExit();
+            return;
+        }
+
+        if (nativeIsOurs) setPlayerNativeFsActive(true);
+
         const inFs = isPlayerFullscreen();
         if (!inFs) {
-            if (isPseudoPlayerFullscreen()) exitPseudoPlayerFullscreen();
-            cleanupFullscreenState();
-            syncPlayerChromeUi();
-            syncFullscreenClipRail();
-            if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive?.()) {
-                DrawingTool.close();
+            if (_playerFsNativeActive || isPseudoPlayerFullscreen()) {
+                completePlayerFullscreenExit();
             }
             return;
         }
 
         syncImmersiveFsUi();
+        syncAnalyzeFsUi();
         syncPlayerChromeUi();
         syncFullscreenClipRail();
+        syncFullscreenAnalyzeRail();
         if (shouldUseImmersiveFsControls()) {
             if (isLocalVideoSource()) {
                 revealFullscreenOverlays(getPlayerContainer(), 8000);
@@ -1641,6 +1721,277 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     const FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY = 'fullscreenClipRailCollapsed';
+    const FULLSCREEN_ANALYZE_RAIL_COLLAPSED_KEY = 'fullscreenAnalyzeRailCollapsed';
+    function getAnalyzeFsRailClip() {
+        if (typeof AppState.getLastCreatedClip === 'function') {
+            return AppState.getLastCreatedClip();
+        }
+        if (typeof AppState.getLastChronologicalClip === 'function') {
+            return AppState.getLastChronologicalClip();
+        }
+        return null;
+    }
+
+    function formatAnalyzeFsLastClipSummary(clip) {
+        if (!clip) return t('analyzeFs.noClipYet');
+        const tag = AppState.getTagType(clip.tag_type_id);
+        const num = AppState.getClipNumber(clip);
+        const label = tag ? `${_resolveTagLabel(tag)} ${num}` : 'Clip';
+        const markSec = typeof AppState.getClipMarkSec === 'function'
+            ? AppState.getClipMarkSec(clip)
+            : (clip.t_sec != null ? clip.t_sec : clip.start_sec);
+        return `${label} · ${UI.formatTime(markSec)}`;
+    }
+
+    function updateAnalyzeFsRailSummary(clip) {
+        const summaryEl = $('#fullscreen-analyze-rail-summary');
+        if (!summaryEl) return;
+        const last = clip || getAnalyzeFsRailClip();
+        summaryEl.textContent = formatAnalyzeFsLastClipSummary(last);
+        summaryEl.classList.toggle('is-empty', !last);
+    }
+    const FULLSCREEN_ANALYZE_TAGBAR_COLLAPSED_KEY = 'fullscreenAnalyzeTagBarCollapsed';
+    const FULLSCREEN_ANALYZE_CHROME_COLLAPSED_KEY = 'fullscreenAnalyzeChromeCollapsed';
+    let _analyzeFsHighlightClipId = null;
+    let _analyzeFsTagBarAnchor = null;
+    let _analyzeFsSessionActive = false;
+
+    function mountAnalyzeFsTagBar(mount) {
+        const tagBar = $('#tag-bar');
+        const container = getPlayerContainer();
+        if (!tagBar || !container) return;
+
+        if (mount) {
+            if (!_analyzeFsTagBarAnchor) {
+                _analyzeFsTagBarAnchor = {
+                    parent: tagBar.parentElement,
+                    next: tagBar.nextElementSibling,
+                };
+            }
+            tagBar.classList.remove('hidden');
+            tagBar.classList.add('tag-bar--analyze-overlay');
+            tagBar.style.zIndex = '25';
+            setFullscreenAnalyzeTagBarCollapsed(isFullscreenAnalyzeTagBarCollapsed());
+            if (tagBar.parentElement !== container) {
+                container.appendChild(tagBar);
+            }
+            if (typeof UI.renderTagButtons === 'function') UI.renderTagButtons();
+            return;
+        }
+
+        tagBar.classList.remove('tag-bar--analyze-overlay');
+        tagBar.style.zIndex = '';
+        const anchor = _analyzeFsTagBarAnchor;
+        if (anchor?.parent && tagBar.parentElement !== anchor.parent) {
+            if (anchor.next && anchor.next.parentElement === anchor.parent) {
+                anchor.parent.insertBefore(tagBar, anchor.next);
+            } else {
+                anchor.parent.appendChild(tagBar);
+            }
+        }
+    }
+
+    function isFullscreenAnalyzeRailCollapsed() {
+        return readAnalyzeFsCollapsedPref(FULLSCREEN_ANALYZE_RAIL_COLLAPSED_KEY, true);
+    }
+
+    function isFullscreenAnalyzeTagBarCollapsed() {
+        return readAnalyzeFsCollapsedPref(FULLSCREEN_ANALYZE_TAGBAR_COLLAPSED_KEY, false);
+    }
+
+    function isFullscreenAnalyzeChromeCollapsed() {
+        return readAnalyzeFsCollapsedPref(FULLSCREEN_ANALYZE_CHROME_COLLAPSED_KEY, true);
+    }
+
+    function setFullscreenAnalyzeRailCollapsed(collapsed) {
+        localStorage.setItem(FULLSCREEN_ANALYZE_RAIL_COLLAPSED_KEY, collapsed ? '1' : '0');
+        const rail = $('#fullscreen-analyze-rail');
+        const toggle = $('#fullscreen-analyze-rail-toggle');
+        if (!rail) return;
+        rail.classList.toggle('is-collapsed', collapsed);
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggle.title = collapsed ? t('analyzeFs.showList') : t('analyzeFs.hideList');
+        }
+        syncAnalyzeFsPanelLayout();
+    }
+
+    function setFullscreenAnalyzeTagBarCollapsed(collapsed) {
+        localStorage.setItem(FULLSCREEN_ANALYZE_TAGBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+        const tagBar = $('#tag-bar');
+        const toggle = $('#tag-bar-fs-toggle');
+        tagBar?.classList.toggle('is-fs-collapsed', collapsed);
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggle.title = collapsed ? t('analyzeFs.showTags') : t('analyzeFs.hideTags');
+        }
+        syncAnalyzeFsPanelLayout();
+    }
+
+    function setFullscreenAnalyzeChromeCollapsed(collapsed) {
+        localStorage.setItem(FULLSCREEN_ANALYZE_CHROME_COLLAPSED_KEY, collapsed ? '1' : '0');
+        const chrome = $('#player-chrome');
+        chrome?.classList.toggle('sr-fs-analyze-chrome-visible', !collapsed);
+        syncAnalyzeFsPanelLayout();
+    }
+
+    function applyAnalyzeFsCollapsedUi(opts = {}) {
+        const expandTags = opts.expandTags === true;
+        setFullscreenAnalyzeRailCollapsed(isFullscreenAnalyzeRailCollapsed());
+        setFullscreenAnalyzeTagBarCollapsed(expandTags ? false : isFullscreenAnalyzeTagBarCollapsed());
+        setFullscreenAnalyzeChromeCollapsed(false);
+        const chrome = $('#player-chrome');
+        const hasGame = !!AppState.get('currentGameId');
+        if (chrome && hasGame) chrome.classList.remove('hidden');
+    }
+
+    function syncAnalyzeFsPanelLayout() {
+        if (!document.documentElement.classList.contains('sr-analyze-fs')) return;
+        const tagCollapsed = isFullscreenAnalyzeTagBarCollapsed();
+        const chromeCollapsed = isFullscreenAnalyzeChromeCollapsed();
+        let railBottom = 100;
+        if (tagCollapsed) railBottom = 52;
+        if (chromeCollapsed) railBottom = Math.min(railBottom, 48);
+        document.documentElement.style.setProperty('--sr-analyze-fs-rail-bottom', `${railBottom}px`);
+    }
+
+    function shouldShowAnalyzeFsRail() {
+        if (AppState.get('mode') !== 'analyze') return false;
+        if (!AppState.get('currentGameId')) return false;
+        return isPlayerFullscreen() || isPseudoPlayerFullscreen();
+    }
+
+    function showAnalyzeFsClipCreatedFeedback(clip) {
+        if (!clip || !isPlayerFullscreen() || AppState.get('mode') !== 'analyze') return;
+        const container = getPlayerContainer();
+        if (!container) return;
+        let toast = container.querySelector('.analyze-fs-clip-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'analyze-fs-clip-toast';
+            toast.setAttribute('role', 'status');
+            container.appendChild(toast);
+        }
+        const tag = AppState.getTagType(clip.tag_type_id);
+        const num = AppState.getClipNumber(clip);
+        const label = tag ? `${_resolveTagLabel(tag)} ${num}` : 'Clip';
+        toast.textContent = `+ ${label}`;
+        toast.classList.add('is-visible');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = window.setTimeout(() => toast.classList.remove('is-visible'), 2200);
+    }
+
+    function onAnalyzeClipCreated(clipId) {
+        const created = AppState.get('clips')?.find((c) => c.id === clipId) || null;
+        _analyzeFsHighlightClipId = clipId || null;
+        updateAnalyzeFsRailSummary(created || getAnalyzeFsRailClip());
+        syncFullscreenAnalyzeRail();
+        if (created) showAnalyzeFsClipCreatedFeedback(created);
+    }
+
+    function syncFullscreenAnalyzeRail() {
+        const rail = $('#fullscreen-analyze-rail');
+        if (!rail) return;
+        rail.classList.toggle('is-collapsed', isFullscreenAnalyzeRailCollapsed());
+
+        const show = shouldShowAnalyzeFsRail();
+        if (!show) {
+            rail.classList.add('hidden');
+            rail.hidden = true;
+            _analyzeFsHighlightClipId = null;
+            return;
+        }
+
+        rail.classList.remove('hidden');
+        rail.hidden = false;
+
+        const listEl = $('#fullscreen-analyze-rail-list');
+        const lastClip = getAnalyzeFsRailClip();
+        updateAnalyzeFsRailSummary(lastClip);
+
+        if (typeof UI.renderFullscreenAnalyzeClips === 'function' && listEl) {
+            UI.renderFullscreenAnalyzeClips(listEl, {
+                highlightClipId: _analyzeFsHighlightClipId,
+                clip: lastClip,
+            });
+        }
+
+        if (_analyzeFsHighlightClipId && listEl) {
+            const highlighted = listEl.querySelector(`[data-clip-id="${_analyzeFsHighlightClipId}"]`);
+            highlighted?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            window.setTimeout(() => {
+                _analyzeFsHighlightClipId = null;
+            }, 1400);
+        }
+    }
+
+    function wireAnalyzeFsPanels() {
+        const rail = $('#fullscreen-analyze-rail');
+        if (rail && rail.dataset.wired !== '1') {
+            rail.dataset.wired = '1';
+            $('#fullscreen-analyze-rail-toggle')?.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                setFullscreenAnalyzeRailCollapsed(!rail.classList.contains('is-collapsed'));
+                syncFullscreenAnalyzeRail();
+            });
+            rail.addEventListener('mousedown', (ev) => ev.stopPropagation());
+            rail.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+            rail.addEventListener('click', (ev) => ev.stopPropagation());
+        }
+
+        const tagToggle = $('#tag-bar-fs-toggle');
+        if (tagToggle && tagToggle.dataset.wired !== '1') {
+            tagToggle.dataset.wired = '1';
+            tagToggle.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const tagBar = $('#tag-bar');
+                const nextCollapsed = !tagBar?.classList.contains('is-fs-collapsed');
+                setFullscreenAnalyzeTagBarCollapsed(nextCollapsed);
+            });
+            tagToggle.addEventListener('mousedown', (ev) => ev.stopPropagation());
+            tagToggle.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+        }
+
+        const tagBar = $('#tag-bar');
+        if (tagBar && tagBar.dataset.fsOverlayWired !== '1') {
+            tagBar.dataset.fsOverlayWired = '1';
+            tagBar.addEventListener('click', (ev) => ev.stopPropagation());
+            tagBar.addEventListener('mousedown', (ev) => ev.stopPropagation());
+            tagBar.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+        }
+
+        const chromeToggle = $('#player-chrome-panel-toggle');
+        if (chromeToggle && chromeToggle.dataset.wired !== '1') {
+            chromeToggle.dataset.wired = '1';
+            const onChromeToggle = (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const chrome = $('#player-chrome');
+                const show = !chrome?.classList.contains('sr-fs-analyze-chrome-visible');
+                setFullscreenAnalyzeChromeCollapsed(!show);
+                syncPlayerChromeUi();
+            };
+            chromeToggle.addEventListener('click', onChromeToggle);
+            chromeToggle.addEventListener('pointerup', onChromeToggle);
+            chromeToggle.addEventListener('mousedown', (ev) => ev.stopPropagation());
+            chromeToggle.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+        }
+
+        const fsExitBtn = $('#tag-bar-fs-exit');
+        if (fsExitBtn && fsExitBtn.dataset.wired !== '1') {
+            fsExitBtn.dataset.wired = '1';
+            const onExitFs = (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                void exitPlayerFullscreen();
+            };
+            fsExitBtn.addEventListener('click', onExitFs);
+            fsExitBtn.addEventListener('pointerup', onExitFs);
+            fsExitBtn.addEventListener('mousedown', (ev) => ev.stopPropagation());
+        }
+    }
 
     function isFullscreenClipRailCollapsed() {
         const stored = localStorage.getItem(FULLSCREEN_CLIP_RAIL_COLLAPSED_KEY);
@@ -1778,6 +2129,9 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
         pushClipRailToPopout(buildClipRailPopoutPayload(ctx));
         syncHeaderDrawMenu();
+        syncFullscreenAnalyzeRail();
+        syncAnalyzeFsUi();
+        syncAnalyzeFsPanelLayout();
     }
 
     function wireFullscreenClipRail() {
@@ -1816,9 +2170,18 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
     function syncPlayerChromeUi() {
         const chrome = $('#player-chrome');
+        const container = $('#player-container');
+        const inAnalyzeFs = AppState.get('mode') === 'analyze' && isPlayerFullscreen() && !!AppState.get('currentGameId');
+        if (chrome && inAnalyzeFs) {
+            chrome.classList.remove('hidden');
+            container?.classList.add('sr-fs-controls-visible');
+        }
+        const tagFsExit = $('#tag-bar-fs-exit');
+        const tagFsToggle = $('#tag-bar-fs-toggle');
+        if (tagFsExit) tagFsExit.style.display = inAnalyzeFs ? 'inline-flex' : 'none';
+        if (tagFsToggle) tagFsToggle.style.display = inAnalyzeFs ? 'inline-flex' : 'none';
         if (!chrome || chrome.classList.contains('hidden')) return;
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
-        const container = $('#player-container');
         const nativeYoutubeControlsOn =
             (typeof YTPlayer.getSourceType === 'function' && YTPlayer.getSourceType() === 'youtube') &&
             (typeof YTPlayer.isYoutubeNativeControlsEnabled === 'function' && YTPlayer.isYoutubeNativeControlsEnabled());
@@ -1875,7 +2238,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         if (fullscreenBtn) {
             const container = $('#player-container');
             const mode = AppState.get('mode');
-            fullscreenBtn.style.display = mode === 'view' ? '' : 'none';
+            const hasProject = !!AppState.get('currentGameId');
+            fullscreenBtn.style.display = (mode === 'view' || mode === 'analyze') && hasProject ? '' : 'none';
             if (container) {
                 const isFullscreen = isPlayerFullscreen();
                 fullscreenBtn.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
@@ -2291,6 +2655,9 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
     function wirePlayerChrome() {
         wireFullscreenClipRail();
+        wireAnalyzeFsPanels();
+        window.__srOnAnalyzeClipCreated = onAnalyzeClipCreated;
+        window.__srSyncAnalyzeFsRail = syncFullscreenAnalyzeRail;
         const root = $('#player-chrome');
         if (!root || root.dataset.wired === '1') return;
         root.dataset.wired = '1';
@@ -2396,6 +2763,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return false;
             if (!evTarget) return false;
             if (evTarget.closest('#player-chrome')) return false;
+            if (evTarget.closest('.tag-bar--analyze-overlay')) return false;
+            if (evTarget.closest('.fullscreen-analyze-rail')) return false;
             if (evTarget.closest('#clip-view-toolbar')) return false;
             if (evTarget.closest('#drawing-toolbar')) return false;
             // Chat y previews de dibujo viven dentro de #player-container: no deben disparar play/pause del tap.
@@ -3004,6 +3373,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         setTimeout(updateLiveEdgeButton, 400);
         setTimeout(syncPlayerChromeUi, 0);
         syncHeaderDrawMenu();
+        syncFullscreenAnalyzeRail();
     });
 
     AppState.on('clipChanged', (clip) => {
@@ -3024,12 +3394,14 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         UI.updateClipEditControls();
         UI.updateFocusView();
         syncFullscreenClipRail();
+        syncFullscreenAnalyzeRail();
     });
 
     AppState.on('clipsUpdated', () => {
         UI.renderAnalyzeClips();
         UI.renderViewClips();
         syncFullscreenClipRail();
+        syncFullscreenAnalyzeRail();
     });
 
     AppState.on('playlistsUpdated', () => {
@@ -5169,6 +5541,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         if (e.button !== 0 || e.detail <= 0) return;
         const btn = e.target.closest('button');
         if (!btn || btn.disabled) return;
+        if (btn.closest('.tag-bar--analyze-overlay, .fullscreen-analyze-rail, .analyze-fs-panel-toggle')) return;
         e.preventDefault();
     }, true);
 

@@ -193,7 +193,7 @@ export const AppState = (() => {
       });
     } else {
       // Otherwise, sort strictly chronologically by t_sec
-      clips.sort((a, b) => a.t_sec - b.t_sec);
+      clips.sort((a, b) => clipChronologicalMarkSec(a) - clipChronologicalMarkSec(b));
     }
 
     return clips;
@@ -874,13 +874,78 @@ export const AppState = (() => {
     return saveToCloud();
   }
 
+  function parseClipSec(value) {
+    if (value == null || value === '') return NaN;
+    const n = typeof value === 'number' ? value : parseFloat(String(value).trim());
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  /** Instante de la jugada en el video (marca del tag, no el fin del clip). */
+  function clipChronologicalMarkSec(clip) {
+    if (!clip) return -Infinity;
+    const mark = parseClipSec(clip.t_sec);
+    if (Number.isFinite(mark)) return mark;
+    return parseClipSec(clip.start_sec);
+  }
+
+  function getClipMarkSec(clip) {
+    if (!clip) return NaN;
+    const mark = parseClipSec(clip.t_sec);
+    if (Number.isFinite(mark)) return mark;
+    return parseClipSec(clip.start_sec);
+  }
+
+  function getGameClipsSortedByTimeline() {
+    const gameId = state.currentGameId;
+    let list = (state.clips || []).filter(Boolean);
+    if (gameId) {
+      const forGame = list.filter((c) => !c.game_id || c.game_id === gameId);
+      if (forGame.length) list = forGame;
+    }
+    return list.slice().sort((a, b) => {
+      const posA = clipChronologicalMarkSec(a);
+      const posB = clipChronologicalMarkSec(b);
+      if (posA !== posB) return posA - posB;
+      const createdA = Date.parse(a.created_at || '') || 0;
+      const createdB = Date.parse(b.created_at || '') || 0;
+      if (createdA !== createdB) return createdA - createdB;
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }
+
+  /** Último clip en la línea de tiempo del partido (mayor marca t_sec). */
+  function getLastChronologicalClip() {
+    const sorted = getGameClipsSortedByTimeline();
+    return sorted.length ? sorted[sorted.length - 1] : null;
+  }
+
+  /** Último clip creado en este partido (por fecha de creación). */
+  function getLastCreatedClip() {
+    const gameId = state.currentGameId;
+    let list = (state.clips || []).filter(Boolean);
+    if (gameId) {
+      const forGame = list.filter((c) => !c.game_id || c.game_id === gameId);
+      if (forGame.length) list = forGame;
+    }
+    if (!list.length) return null;
+    const withTs = list.filter((c) => c.created_at);
+    if (withTs.length) {
+      return withTs.reduce((best, c) => {
+        const bestTs = Date.parse(best.created_at || '') || 0;
+        const curTs = Date.parse(c.created_at || '') || 0;
+        return curTs >= bestTs ? c : best;
+      });
+    }
+    return list[list.length - 1];
+  }
+
   // Helper: get sequential clip number per tag type
   function getClipNumber(clip) {
     if (clip && clip._fromCollection && clip._collectionIndex != null) {
       return clip._collectionIndex;
     }
     const allClips = state.clips.filter(c => c.tag_type_id === clip.tag_type_id);
-    allClips.sort((a, b) => a.t_sec - b.t_sec);
+    allClips.sort((a, b) => clipChronologicalMarkSec(a) - clipChronologicalMarkSec(b));
     const idx = allClips.findIndex(c => c.id === clip.id);
     return idx + 1;
   }
@@ -1342,7 +1407,7 @@ export const AppState = (() => {
     init, setFeatureFlags, hasFeature, setAuthenticatedUser,
     clearProject, saveToCloud, loadFromCloud, importXML, exportXML,
     exportProjectData, importProjectData,
-    addComment, getComments, removeComment, persistChatMutation, getClipNumber, getPreferredChatName,
+    addComment, getComments, removeComment, persistChatMutation, getClipNumber, getClipMarkSec, getLastChronologicalClip, getLastCreatedClip, getPreferredChatName,
     addActivity, getActivityLog,
     openCollection, closeCollection, setCollectionItemIndex, navigateCollectionItem,
     removeCollectionItem, reorderCollectionItems,

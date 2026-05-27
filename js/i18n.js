@@ -101,6 +101,23 @@ es: {
     'rail.current': 'Actual',
     'rail.next': 'Siguiente',
 
+    // Fullscreen analyze
+    'analyzeFs.clips': 'Clips',
+    'analyzeFs.hideList': 'Ocultar lista de clips',
+    'analyzeFs.showList': 'Mostrar lista de clips',
+    'analyzeFs.clipCreated': 'Clip creado',
+    'analyzeFs.createWithTags': 'Creá clips con los tags',
+    'analyzeFs.recent': 'Últimos',
+    'analyzeFs.lastClip': 'Último creado',
+    'analyzeFs.noClipYet': 'Sin clips',
+    'analyzeFs.noClipsYet': 'Sin clips',
+    'analyzeFs.tags': 'Botonera',
+    'analyzeFs.hideTags': 'Ocultar botonera',
+    'analyzeFs.showTags': 'Mostrar botonera',
+    'analyzeFs.controls': 'Controles',
+    'analyzeFs.hideControls': 'Ocultar controles',
+    'analyzeFs.showControls': 'Mostrar controles',
+
     // No-game overlay
     'overlay.selectOrCreate': 'Selecciona o crea un partido para empezar',
 
@@ -740,6 +757,23 @@ en: {
     'rail.prev': 'Previous',
     'rail.current': 'Current',
     'rail.next': 'Next',
+
+    // Fullscreen analyze
+    'analyzeFs.clips': 'Clips',
+    'analyzeFs.hideList': 'Hide clip list',
+    'analyzeFs.showList': 'Show clip list',
+    'analyzeFs.clipCreated': 'Clip created',
+    'analyzeFs.createWithTags': 'Create clips with tags',
+    'analyzeFs.recent': 'Recent',
+    'analyzeFs.lastClip': 'Last created',
+    'analyzeFs.noClipYet': 'No clips',
+    'analyzeFs.noClipsYet': 'No clips',
+    'analyzeFs.tags': 'Botonera',
+    'analyzeFs.hideTags': 'Hide tag bar',
+    'analyzeFs.showTags': 'Show tag bar',
+    'analyzeFs.controls': 'Controls',
+    'analyzeFs.hideControls': 'Hide controls',
+    'analyzeFs.showControls': 'Show controls',
 
     // No-game overlay
     'overlay.selectOrCreate': 'Select or create a match to start',

@@ -187,9 +187,11 @@ export const UI = (() => {
     }
 
     function _resolveTagDisplayLabel(tag) {
+        const custom = (tag?.label || '').trim();
+        if (custom) return custom;
         const builtinKey = tag.id.replace('tag-', '').replace(/-/g, '_');
         const translated = getBuiltinTagLabel(builtinKey);
-        return translated !== builtinKey ? translated : tag.label;
+        return translated !== builtinKey ? translated : 'Tag';
     }
 
     function renderTagButtons() {
@@ -272,6 +274,9 @@ export const UI = (() => {
                         toast(`Manual iniciado: ${tag.label} @ ${formatTime(tSec)}`, 'success');
                     } else {
                         toast(`Manual cerrado: ${tag.label} @ ${formatTime(tSec)}`, 'success');
+                        if (result.clip && typeof window.__srOnAnalyzeClipCreated === 'function') {
+                            window.__srOnAnalyzeClipCreated(result.clip.id);
+                        }
                     }
                     renderTagButtons();
                     return;
@@ -281,6 +286,9 @@ export const UI = (() => {
                     btn.classList.add('tag-flash');
                     setTimeout(() => btn.classList.remove('tag-flash'), 500);
                     toast(t('toast.clipCreated', { label: _resolveTagDisplayLabel(tag), time: formatTime(tSec) }), 'success');
+                    if (typeof window.__srOnAnalyzeClipCreated === 'function') {
+                        window.__srOnAnalyzeClipCreated(clip.id);
+                    }
 
                     // Auto-scroll to the newly created clip
                     const clipEl = document.querySelector(`.clip-item[data-clip-id="${clip.id}"]`);
@@ -747,6 +755,52 @@ export const UI = (() => {
         }
     }
 
+    // ═══ CLIP LIST (Analyze fullscreen rail) ═══
+    function renderFullscreenAnalyzeClips(container, options = {}) {
+        if (!container) return;
+        const highlightClipId = options.highlightClipId || null;
+        const clip = options.clip ?? (
+            typeof AppState.getLastCreatedClip === 'function'
+                ? AppState.getLastCreatedClip()
+                : (typeof AppState.getLastChronologicalClip === 'function'
+                    ? AppState.getLastChronologicalClip()
+                    : null)
+        );
+        const currentClipId = AppState.get('currentClipId');
+        container.innerHTML = '';
+
+        if (!clip) {
+            container.innerHTML = `<p class="fullscreen-analyze-rail__empty">${t('analyzeFs.createWithTags')}</p>`;
+            return;
+        }
+
+        const tag = AppState.getTagType(clip.tag_type_id);
+        const clipNum = AppState.getClipNumber(clip);
+        const displayLabel = tag ? _resolveTagDisplayLabel(tag) : '?';
+        const tagLabel = tag ? `${displayLabel} ${clipNum}` : '?';
+        const markSec = typeof AppState.getClipMarkSec === 'function'
+            ? AppState.getClipMarkSec(clip)
+            : (clip.t_sec != null ? clip.t_sec : clip.start_sec);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'fullscreen-analyze-rail__item'
+            + (clip.id === currentClipId ? ' is-active' : '')
+            + (clip.id === highlightClipId ? ' is-new' : '');
+        btn.dataset.clipId = clip.id;
+        btn.setAttribute('role', 'listitem');
+        btn.innerHTML = `<span class="fullscreen-analyze-rail__item-label">${tagLabel}</span>`
+            + `<span class="fullscreen-analyze-rail__item-time">${formatTime(markSec)} · ${formatTime(clip.start_sec)}→${formatTime(clip.end_sec)}</span>`;
+        btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (typeof YTPlayer === 'undefined' || !YTPlayer.playClip) return;
+            YTPlayer.playClip(clip.start_sec, clip.end_sec);
+            AppState.setCurrentClip(clip.id);
+            renderFullscreenAnalyzeClips(container, { ...options, highlightClipId: null });
+            renderAnalyzeClips();
+        });
+        container.appendChild(btn);
+    }
+
     // ═══ CLIP LIST (Analyze) ═══
     function renderAnalyzeClips() {
         const container = $('#analyze-clip-list');
@@ -830,6 +884,10 @@ export const UI = (() => {
                 toast(t('toast.clipDeleted'), 'success');
             });
         });
+
+        if (typeof window.__srSyncAnalyzeFsRail === 'function') {
+            window.__srSyncAnalyzeFsRail();
+        }
 
         // Export buttons
         if (isLocal) {
@@ -2826,6 +2884,7 @@ export const UI = (() => {
                 });
                 if (applyEditBtn) {
                     applyEditBtn.addEventListener('click', () => {
+                        flushBBEditorDetailToModel();
                         renderBBEditorButtons(_bbEditorModelRef, containerId);
                     });
                 }
@@ -2901,8 +2960,45 @@ export const UI = (() => {
 
     }
 
+    /** Vuelca campos del panel Editor al modelo antes de guardar (evita perder el último cambio). */
+    function flushBBEditorDetailToModel() {
+        const detail = document.getElementById('bb-builder-detail');
+        if (!detail || _bbEditorCreateRow) return;
+        if (!_bbEditorModelRef?.length) return;
+
+        if (_bbEditorSelectedIdx < 0 || _bbEditorSelectedIdx >= _bbEditorModelRef.length) return;
+        const selected = _bbEditorModelRef[_bbEditorSelectedIdx];
+        if (!selected) return;
+
+        const labelEl = detail.querySelector('.bb-field-label');
+        const preEl = detail.querySelector('.bb-field-pre');
+        const postEl = detail.querySelector('.bb-field-post');
+        const modeEl = detail.querySelector('.bb-field-mode');
+        const rowEl = detail.querySelector('.bb-field-row');
+        const hkBtn = detail.querySelector('.bb-field-hotkey');
+
+        if (labelEl) {
+            const label = (labelEl.value || '').trim() || selected.label || 'Tag';
+            selected.label = label;
+            selected.key = label.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || selected.key || 'tag';
+        }
+        if (preEl) selected.pre_sec = parseInt(preEl.value, 10) || 0;
+        if (modeEl) selected.captureMode = modeEl.value === 'manual' ? 'manual' : 'fixed';
+        if (postEl) {
+            selected.post_sec = selected.captureMode === 'manual'
+                ? 0
+                : (parseInt(postEl.value, 10) || 0);
+        }
+        if (rowEl) selected.row = rowEl.value === 'bottom' ? 'bottom' : 'top';
+        if (hkBtn) {
+            const rawHk = String(hkBtn.dataset.hotkey || '').trim().toUpperCase();
+            selected.hotkey = HOTKEY_OPTIONS.includes(rawHk) ? rawHk : '';
+        }
+    }
+
     // Returns current builder state as normalized buttons array.
     function readBBEditorButtons() {
+        flushBBEditorDetailToModel();
         return _bbNormalizeButtons(_bbEditorModelRef);
     }
 
@@ -2910,7 +3006,7 @@ export const UI = (() => {
         $, $$, toast, formatTime,
         FLAG_EMOJI, getFlagLabel,
         updateProjectTitle, renderTagButtons,
-        renderAnalyzeClips, renderViewClips,
+        renderAnalyzeClips, renderFullscreenAnalyzeClips, renderViewClips,
         updateClipEditControls,
         renderAnalyzePlaylists,
         renderViewSources, updateFlagFilterBar, updateFlagButtons,
@@ -2922,7 +3018,7 @@ export const UI = (() => {
         toggleTagEditor, saveTagFromEditor, deleteTagFromEditor, closeTagInlineEditor,
         getSelectedClipIds, clearClipSelection, renderNotifications,
         renderSharePanel,
-        renderButtonboardsPanel, populateButtonboardSelector, renderBBEditorButtons, readBBEditorButtons,
+        renderButtonboardsPanel, populateButtonboardSelector, renderBBEditorButtons, readBBEditorButtons, flushBBEditorDetailToModel,
         refreshAll,
         isLocalProject: _isLocalProject,
         handlePlaylistExport: _handlePlaylistExport,

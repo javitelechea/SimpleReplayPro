@@ -133,6 +133,10 @@
         <video id="live-replay-video" class="hidden" controls playsinline></video>
         <div id="player-chrome" class="player-chrome hidden" aria-label="Controles del reproductor">
           <div class="player-chrome__bar">
+            <button type="button" id="player-chrome-panel-toggle" class="player-chrome__btn player-chrome__btn--panel-toggle analyze-fs-panel-toggle" aria-expanded="true" title="Ocultar controles" data-i18n-title="analyzeFs.hideControls" data-i18n-aria="analyzeFs.controls">
+              <span class="analyze-fs-panel-toggle__label" data-i18n="analyzeFs.controls">Controles</span>
+              <span class="analyze-fs-panel-toggle__icon" aria-hidden="true">▾</span>
+            </button>
             <button type="button" id="player-chrome-seek-back" class="player-chrome__btn" title="Retroceder (paso de preferencias)" aria-label="Retroceder en el video" data-i18n-title="player.seekBack" data-i18n-aria="player.seekBackAria">
               <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7l-6 5 6 5V7Zm8 0-6 5 6 5V7Z" fill="currentColor"/></svg>
             </button>
@@ -175,6 +179,16 @@
             </button>
             <span class="fullscreen-clip-rail__count"></span>
           </div>
+        </div>
+        <div id="fullscreen-analyze-rail" class="fullscreen-analyze-rail hidden" hidden aria-label="Clips del partido en pantalla completa">
+          <div class="fullscreen-analyze-rail__head">
+            <button type="button" id="fullscreen-analyze-rail-toggle" class="fullscreen-analyze-rail__toggle" aria-expanded="true" title="Ocultar detalle del clip" data-i18n-title="analyzeFs.hideList">
+              <span class="fullscreen-analyze-rail__toggle-label" data-i18n="analyzeFs.lastClip">Último creado</span>
+              <span id="fullscreen-analyze-rail-summary" class="fullscreen-analyze-rail__summary">—</span>
+              <span class="fullscreen-analyze-rail__toggle-icon" aria-hidden="true">▾</span>
+            </button>
+          </div>
+          <div id="fullscreen-analyze-rail-list" class="fullscreen-analyze-rail__list" role="list"></div>
         </div>
         <div id="no-game-overlay" class="player-overlay">
           <div class="overlay-content">
@@ -308,6 +322,11 @@
       <!-- Action area: Tag Buttons -->
       <div id="tag-bar" class="tag-bar hidden">
         <div class="tag-bar-header">
+          <button type="button" id="tag-bar-fs-exit" class="analyze-fs-panel-toggle analyze-fs-panel-toggle--exit" title="Salir de pantalla completa" aria-label="Salir de pantalla completa" data-i18n-title="player.exitFullscreen" data-i18n-aria="player.exitFullscreen">✕</button>
+          <button type="button" id="tag-bar-fs-toggle" class="analyze-fs-panel-toggle analyze-fs-panel-toggle--tags" aria-expanded="true" title="Ocultar botonera" data-i18n-title="analyzeFs.hideTags" data-i18n-aria="analyzeFs.tags">
+            <span class="analyze-fs-panel-toggle__label" data-i18n="analyzeFs.tags">Botonera</span>
+            <span class="analyze-fs-panel-toggle__icon" aria-hidden="true">▾</span>
+          </button>
           <div class="tag-rows-wrap">
             <div class="tag-team-row">
               <div id="tag-buttons-a" class="tag-buttons-row"></div>

@@ -117,8 +117,21 @@ export const DemoData = (() => {
         return g;
     }
 
+    function parseClipSec(value) {
+        if (value == null || value === '') return NaN;
+        const n = typeof value === 'number' ? value : parseFloat(String(value).trim());
+        return Number.isFinite(n) ? n : NaN;
+    }
+
+    function clipMarkSec(clip) {
+        const mark = parseClipSec(clip?.t_sec);
+        return Number.isFinite(mark) ? mark : parseClipSec(clip?.start_sec);
+    }
+
     function getClipsForGame(gameId) {
-        return clips.filter(c => c.game_id === gameId).sort((a, b) => a.t_sec - b.t_sec);
+        return clips
+            .filter(c => c.game_id === gameId)
+            .sort((a, b) => clipMarkSec(a) - clipMarkSec(b));
     }
 
     function createClip(gameId, tagTypeId, tSec, startSec, endSec, createdBy) {
