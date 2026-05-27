@@ -1251,6 +1251,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         document.documentElement.classList.toggle('sr-analyze-fs', on);
         document.body.classList.toggle('sr-analyze-fs', on);
         mountAnalyzeFsTagBar(on);
+        mountAnalyzeFsTimeline(on);
         if (on) {
             applyAnalyzeFsCollapsedUi({ expandTags: entering || opts.expandTags === true });
             syncAnalyzeFsPanelLayout();
@@ -1790,7 +1791,46 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     const FULLSCREEN_ANALYZE_CHROME_COLLAPSED_KEY = 'fullscreenAnalyzeChromeCollapsed';
     let _analyzeFsHighlightClipId = null;
     let _analyzeFsTagBarAnchor = null;
+    let _analyzeFsTimelineAnchor = null;
     let _analyzeFsSessionActive = false;
+
+    function mountAnalyzeFsTimeline(mount) {
+        const timeline = $('#custom-timeline');
+        const container = getPlayerContainer();
+        if (!timeline || !container) return;
+
+        const shouldMount = mount
+            && AppState.get('mode') === 'analyze'
+            && !!AppState.get('currentGameId');
+
+        if (shouldMount) {
+            if (!_analyzeFsTimelineAnchor) {
+                _analyzeFsTimelineAnchor = {
+                    parent: timeline.parentElement,
+                    next: timeline.nextElementSibling,
+                };
+            }
+            timeline.classList.remove('hidden');
+            timeline.classList.add('custom-timeline--analyze-fs-overlay');
+            if (timeline.parentElement !== container) {
+                container.appendChild(timeline);
+            }
+            document.documentElement.style.setProperty('--sr-analyze-fs-timeline-height', '36px');
+            if (typeof Timeline?.renderClips === 'function') Timeline.renderClips();
+            return;
+        }
+
+        timeline.classList.remove('custom-timeline--analyze-fs-overlay');
+        document.documentElement.style.removeProperty('--sr-analyze-fs-timeline-height');
+        const anchor = _analyzeFsTimelineAnchor;
+        if (anchor?.parent && timeline.parentElement !== anchor.parent) {
+            if (anchor.next && anchor.next.parentElement === anchor.parent) {
+                anchor.parent.insertBefore(timeline, anchor.next);
+            } else {
+                anchor.parent.appendChild(timeline);
+            }
+        }
+    }
 
     function mountAnalyzeFsTagBar(mount) {
         const tagBar = $('#tag-bar');
@@ -1996,23 +2036,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             tagBar.addEventListener('click', (ev) => ev.stopPropagation());
             tagBar.addEventListener('mousedown', (ev) => ev.stopPropagation());
             tagBar.addEventListener('pointerdown', (ev) => ev.stopPropagation());
-        }
-
-        const chromeToggle = $('#player-chrome-panel-toggle');
-        if (chromeToggle && chromeToggle.dataset.wired !== '1') {
-            chromeToggle.dataset.wired = '1';
-            const onChromeToggle = (ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-                const chrome = $('#player-chrome');
-                const show = !chrome?.classList.contains('sr-fs-analyze-chrome-visible');
-                setFullscreenAnalyzeChromeCollapsed(!show);
-                syncPlayerChromeUi();
-            };
-            chromeToggle.addEventListener('click', onChromeToggle);
-            chromeToggle.addEventListener('pointerup', onChromeToggle);
-            chromeToggle.addEventListener('mousedown', (ev) => ev.stopPropagation());
-            chromeToggle.addEventListener('pointerdown', (ev) => ev.stopPropagation());
         }
 
         const fsExitBtn = $('#tag-bar-fs-exit');
@@ -2800,6 +2823,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             if (!evTarget) return false;
             if (evTarget.closest('#player-chrome')) return false;
             if (evTarget.closest('.tag-bar--analyze-overlay')) return false;
+            if (evTarget.closest('#custom-timeline')) return false;
             if (evTarget.closest('.fullscreen-analyze-rail')) return false;
             if (evTarget.closest('#clip-view-toolbar')) return false;
             if (evTarget.closest('#drawing-toolbar')) return false;

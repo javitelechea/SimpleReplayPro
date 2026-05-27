@@ -1437,7 +1437,7 @@ html.sr-player-fs-active .clip-chat-panel,
 html.sr-player-fs-active #export-progress,
 html.sr-player-fs-active #mobile-mode-menu,
 html.sr-player-fs-active #focus-overlay,
-html.sr-player-fs-active #custom-timeline,
+html.sr-player-fs-active:not(.sr-analyze-fs) #custom-timeline,
 html.sr-player-fs-active #clip-view-toolbar,
 html.sr-player-fs-active:not(.sr-analyze-fs) #tag-bar:not(.tag-bar--analyze-overlay),
 html.sr-player-fs-active #no-game-overlay {
@@ -1782,7 +1782,6 @@ html.sr-analyze-fs #app-header,
 html.sr-analyze-fs #side-panel,
 html.sr-analyze-fs .side-panel,
 html.sr-analyze-fs #nav-arrows,
-html.sr-analyze-fs #custom-timeline,
 html.sr-analyze-fs #clip-view-toolbar,
 html.sr-analyze-fs #panel-analyze,
 html.sr-analyze-fs #panel-view,
@@ -1875,8 +1874,7 @@ html.sr-analyze-fs #player-container .player-chrome:not(.hidden) {
   transition: transform 0.15s ease;
 }
 
-html.sr-analyze-fs .tag-bar.is-fs-collapsed .analyze-fs-panel-toggle__icon,
-html.sr-analyze-fs .player-chrome.is-fs-collapsed .analyze-fs-panel-toggle__icon {
+html.sr-analyze-fs .tag-bar.is-fs-collapsed .analyze-fs-panel-toggle__icon {
   transform: rotate(-90deg);
 }
 
@@ -2092,6 +2090,55 @@ html.sr-analyze-fs #quick-clip-menu:not(.hidden) {
   -webkit-backdrop-filter: blur(10px);
 }
 
+/* Línea de tiempo del partido (posición actual + clips) en FS Analizar */
+html.sr-analyze-fs #player-container .custom-timeline.custom-timeline--analyze-fs-overlay {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  position: absolute !important;
+  left: max(10px, env(safe-area-inset-left, 0px)) !important;
+  right: max(10px, env(safe-area-inset-right, 0px)) !important;
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+  width: auto !important;
+  height: 34px !important;
+  z-index: 26 !important;
+  margin: 0 !important;
+  padding: 0 42px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  background: rgba(8, 10, 16, 0.55) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35) !important;
+  cursor: pointer !important;
+}
+
+html.sr-analyze-fs #player-container .custom-timeline--analyze-fs-overlay .timeline-track {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+html.sr-analyze-fs #player-container .custom-timeline--analyze-fs-overlay .timeline-progress {
+  opacity: 0.35;
+}
+
+html.sr-analyze-fs #player-container .custom-timeline--analyze-fs-overlay .timeline-playhead::before {
+  border-top-color: #f87171;
+}
+
+html.sr-analyze-fs #player-container .custom-timeline--analyze-fs-overlay .timeline-playhead {
+  background: #f87171;
+  box-shadow: 0 0 6px rgba(248, 113, 113, 0.55);
+}
+
+html.sr-analyze-fs #player-container .custom-timeline--analyze-fs-overlay .playhead-time {
+  top: -24px;
+  background: rgba(8, 10, 16, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  font-size: 0.68rem;
+}
+
 html.sr-analyze-fs #player-container:not(:fullscreen) .fullscreen-analyze-rail,
 html.sr-analyze-fs .fullscreen-analyze-rail:not(.hidden),
 html.sr-analyze-fs #player-container:fullscreen .fullscreen-analyze-rail:not(.hidden),
@@ -2117,7 +2164,7 @@ html.sr-analyze-fs #player-container .tag-bar.tag-bar--analyze-overlay {
   position: absolute !important;
   left: 50% !important;
   right: auto !important;
-  bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px) + var(--sr-analyze-fs-timeline-height, 36px)) !important;
   transform: translateX(-50%) !important;
   z-index: 25 !important;
   flex-shrink: 0 !important;
@@ -2145,10 +2192,6 @@ html.sr-analyze-fs #video-area > .tag-bar:not(.tag-bar--analyze-overlay) {
 html.sr-analyze-fs #player-container .tag-bar--analyze-overlay .analyze-fs-panel-toggle {
   display: inline-flex !important;
   pointer-events: auto !important;
-}
-
-html.sr-analyze-fs #player-container .player-chrome__btn--panel-toggle {
-  display: none !important;
 }
 
 html.sr-analyze-fs #player-container .tag-bar--analyze-overlay .tag-bar-header {
@@ -2247,11 +2290,6 @@ html.sr-analyze-fs #player-container .player-chrome:not(.hidden) {
 html.sr-analyze-fs #player-container .player-chrome:not(.hidden) .player-chrome__bar {
   pointer-events: auto;
 }
-
-html.sr-analyze-fs #player-container .player-chrome__btn--panel-toggle {
-  display: none !important;
-}
-
 
 html.sr-analyze-fs #player-container {
   flex: 1 1 auto !important;
@@ -2662,6 +2700,8 @@ html.sr-analyze-fs #player-container {
   display: flex;
   align-items: center;
   transition: background var(--tr-fast);
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 .custom-timeline:hover {
@@ -2671,9 +2711,11 @@ html.sr-analyze-fs #player-container {
 .timeline-track {
   position: absolute;
   top: 50%;
+  left: 1px;
+  right: 1px;
   transform: translateY(-50%);
   height: 6px;
-  width: 100%;
+  width: auto;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
   pointer-events: none;
@@ -2736,11 +2778,38 @@ html.sr-analyze-fs #player-container {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+.timeline-edge-time {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.62rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(232, 234, 240, 0.72);
+  pointer-events: none;
+  z-index: 12;
+  line-height: 1;
+}
+
+html.sr-analyze-fs #player-container .custom-timeline--analyze-fs-overlay .timeline-edge-time {
+  display: block;
+}
+
+.timeline-edge-time--start {
+  left: 8px;
+}
+
+.timeline-edge-time--end {
+  right: 8px;
+}
+
 .timeline-clips {
   position: absolute;
   top: 0;
-  left: 0;
-  width: 100%;
+  left: 1px;
+  right: 1px;
+  width: auto;
   height: 100%;
   pointer-events: none;
 }

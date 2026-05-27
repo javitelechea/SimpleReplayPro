@@ -133,10 +133,6 @@
         <video id="live-replay-video" class="hidden" controls playsinline></video>
         <div id="player-chrome" class="player-chrome hidden" aria-label="Controles del reproductor">
           <div class="player-chrome__bar">
-            <button type="button" id="player-chrome-panel-toggle" class="player-chrome__btn player-chrome__btn--panel-toggle analyze-fs-panel-toggle" aria-expanded="true" title="Ocultar controles" data-i18n-title="analyzeFs.hideControls" data-i18n-aria="analyzeFs.controls">
-              <span class="analyze-fs-panel-toggle__label" data-i18n="analyzeFs.controls">Controles</span>
-              <span class="analyze-fs-panel-toggle__icon" aria-hidden="true">▾</span>
-            </button>
             <button type="button" id="player-chrome-seek-back" class="player-chrome__btn" title="Retroceder (paso de preferencias)" aria-label="Retroceder en el video" data-i18n-title="player.seekBack" data-i18n-aria="player.seekBackAria">
               <svg class="player-chrome__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7l-6 5 6 5V7Zm8 0-6 5 6 5V7Z" fill="currentColor"/></svg>
             </button>
@@ -255,6 +251,8 @@
 
       <!-- Custom Timeline -->
       <div id="custom-timeline" class="custom-timeline hidden">
+        <span id="timeline-time-start" class="timeline-edge-time timeline-edge-time--start" aria-hidden="true">0:00</span>
+        <span id="timeline-time-end" class="timeline-edge-time timeline-edge-time--end" aria-hidden="true">—</span>
         <div class="timeline-track"></div>
         <div id="timeline-progress" class="timeline-progress"></div>
         <div id="timeline-clips" class="timeline-clips"></div>

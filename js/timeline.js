@@ -9,6 +9,7 @@ export const Timeline = (() => {
     let _lastDragSeekTs = 0;
 
     let _timelineEl, _trackEl, _progressEl, _playheadEl, _timeLabelEl, _clipsContainerEl;
+    let _timeStartEl, _timeEndEl;
 
     function init() {
         _timelineEl = document.getElementById('custom-timeline');
@@ -16,6 +17,8 @@ export const Timeline = (() => {
         _progressEl = document.getElementById('timeline-progress');
         _playheadEl = document.getElementById('timeline-playhead');
         _timeLabelEl = document.getElementById('playhead-time');
+        _timeStartEl = document.getElementById('timeline-time-start');
+        _timeEndEl = document.getElementById('timeline-time-end');
         _clipsContainerEl = document.getElementById('timeline-clips');
 
         if (!_timelineEl) return;
@@ -27,8 +30,12 @@ export const Timeline = (() => {
 
         // Event listeners
         _timelineEl.addEventListener('mousedown', onMouseDown);
+        _timelineEl.addEventListener('touchstart', onTouchStart, { passive: false });
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('touchmove', onTouchMove, { passive: false });
+        document.addEventListener('touchend', onTouchEnd);
+        document.addEventListener('touchcancel', onTouchEnd);
 
         // Listen for state changes to re-render clips
         AppState.on('clipsUpdated', renderClips);
@@ -95,7 +102,49 @@ export const Timeline = (() => {
                 const percent = ((current - bounds.start) / bounds.duration) * 100;
                 updatePlayhead(percent, current);
             }
+            updateEdgeTimes(bounds);
         } catch (e) { }
+    }
+
+    function updateEdgeTimes(bounds) {
+        if (!_timeStartEl && !_timeEndEl) return;
+        const b = bounds || getTimelineBounds();
+        if (_timeStartEl) _timeStartEl.textContent = formatTime(b.start);
+        if (_timeEndEl) {
+            let endSec = b.end;
+            if (typeof YTPlayer !== 'undefined' && YTPlayer.isReady()) {
+                const dur = YTPlayer.getDuration();
+                if (Number.isFinite(dur) && dur > 0) endSec = dur;
+            }
+            _timeEndEl.textContent = formatTime(endSec);
+        }
+    }
+
+    function applyPlayheadEdgeStyles(percent) {
+        const p = Math.max(0, Math.min(100, percent));
+        let leftPct = p;
+        let playheadTransform = 'translateX(-50%)';
+        if (p <= 0.5) {
+            leftPct = 0;
+            playheadTransform = 'translateX(0)';
+        } else if (p >= 99.5) {
+            leftPct = 100;
+            playheadTransform = 'translateX(-100%)';
+        }
+        _playheadEl.style.left = `${leftPct}%`;
+        _playheadEl.style.transform = playheadTransform;
+
+        if (!_timeLabelEl) return;
+        if (p <= 3) {
+            _timeLabelEl.style.left = '0';
+            _timeLabelEl.style.transform = 'translateX(0)';
+        } else if (p >= 97) {
+            _timeLabelEl.style.left = '100%';
+            _timeLabelEl.style.transform = 'translateX(-100%)';
+        } else {
+            _timeLabelEl.style.left = '50%';
+            _timeLabelEl.style.transform = 'translateX(-50%)';
+        }
     }
 
     function updatePlayhead(percent, currentSec) {
@@ -107,8 +156,9 @@ export const Timeline = (() => {
             _progressEl.style.width = '0%';
         } else {
             _playheadEl.style.display = 'block';
-            _progressEl.style.width = `${percent}%`;
-            _playheadEl.style.left = `${percent}%`;
+            const progressPct = Math.max(0, Math.min(100, percent));
+            _progressEl.style.width = `${progressPct}%`;
+            applyPlayheadEdgeStyles(progressPct);
         }
 
         if (_timeLabelEl) {
@@ -119,7 +169,8 @@ export const Timeline = (() => {
     function getSecFromEvent(e) {
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return 0;
         const rect = (_trackEl || _timelineEl).getBoundingClientRect();
-        let x = e.clientX - rect.left;
+        const clientX = e.clientX ?? e.changedTouches?.[0]?.clientX ?? e.touches?.[0]?.clientX ?? 0;
+        let x = clientX - rect.left;
         x = Math.max(0, Math.min(x, rect.width));
         const percent = x / rect.width;
 
@@ -127,14 +178,18 @@ export const Timeline = (() => {
         return bounds.start + (percent * bounds.duration);
     }
 
-    function onMouseDown(e) {
+    function beginScrub(e) {
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
-        if (e.button !== 0) return; // only left click
+        if (e.button !== undefined && e.button !== 0) return;
 
         // Scrub manual: no auto-pausa al fin del clip (playlist/colección).
         if (typeof YTPlayer.clearClipEnd === 'function') {
             YTPlayer.clearClipEnd();
         }
+
+        _isDragging = true;
+        _dragType = 'playhead';
+        _lastDragSeekTs = 0;
 
         const sec = getSecFromEvent(e);
         YTPlayer.seekTo(sec);
@@ -143,6 +198,27 @@ export const Timeline = (() => {
         if (bounds.duration > 0) {
             updatePlayhead(((sec - bounds.start) / bounds.duration) * 100, sec);
         }
+    }
+
+    function onMouseDown(e) {
+        beginScrub(e);
+    }
+
+    function onTouchStart(e) {
+        if (!_timelineEl?.contains(e.target)) return;
+        e.preventDefault();
+        beginScrub(e);
+    }
+
+    function onTouchMove(e) {
+        if (!_isDragging) return;
+        e.preventDefault();
+        onMouseMove(e);
+    }
+
+    function onTouchEnd(e) {
+        if (!_isDragging) return;
+        onMouseUp(e);
     }
 
     function onMouseMove(e) {
@@ -233,6 +309,7 @@ export const Timeline = (() => {
 
             _clipsContainerEl.appendChild(el);
         });
+        updateEdgeTimes(bounds);
     }
 
     return { init, renderClips };
