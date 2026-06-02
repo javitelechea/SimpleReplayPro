@@ -1,0 +1,23 @@
+# Prueba local — mismo esquema que tapo en MediaMTX
+# http://localhost:8888/tapo/
+# http://localhost:8889/tapo/whep
+# rtsp://127.0.0.1:8554/tapo
+
+logLevel: info
+
+rtsp: true
+rtspAddress: :8554
+
+hls: true
+hlsAddress: :8888
+hlsAllowOrigins: ['*']
+
+webrtc: true
+webrtcAddress: :8889
+webrtcAllowOrigins: ['*']
+
+api: true
+apiAddress: :9997
+
+paths:
+  tapo:

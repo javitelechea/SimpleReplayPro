@@ -2459,8 +2459,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                     refreshLiveCapturePanelState();
                     return;
                 }
-                if (sourceType === 'ip' && !/^https?:\/\//i.test(streamUrl)) {
-                    throw new Error('La URL debe comenzar con http:// o https://');
+                if (sourceType === 'ip' && !/^(rtsp|https?):\/\//i.test(streamUrl)) {
+                    throw new Error('La URL debe ser RTSP o HTTP de MediaMTX (ej. http://127.0.0.1:8888/tapo/)');
                 }
                 await startLivePreview({ facade, deviceId, resolution, sourceType, streamUrl });
             } catch (e) {

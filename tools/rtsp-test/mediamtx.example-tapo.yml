@@ -1,0 +1,22 @@
+# Ejemplo: MediaMTX lee la Tapo por RTSP (no hace falta publicar con ffmpeg).
+# Copiá a mediamtx.yml o fusioná el bloque paths.tapo.
+#
+# Reemplazá USER, PASS, IP y la ruta RTSP de tu cámara (mirala en la app Tapo).
+
+logLevel: info
+
+rtsp: true
+rtspAddress: :8554
+
+hls: true
+hlsAddress: :8888
+hlsAllowOrigins: ['*']
+
+webrtc: true
+webrtcAddress: :8889
+webrtcAllowOrigins: ['*']
+
+paths:
+  tapo:
+    source: rtsp://USER:PASS@192.168.0.XXX:554/stream1
+    sourceOnDemand: no

@@ -1,0 +1,5 @@
+bin/
+*.log
+*.pid
+app-web.log
+app-web.pid

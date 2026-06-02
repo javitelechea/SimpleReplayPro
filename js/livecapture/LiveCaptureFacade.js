@@ -192,20 +192,32 @@ export class LiveCaptureFacade {
       this._clearPreviewSurface();
       return;
     }
+    if (!/^(rtsp|https?):\/\//i.test(src)) {
+      throw new Error('Usá una URL RTSP o HTTP de MediaMTX (ej. http://localhost:8888/tapo/).');
+    }
+    const endpoints = this._buildIpReadEndpoints(src);
     let lastErr = null;
-    try {
-      await this.attachPreviewWebRtc(src);
-      return;
-    } catch (e) {
-      lastErr = e;
+    for (const endpoint of endpoints) {
+      if (/\.m3u8(\?|#|$)/i.test(endpoint)) {
+        try {
+          await this._attachPreviewMediamtxHls(endpoint);
+          return;
+        } catch (e) {
+          lastErr = e;
+          continue;
+        }
+      }
+      if (/\/whep$/i.test(endpoint)) {
+        try {
+          await this._attachPreviewWebRtcOnce(endpoint);
+          return;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
     }
-    try {
-      await this.attachPreviewUrl(src);
-      return;
-    } catch (e) {
-      lastErr = e;
-    }
-    throw lastErr || new Error('No se pudo abrir la cámara IP.');
+    const hint = lastErr?.message || 'sin detalle';
+    throw new Error(`No se pudo abrir la cámara IP (${hint}). Probá http://127.0.0.1:8888/tapo/ con MediaMTX activo.`);
   }
 
   /** Volver al vivo (oculta replay, muestra preview). */
@@ -349,6 +361,7 @@ export class LiveCaptureFacade {
       this._preview.srcObject = null;
     }
     try { this._preview.pause(); } catch { /* noop */ }
+    this._preview.onplay = null;
     this._preview.removeAttribute('src');
     try { this._preview.load(); } catch { /* noop */ }
   }
@@ -374,26 +387,178 @@ export class LiveCaptureFacade {
     return [...new Set(out)];
   }
 
-  async _attachPreviewUrlOnce(src) {
+  /**
+   * Orden baja latencia: WHEP (:8889) primero, luego HLS LL (:8888).
+   * Alineado con la página de MediaMTX (http://host:8888/path/).
+   */
+  _buildIpReadEndpoints(url) {
+    const src = String(url || '').trim();
+    if (/^rtsp:\/\//i.test(src)) return this._buildRtspReadEndpoints(src);
+    if (/^https?:\/\//i.test(src)) return this._buildHttpReadEndpoints(src);
+    return [];
+  }
+
+  _buildRtspReadEndpoints(rtspUrl) {
+    const parsed = this._parseStreamPathUrl(rtspUrl);
+    if (!parsed) return [];
+    return this._mediamtxReadUrls(parsed.host, parsed.path);
+  }
+
+  _buildHttpReadEndpoints(httpUrl) {
+    const parsed = this._parseStreamPathUrl(httpUrl);
+    if (!parsed) return [];
+    const out = this._mediamtxReadUrls(parsed.host, parsed.path);
+    const clean = httpUrl.replace(/\/+$/, '');
+    if (/\.m3u8(\?|#|$)/i.test(clean)) out.unshift(clean);
+    return [...new Set(out)];
+  }
+
+  _mediamtxReadUrls(host, path) {
+    const h = this._normalizeStreamHost(host);
+    const p = path || 'cam';
+    // Mismo orden que la página http://host:8888/path/ de MediaMTX (HLS primero).
+    return [
+      `http://${h}:8888/${p}/index.m3u8`,
+      `http://${h}:8889/${p}/whep`,
+    ];
+  }
+
+  /** Mismo host que la app (127.0.0.1 vs localhost) para evitar CORS y fallos raros. */
+  _normalizeStreamHost(host) {
+    const h = String(host || '').toLowerCase();
+    const bracketed = h.includes(':') ? `[${host}]` : host;
+    const isLoopback = h === 'localhost' || h === '127.0.0.1' || h === '::1';
+    if (!isLoopback) return bracketed;
+    const pageHost =
+      typeof window !== 'undefined' && window.location?.hostname
+        ? window.location.hostname
+        : '127.0.0.1';
+    const use = pageHost.toLowerCase() === 'localhost' ? 'localhost' : '127.0.0.1';
+    return use;
+  }
+
+  _parseStreamPathUrl(anyUrl) {
+    try {
+      const u = new URL(anyUrl);
+      const path = (u.pathname || '/').replace(/^\/+/, '').replace(/\/index\.m3u8$/i, '') || 'cam';
+      return { host: u.hostname, path };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Igual que internal/servers/hls/index.html de MediaMTX. */
+  _hlsMediamtxOptions() {
+    return { maxLiveSyncPlaybackRate: 1.5 };
+  }
+
+  /**
+   * HLS como en http://127.0.0.1:8888/tapo/ (hls.min.js del propio MediaMTX).
+   * @param {string} m3u8Url
+   */
+  async _attachPreviewMediamtxHls(m3u8Url) {
     if (!this._preview) throw new Error('Preview no disponible.');
     this._clearPreviewSurface();
+    const u = new URL(m3u8Url);
+    const HlsCtor = await this._loadHlsCtor(u.hostname, u.port || '8888');
+    if (!(HlsCtor && HlsCtor.isSupported())) {
+      throw new Error('HLS no soportado en este navegador.');
+    }
+
+    this._preview.crossOrigin = 'anonymous';
+    this._preview.playsInline = true;
+    this._preview.muted = true;
+    this._preview.autoplay = true;
+
+    const hls = new HlsCtor(this._hlsMediamtxOptions());
+    this._hls = hls;
+
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const done = (ok, err) => {
+        if (settled) return;
+        settled = true;
+        try { hls.off(HlsCtor.Events.ERROR, onErr); } catch { /* noop */ }
+        try { hls.off(HlsCtor.Events.MANIFEST_LOADED, onManifest); } catch { /* noop */ }
+        try { hls.off(HlsCtor.Events.MEDIA_ATTACHED, onAttached); } catch { /* noop */ }
+        if (ok) resolve();
+        else reject(err || new Error('No se pudo cargar HLS.'));
+      };
+      const onErr = (_evt, data) => {
+        if (data?.fatal) done(false, new Error(`HLS: ${data.type || 'fatal'}`));
+      };
+      const onManifest = () => {
+        try { this._preview.play().catch(() => {}); } catch { /* noop */ }
+        done(true);
+      };
+      const onAttached = () => {
+        hls.loadSource(m3u8Url);
+      };
+      hls.on(HlsCtor.Events.ERROR, onErr);
+      hls.on(HlsCtor.Events.MANIFEST_LOADED, onManifest);
+      hls.on(HlsCtor.Events.MEDIA_ATTACHED, onAttached);
+      hls.attachMedia(this._preview);
+      setTimeout(() => done(false, new Error('Timeout cargando HLS.')), 12000);
+    });
+
+    this._preview.onplay = () => {
+      try {
+        const pos = hls.liveSyncPosition;
+        if (Number.isFinite(pos) && pos > 0) {
+          this._preview.currentTime = pos;
+        }
+      } catch {
+        /* noop */
+      }
+    };
+    try { await this._preview.play(); } catch { /* noop */ }
+  }
+
+  _isLocalHost(host) {
+    const h = String(host || '').toLowerCase();
+    return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
+  }
+
+  async _attachPreviewUrlOnce(src) {
+    if (!this._preview) throw new Error('Preview no disponible.');
     const isM3u8 = /\.m3u8(\?|#|$)/i.test(src);
+    if (!isM3u8 && /^https?:\/\//i.test(src)) {
+      const candidates = this._buildUrlCandidates(src).filter((u) => /\.m3u8(\?|#|$)/i.test(u));
+      let lastErr = null;
+      for (const m3u8 of candidates) {
+        try {
+          await this._attachPreviewUrlOnce(m3u8);
+          return;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr || new Error('La URL HTTP no es un stream de video (usá …/index.m3u8 o la página MediaMTX /tapo/).');
+    }
+    this._clearPreviewSurface();
     const canNativeHls = this._preview.canPlayType('application/vnd.apple.mpegurl');
     this._preview.crossOrigin = 'anonymous';
     this._preview.playsInline = true;
     this._preview.muted = true;
     this._preview.autoplay = true;
 
-    if (isM3u8 && !canNativeHls) {
+    const loadTimeoutMs = 6000;
+
+    if (isM3u8) {
+      if (canNativeHls) {
+        try {
+          await this._attachPreviewVideoSrcOnce(src, loadTimeoutMs);
+          try { await this._preview.play(); } catch { /* noop */ }
+          return;
+        } catch {
+          /* fallback hls.js */
+        }
+      }
       const HlsCtor = await this._loadHlsCtor();
       if (!(HlsCtor && HlsCtor.isSupported())) {
         throw new Error('HLS no soportado en este navegador.');
       }
-      this._hls = new HlsCtor({
-        lowLatencyMode: true,
-        enableWorker: true,
-        backBufferLength: 60,
-      });
+      this._hls = new HlsCtor(this._hlsMediamtxOptions());
       await new Promise((resolve, reject) => {
         let settled = false;
         const done = (ok, err) => {
@@ -404,7 +569,17 @@ export class LiveCaptureFacade {
           if (ok) resolve();
           else reject(err || new Error('No se pudo cargar el manifiesto HLS.'));
         };
-        const onParsed = () => done(true);
+        const onParsed = () => {
+          try {
+            const edge = this._hls?.liveSyncPosition;
+            if (Number.isFinite(edge) && edge > 0) {
+              this._preview.currentTime = edge;
+            }
+          } catch {
+            /* noop */
+          }
+          done(true);
+        };
         const onErr = (_evt, data) => {
           if (data?.fatal) {
             done(false, new Error(`HLS error: ${data.type || 'fatal'}`));
@@ -414,13 +589,18 @@ export class LiveCaptureFacade {
         this._hls.on(HlsCtor.Events.ERROR, onErr);
         this._hls.loadSource(src);
         this._hls.attachMedia(this._preview);
-        setTimeout(() => done(false, new Error('Timeout cargando HLS.')), 9000);
+        setTimeout(() => done(false, new Error('Timeout cargando HLS.')), loadTimeoutMs);
       });
       try { await this._preview.play(); } catch { /* noop */ }
       return;
     }
 
-    await new Promise((resolve, reject) => {
+    await this._attachPreviewVideoSrcOnce(src, loadTimeoutMs);
+    try { await this._preview.play(); } catch { /* noop */ }
+  }
+
+  _attachPreviewVideoSrcOnce(src, timeoutMs = 6000) {
+    return new Promise((resolve, reject) => {
       let settled = false;
       const done = (ok, err) => {
         if (settled) return;
@@ -436,9 +616,8 @@ export class LiveCaptureFacade {
       this._preview.addEventListener('error', onError);
       this._preview.src = src;
       try { this._preview.load(); } catch { /* noop */ }
-      setTimeout(() => done(false, new Error('Timeout cargando stream URL.')), 9000);
+      setTimeout(() => done(false, new Error('Timeout cargando stream URL.')), timeoutMs);
     });
-    try { await this._preview.play(); } catch { /* noop */ }
   }
 
   async _attachPreviewWebRtcOnce(endpoint) {
@@ -451,26 +630,43 @@ export class LiveCaptureFacade {
     const pc = new RTCPeerConnection({ iceServers: [] });
     this._pc = pc;
     const ms = new MediaStream();
-    pc.ontrack = (ev) => {
+    let gotVideo = false;
+    const bindTrack = (ev) => {
       ev.streams.forEach((s) => s.getTracks().forEach((t) => ms.addTrack(t)));
       if (!ev.streams.length && ev.track) ms.addTrack(ev.track);
+      if (!ms.getVideoTracks().length) return;
+      gotVideo = true;
       this._preview.srcObject = ms;
       this._preview.play().catch(() => {});
     };
+    pc.ontrack = bindTrack;
     pc.addTransceiver('video', { direction: 'recvonly' });
     pc.addTransceiver('audio', { direction: 'recvonly' });
 
+    let host = '';
+    try {
+      host = new URL(endpoint).hostname;
+    } catch {
+      /* noop */
+    }
+    const iceMs = this._isLocalHost(host) ? 800 : 2500;
+
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    await this._waitIceGatheringComplete(pc, 3000);
+    await this._waitIceGatheringComplete(pc, iceMs);
     const sdpOffer = pc.localDescription?.sdp || offer.sdp || '';
     if (!sdpOffer) throw new Error('No se pudo crear oferta WebRTC.');
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/sdp' },
-      body: sdpOffer,
-    });
+    let res;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: sdpOffer,
+      });
+    } catch (e) {
+      throw new Error(`WebRTC bloqueado (CORS/red): ${e?.message || e}`);
+    }
     if (!res.ok) throw new Error(`WebRTC no disponible (${res.status}).`);
     const answerSdp = await res.text();
     if (!answerSdp || !answerSdp.includes('m=')) {
@@ -479,6 +675,21 @@ export class LiveCaptureFacade {
     await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
     const loc = res.headers.get('location') || '';
     this._whepResourceUrl = loc ? new URL(loc, endpoint).toString() : '';
+
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        if (gotVideo) resolve();
+        else reject(new Error('WebRTC sin video (¿MediaMTX activo y stream en el path?)'));
+      }, 8000);
+      const check = () => {
+        if (gotVideo) {
+          clearTimeout(t);
+          resolve();
+        }
+      };
+      pc.addEventListener('track', () => check());
+      check();
+    });
   }
 
   _waitIceGatheringComplete(pc, timeoutMs = 3000) {
@@ -498,22 +709,39 @@ export class LiveCaptureFacade {
     });
   }
 
-  async _loadHlsCtor() {
+  /**
+   * @param {string} [mtxHost]
+   * @param {string} [mtxPort]
+   */
+  async _loadHlsCtor(mtxHost, mtxPort = '8888') {
     if (typeof window === 'undefined') return null;
     if (window.Hls) return window.Hls;
-    if (window.__srHlsLoadPromise) {
-      await window.__srHlsLoadPromise;
+
+    const h = this._normalizeStreamHost(mtxHost || '127.0.0.1');
+    const scriptUrl = `http://${h}:${mtxPort}/hls.min.js`;
+    const cacheKey = `__srHlsLoad:${scriptUrl}`;
+
+    if (window[cacheKey]) {
+      await window[cacheKey];
       return window.Hls || null;
     }
-    window.__srHlsLoadPromise = new Promise((resolve, reject) => {
+
+    window[cacheKey] = new Promise((resolve, reject) => {
       const tag = document.createElement('script');
-      tag.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+      tag.src = scriptUrl;
       tag.async = true;
       tag.onload = () => resolve();
-      tag.onerror = () => reject(new Error('No se pudo cargar hls.js'));
+      tag.onerror = () => {
+        const fallback = document.createElement('script');
+        fallback.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.7';
+        fallback.async = true;
+        fallback.onload = () => resolve();
+        fallback.onerror = () => reject(new Error('No se pudo cargar hls.js'));
+        document.head.appendChild(fallback);
+      };
       document.head.appendChild(tag);
     });
-    await window.__srHlsLoadPromise;
+    await window[cacheKey];
     return window.Hls || null;
   }
 }
