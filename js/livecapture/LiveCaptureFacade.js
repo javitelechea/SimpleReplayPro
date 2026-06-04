@@ -10,6 +10,31 @@ import { ReplayEngine } from './ReplayEngine.js';
 
 export const LIVE_CAPTURE_ENGINE_TYPE = 'liveCapture';
 
+const HTTPS_LOCAL_STREAM_MSG =
+  'Desde HTTPS (simplereplay.survision.ar) el navegador bloquea MediaMTX en http://127.0.0.1. ' +
+  'Usá la app en http://127.0.0.1:8080 en esta misma PC, o poné HTTPS en MediaMTX.';
+
+/** Página HTTPS no puede cargar streams HTTP a localhost/IP local (mixed content). */
+export function isHttpsPageBlockedLocalMediaUrl(anyUrl) {
+  if (typeof window === 'undefined' || window.location.protocol !== 'https:') return false;
+  try {
+    const u = new URL(String(anyUrl || '').trim());
+    if (u.protocol !== 'http:') return false;
+    const h = u.hostname.toLowerCase();
+    if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]') return true;
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+    if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function getHttpsLocalStreamBlockedMessage() {
+  return HTTPS_LOCAL_STREAM_MSG;
+}
+
 export class LiveCaptureFacade {
   constructor() {
     /** @type {HTMLDivElement|null} */
@@ -195,7 +220,15 @@ export class LiveCaptureFacade {
     if (!/^(rtsp|https?):\/\//i.test(src)) {
       throw new Error('Usá una URL RTSP o HTTP de MediaMTX (ej. http://localhost:8888/tapo/).');
     }
+    if (isHttpsPageBlockedLocalMediaUrl(src)) {
+      throw new Error(HTTPS_LOCAL_STREAM_MSG);
+    }
     const endpoints = this._buildIpReadEndpoints(src);
+    for (const endpoint of endpoints) {
+      if (isHttpsPageBlockedLocalMediaUrl(endpoint)) {
+        throw new Error(HTTPS_LOCAL_STREAM_MSG);
+      }
+    }
     let lastErr = null;
     for (const endpoint of endpoints) {
       if (/\.m3u8(\?|#|$)/i.test(endpoint)) {
@@ -719,6 +752,9 @@ export class LiveCaptureFacade {
 
     const h = this._normalizeStreamHost(mtxHost || '127.0.0.1');
     const scriptUrl = `http://${h}:${mtxPort}/hls.min.js`;
+    if (isHttpsPageBlockedLocalMediaUrl(scriptUrl)) {
+      throw new Error(HTTPS_LOCAL_STREAM_MSG);
+    }
     const cacheKey = `__srHlsLoad:${scriptUrl}`;
 
     if (window[cacheKey]) {

@@ -18,7 +18,11 @@ import { ButtonboardTemplates } from './buttonboardTemplates.js';
 import { createSessionGuard } from './sessionGuard.js';
 import { PopoutController } from './popoutController.js';
 import { buildLocalFilePopoutPayload, buildLocalBufferPopoutPayload } from './popoutMediaShare.js';
-import { LiveCaptureFacade } from './livecapture/LiveCaptureFacade.js';
+import {
+    LiveCaptureFacade,
+    isHttpsPageBlockedLocalMediaUrl,
+    getHttpsLocalStreamBlockedMessage,
+} from './livecapture/LiveCaptureFacade.js';
 import {
     startLiveRecording,
     startLivePreview,
@@ -35,6 +39,11 @@ import {
 import { promoteStoppedSessionToLocal } from './livecapture/sessionConsolidate.js';
 import { canRunLiveCapture } from './livecapture/index.js';
 import { attachSimpleReplayDevApi } from './simpleReplayDev.js';
+import { initTapoRinkZones } from './addons/tapoRinkZones.js';
+import {
+    isExtendedSportXml,
+    resolveExtendedSportXmlOffset,
+} from './extendedSportXmlImport.js';
 import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from './i18n.js';
 
 (function () {
@@ -62,6 +71,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     /** Ref desde `wireLiveCaptureAnalyzeTab`: cambiar pestaña Clips / Captura en vivo. */
     /** @type {((which: 'clips' | 'livecapture') => void) | null} */
     let _switchAnalyzeTabRef = null;
+    /** @type {{ refresh: () => void } | null} */
+    let _tapoRinkRef = null;
     let _liveProbeLastDuration = 0;
     let _liveProbeLastTs = 0;
     let _liveDurationGrowthHits = 0;
@@ -2433,7 +2444,11 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         }
 
         let _previewDebounce = null;
+        let _ipHttpsBlocked = false;
+        let _ipHttpsBlockedToastShown = false;
+
         function scheduleLivePreviewRefresh() {
+            if (_ipHttpsBlocked) return;
             clearTimeout(_previewDebounce);
             _previewDebounce = setTimeout(() => {
                 refreshLivePreviewNow();
@@ -2446,12 +2461,24 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             if (game?.video_source !== 'liveCapture') return;
             const sourceType = getLiveSourceKind();
             if (sourceType === 'camera' && !envOk) return;
+            const streamUrl = (inputStreamUrl?.value || '').trim();
+            if (sourceType === 'ip' && streamUrl && isHttpsPageBlockedLocalMediaUrl(streamUrl)) {
+                _ipHttpsBlocked = true;
+                stopLivePreview();
+                facade.attachPreviewStream?.(null);
+                if (!_ipHttpsBlockedToastShown) {
+                    _ipHttpsBlockedToastShown = true;
+                    UI.toast(getHttpsLocalStreamBlockedMessage(), 'error');
+                }
+                refreshLiveCapturePanelState();
+                return;
+            }
+            _ipHttpsBlocked = false;
             try {
                 ensureCaptureSessionId();
                 if (!facade.getSessionId?.()) return;
                 const deviceId = ($('#livecapture-device')?.value || '').trim() || undefined;
                 const resolution = selRes?.value === '1080' ? '1080' : '720';
-                const streamUrl = (inputStreamUrl?.value || '').trim();
                 if (sourceType === 'ip' && !streamUrl) {
                     // Si el usuario cambia a URL pero aún no cargó una, apagar preview de cámara.
                     stopLivePreview();
@@ -2464,9 +2491,18 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 }
                 await startLivePreview({ facade, deviceId, resolution, sourceType, streamUrl });
             } catch (e) {
-                console.warn('[LiveCapture] vista previa:', e?.message || e);
-                if (sourceType === 'ip') {
-                    UI.toast(e?.message || 'No se pudo conectar la cámara IP', 'error');
+                const msg = e?.message || '';
+                if (isHttpsPageBlockedLocalMediaUrl(streamUrl) || msg.includes('HTTPS (simplereplay')) {
+                    _ipHttpsBlocked = true;
+                    if (!_ipHttpsBlockedToastShown) {
+                        _ipHttpsBlockedToastShown = true;
+                        UI.toast(getHttpsLocalStreamBlockedMessage(), 'error');
+                    }
+                } else {
+                    console.warn('[LiveCapture] vista previa:', msg || e);
+                    if (sourceType === 'ip') {
+                        UI.toast(msg || 'No se pudo conectar la cámara IP', 'error');
+                    }
                 }
             }
             refreshLiveCapturePanelState();
@@ -2578,6 +2614,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 lines.push(t('live.ipCameraActive'));
             }
             if (statusEl) statusEl.innerHTML = lines.length ? lines.join('<br/>') : '';
+            _tapoRinkRef?.refresh?.();
         }
 
         btnSetupDevices?.addEventListener('click', async () => {
@@ -2611,6 +2648,12 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 const next = btn.getAttribute('data-source-kind') || 'camera';
                 if (next === getLiveSourceKind()) return;
                 setLiveSourceKind(next);
+                if (next === 'ip') {
+                    const streamIn = $('#livecapture-stream-url');
+                    if (streamIn && !String(streamIn.value || '').trim()) {
+                        streamIn.value = 'http://127.0.0.1:8888/tapo/';
+                    }
+                }
                 // Cambiar tipo de fuente debe cortar inmediatamente la preview previa (webcam o URL).
                 stopLivePreview();
                 facade.attachPreviewStream?.(null);
@@ -2635,6 +2678,10 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             }
             clearTimeout(_previewDebounce);
             refreshLivePreviewNow();
+        });
+        inputStreamUrl?.addEventListener('input', () => {
+            _ipHttpsBlocked = false;
+            _ipHttpsBlockedToastShown = false;
         });
         inputStreamUrl?.addEventListener('keydown', (ev) => {
             if (ev.key !== 'Enter') return;
@@ -2710,6 +2757,16 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
         setInterval(refreshLiveCapturePanelState, 1000);
         refreshLiveCapturePanelState();
+
+        const tapoRinkHost = $('#tapo-rink-host');
+        if (tapoRinkHost) {
+            _tapoRinkRef = initTapoRinkZones({
+                host: tapoRinkHost,
+                getStreamUrl: () => (inputStreamUrl?.value || '').trim(),
+                getSourceKind: getLiveSourceKind,
+                getIsRecording: isLiveRecordingActive,
+            });
+        }
     }
 
     function wirePlayerChrome() {
@@ -5979,39 +6036,39 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 try {
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(xmlString, "application/xml");
-                    
-                    // Find first "Start" in XML
-                    let xmlStartSec = null;
-                    const instances = xmlDoc.querySelectorAll("ALL_INSTANCES > instance");
-                    for (const inst of instances) {
-                        const code = inst.querySelector("code")?.textContent?.trim();
-                        if (code === "Start") {
-                            xmlStartSec = parseFloat(inst.querySelector("start")?.textContent || 0);
-                            break;
-                        }
-                    }
 
-                    // Find "Start" in AppState
                     const appStartClip = AppState.get('clips').find(c => {
                         const tag = AppState.getTagType(c.tag_type_id);
                         return tag && tag.id === 'tag-start';
                     });
 
-                    if (xmlStartSec !== null) {
-                        if (appStartClip) {
-                            // CASE: Both exist -> Alignment
-                            offset = appStartClip.t_sec - xmlStartSec;
+                    if (isExtendedSportXml(xmlDoc)) {
+                        offset = resolveExtendedSportXmlOffset(xmlDoc, appStartClip);
+                    } else {
+                        // SportCode clásico: alineación por evento "Start"
+                        let xmlStartSec = null;
+                        const instances = xmlDoc.querySelectorAll("ALL_INSTANCES > instance");
+                        for (const inst of instances) {
+                            const code = inst.querySelector("code")?.textContent?.trim();
+                            if (code === "Start") {
+                                xmlStartSec = parseFloat(inst.querySelector("start")?.textContent || 0);
+                                break;
+                            }
+                        }
+
+                        if (xmlStartSec !== null) {
+                            if (appStartClip) {
+                                offset = appStartClip.t_sec - xmlStartSec;
+                            } else {
+                                const choice = confirm("El XML tiene un evento 'Start' pero el proyecto actual NO tiene uno.\n\n¿Deseas importar igualmente sin alineación (inicio en 0)?\n\n(Aceptar = Importar en 0 / Cancelar = Detener para crear el 'Start')");
+                                if (!choice) return;
+                                offset = 0;
+                            }
                         } else {
-                            // CASE: XML has Start, but App doesn't
-                            const choice = confirm("El XML tiene un evento 'Start' pero el proyecto actual NO tiene uno.\n\n¿Deseas importar igualmente sin alineación (inicio en 0)?\n\n(Aceptar = Importar en 0 / Cancelar = Detener para crear el 'Start')");
-                            if (!choice) return; // Stop to let user create Start
+                            const choice = confirm("El XML NO tiene evento 'Start'. No se podrá alinear de forma automática.\n\n¿Deseas importar igualmente sin alineación (inicio en 0)?");
+                            if (!choice) return;
                             offset = 0;
                         }
-                    } else {
-                        // CASE: XML doesn't have Start
-                        const choice = confirm("El XML NO tiene evento 'Start'. No se podrá alinear de forma automática.\n\n¿Deseas importar igualmente sin alineación (inicio en 0)?");
-                        if (!choice) return; // Stop the import
-                        offset = 0;
                     }
 
                 } catch (e) {

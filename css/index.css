@@ -7171,3 +7171,191 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
 #select-new-project-buttonboard {
   width: 100%;
 }
+
+/* Tapo hockey zones (addon oculto) */
+.tapo-rink-host {
+  margin: 0.5rem 0;
+  padding: 0.35rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tapo-rink-host:not(.hidden) + .livecapture-controls-footer {
+  margin-top: 0.25rem;
+}
+
+.tapo-rink__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.35rem 0.15rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tapo-rink__toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tapo-rink__chevron {
+  font-size: 0.85rem;
+  color: var(--text-muted, #9ca3af);
+  transition: transform 0.15s ease;
+}
+
+.tapo-rink--collapsed .tapo-rink__chevron {
+  transform: rotate(-90deg);
+}
+
+.tapo-rink--collapsed .tapo-rink__body {
+  display: none;
+}
+
+.tapo-rink__head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.tapo-rink__ctrl-btn.is-active {
+  background: rgba(37, 99, 235, 0.35);
+  border-color: rgba(96, 165, 250, 0.85);
+  color: #dbeafe;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45);
+}
+
+.tapo-rink--kbd-armed .tapo-rink__toggle {
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
+}
+
+.tapo-rink__ctrl-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  color: #93c5fd;
+  text-align: center;
+}
+
+.tapo-rink__cell--flash {
+  background: rgba(59, 130, 246, 0.55) !important;
+}
+
+.tapo-rink__title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tapo-rink__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+
+.tapo-rink__cell {
+  min-height: 2.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #e5e7eb;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tapo-rink__cell--ok {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.tapo-rink__cell--sel {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(96, 165, 250, 0.7);
+}
+
+.tapo-rink__cell--current {
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.85);
+  border-color: rgba(250, 204, 21, 0.7);
+}
+
+.tapo-rink__setup-extra {
+  margin-top: 0.5rem;
+}
+
+.tapo-rink__hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.tapo-ptz-pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(3rem, 1fr));
+  grid-template-rows: repeat(3, minmax(3rem, 1fr));
+  gap: 0.4rem;
+  max-width: 220px;
+  margin: 0 auto 0.65rem;
+  touch-action: none;
+}
+
+.tapo-ptz-pad button {
+  border: none;
+  border-radius: 10px;
+  background: #1e2430;
+  color: #f3f4f6;
+  font-size: 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 3rem;
+}
+
+.tapo-ptz-pad button.is-active {
+  background: #2563eb;
+}
+
+.tapo-ptz-pad button[data-tapo-stop] {
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+  background: #3a2020;
+  color: #fca5a5;
+}
+
+.tapo-rink__status {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  min-height: 1rem;
+}
+
+.tapo-rink__status--err {
+  color: #f87171;
+}
+
+.tapo-gp-test {
+  margin-top: 0.5rem;
+}
+
+.tapo-gp-test__out {
+  margin: 0.45rem 0 0;
+  padding: 0.5rem 0.55rem;
+  max-height: 7rem;
+  overflow: auto;
+  font-size: 0.65rem;
+  line-height: 1.35;
+  color: #a5b4c8;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

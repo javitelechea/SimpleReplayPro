@@ -252,6 +252,21 @@ export const DrawingTool = (() => {
         if (sizeSlider) sizeSlider.value = String(_lineWidth);
     }
 
+    function _isPlayerFullscreen() {
+        const container = document.getElementById('player-container');
+        const nativeEl = document.fullscreenElement || document.webkitFullscreenElement || null;
+        if (nativeEl === document.documentElement) return true;
+        if (container && nativeEl === container) return true;
+        return document.documentElement.classList.contains('sr-player-fs-active');
+    }
+
+    /** Ver + FS: Space limpia el lienzo, sale del dibujo y reanuda el video. */
+    function _dismissViewFullscreenDrawingAndPlay() {
+        clearCanvas();
+        close();
+        if (typeof YTPlayer !== 'undefined' && YTPlayer.play) YTPlayer.play();
+    }
+
     function _onDrawingKeydown(e) {
         if (!_active) return;
 
@@ -276,7 +291,14 @@ export const DrawingTool = (() => {
 
         let handled = false;
 
-        if (e.key === 'Escape') {
+        if (
+            (e.key === ' ' || e.key === 'Space')
+            && AppState.get('mode') === 'view'
+            && _isPlayerFullscreen()
+        ) {
+            _dismissViewFullscreenDrawingAndPlay();
+            handled = true;
+        } else if (e.key === 'Escape') {
             close();
             handled = true;
         } else if (mod && key === 's') {

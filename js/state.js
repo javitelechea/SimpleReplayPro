@@ -7,6 +7,10 @@ import { DemoData } from './demoData.js';
 import { FirebaseData } from './firebaseData.js';
 import { ExportManager } from './export.js';
 import { isLiveRecordingActive } from './livecapture/liveRecordingController.js';
+import {
+  isExtendedSportXml,
+  importExtendedSportXmlDocument,
+} from './extendedSportXmlImport.js';
 
 /** userId when Firebase Auth has no signed-in user (not a Firebase uid) */
 const ANONYMOUS_USER_ID = 'anonymous';
@@ -1114,6 +1118,15 @@ export const AppState = (() => {
       if (parserError) {
         console.error("XML Parsing Error:", parserError.textContent);
         return false;
+      }
+
+      if (isExtendedSportXml(xmlDoc)) {
+        return importExtendedSportXmlDocument(xmlDoc, offset, {
+          state,
+          DemoData,
+          emit,
+          addActivity,
+        });
       }
 
       // Build a merged snapshot and restore DemoData once (single source of truth).
