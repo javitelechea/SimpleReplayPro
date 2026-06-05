@@ -478,7 +478,11 @@ export const YTPlayer = (() => {
             _buildVideoPlayerInstance();
             await _videoPlayer.loadVideo({ type: 'youtube', id: _lastMedia.id });
             if (currentTime > 0) _videoPlayer.seekTo(currentTime);
-            if (selectedQ && selectedQ !== 'auto') _videoPlayer.setPlaybackQuality(selectedQ);
+            const isMobile = typeof window !== 'undefined' && (
+                window.matchMedia('(max-width: 1024px)').matches
+                || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '')
+            );
+            if (!isMobile && selectedQ && selectedQ !== 'auto') _videoPlayer.setPlaybackQuality(selectedQ);
             if (wasPlaying) _videoPlayer.play();
             else _videoPlayer.pause();
             return true;

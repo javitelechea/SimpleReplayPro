@@ -1203,6 +1203,10 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function syncPlayerYtNativeBtnUi() {
         const nativeBtn = $('#player-chrome-yt-native');
         if (!nativeBtn) return;
+        if (isMobileLayout()) {
+            nativeBtn.style.display = 'none';
+            return;
+        }
         const source = typeof YTPlayer.getSourceType === 'function' ? YTPlayer.getSourceType() : null;
         const isYoutube = source === 'youtube';
         const nativeOn = typeof YTPlayer.isYoutubeNativeControlsEnabled === 'function'
@@ -1252,6 +1256,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         if (typeof DrawingTool !== 'undefined' && DrawingTool.isActive?.()) {
             DrawingTool.close();
         }
+        void syncMobileYoutubeNativeMode();
     }
 
     function syncAnalyzeFsUi(opts = {}) {
@@ -1464,7 +1469,46 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function isMobileChromeAutoHide() {
-        return isMobileLayout() && !isPlayerFullscreen();
+        return isMobileLayout() && !isPlayerFullscreen() && !shouldPreferMobileYoutubeNative();
+    }
+
+    /** Móvil + modo Ver + YouTube: controles nativos del iframe (sin barra propia). */
+    function shouldPreferMobileYoutubeNative() {
+        if (!isMobileLayout()) return false;
+        if (AppState.get('mode') !== 'view') return false;
+        if (isPlayerFullscreen()) return false;
+        if (typeof YTPlayer?.getSourceType !== 'function') return false;
+        if (typeof YTPlayer.isReady === 'function' && !YTPlayer.isReady()) return false;
+        return YTPlayer.getSourceType() === 'youtube';
+    }
+
+    let _mobileNativeSyncBusy = false;
+    async function syncMobileYoutubeNativeMode() {
+        if (_mobileNativeSyncBusy) return;
+        _mobileNativeSyncBusy = true;
+        try {
+            const preferNative = shouldPreferMobileYoutubeNative();
+            document.body.classList.toggle('mobile-yt-native', preferNative);
+            const container = getPlayerContainer();
+            if (preferNative) {
+                hideMobileChrome(container);
+                if (typeof YTPlayer.setYoutubeNativeControlsEnabled === 'function'
+                    && !YTPlayer.isYoutubeNativeControlsEnabled()) {
+                    await YTPlayer.setYoutubeNativeControlsEnabled(true);
+                }
+            } else if (
+                isMobileLayout()
+                && typeof YTPlayer?.isYoutubeNativeControlsEnabled === 'function'
+                && YTPlayer.isYoutubeNativeControlsEnabled()
+            ) {
+                await YTPlayer.setYoutubeNativeControlsEnabled(false);
+            }
+            syncPlayerChromeUi();
+        } catch (err) {
+            console.warn('syncMobileYoutubeNativeMode:', err);
+        } finally {
+            _mobileNativeSyncBusy = false;
+        }
     }
 
     function revealMobileChrome(container, autoHideMs = 3500) {
@@ -1715,6 +1759,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             if (_playerFsNativeActive || isPseudoPlayerFullscreen()) {
                 completePlayerFullscreenExit();
             }
+            void syncMobileYoutubeNativeMode();
             return;
         }
 
@@ -2320,6 +2365,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function syncPlayerChromeUi() {
         const chrome = $('#player-chrome');
         const container = $('#player-container');
+        const mobileYtNative = document.body.classList.contains('mobile-yt-native');
         const inAnalyzeFs = AppState.get('mode') === 'analyze' && isPlayerFullscreen() && !!AppState.get('currentGameId');
         if (chrome && inAnalyzeFs) {
             chrome.classList.remove('hidden');
@@ -2329,6 +2375,10 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         const tagFsToggle = $('#tag-bar-fs-toggle');
         if (tagFsExit) tagFsExit.style.display = inAnalyzeFs ? 'inline-flex' : 'none';
         if (tagFsToggle) tagFsToggle.style.display = inAnalyzeFs ? 'inline-flex' : 'none';
+        if (mobileYtNative && chrome) {
+            chrome.classList.add('hidden');
+            return;
+        }
         if (!chrome || chrome.classList.contains('hidden')) return;
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
         const nativeYoutubeControlsOn =
@@ -2968,6 +3018,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         const DOUBLE_TAP_MAX_DELTA_X = 140;
 
         const canHandleSurfaceGesture = (evTarget) => {
+            if (shouldPreferMobileYoutubeNative()) return false;
             if (!AppState.get('currentGameId')) return false;
             if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return false;
             if (!evTarget) return false;
@@ -3086,7 +3137,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             }
             lastTapTs = now;
             lastTapX = touch.clientX;
-        });
+        }, { passive: true });
     }
 
     function wireHeaderNavMenu() {
@@ -3477,6 +3528,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         syncLiveCaptureAnalyzeDock();
         syncFullscreenClipRail();
         syncHeaderDrawMenu();
+        void syncMobileYoutubeNativeMode();
     });
 
     AppState.on('featuresChanged', () => {
@@ -3612,6 +3664,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         }
         setTimeout(updateLiveEdgeButton, 400);
         setTimeout(syncPlayerChromeUi, 0);
+        setTimeout(() => { void syncMobileYoutubeNativeMode(); }, 600);
         syncHeaderDrawMenu();
         syncFullscreenAnalyzeRail();
     });
@@ -6930,6 +6983,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
         // Render initial UI
         UI.refreshAll();
+        setTimeout(() => { void syncMobileYoutubeNativeMode(); }, 900);
         document.body.classList.remove('initial-playlist-lock-loading');
         updateLiveEdgeButton();
         wireAutoSaveLoop();

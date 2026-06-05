@@ -114,6 +114,12 @@ export class VideoPlayer {
         });
     }
 
+    _isMobilePlayback() {
+        if (typeof window === 'undefined') return false;
+        return window.matchMedia('(max-width: 1024px)').matches
+            || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+    }
+
     _normalizeYoutubeQuality(quality) {
         const q = String(quality || '').trim().toLowerCase();
         if (!q || q === 'auto' || q === 'default' || q === 'unknown') return 'default';
@@ -121,6 +127,7 @@ export class VideoPlayer {
     }
 
     _applyYoutubeQualityPreference({ allowReloadFallback = false } = {}) {
+        if (this._isMobilePlayback()) return true;
         if (this.type !== 'youtube' || !this.player || typeof this.player.setPlaybackQuality !== 'function') return false;
         const q = this._normalizeYoutubeQuality(this._preferredYoutubeQuality);
         try {
@@ -536,6 +543,7 @@ export class VideoPlayer {
     }
 
     setPlaybackQuality(quality) {
+        if (this._isMobilePlayback()) return true;
         if (this.type !== 'youtube' || !this.player || typeof this.player.setPlaybackQuality !== 'function') {
             return false;
         }

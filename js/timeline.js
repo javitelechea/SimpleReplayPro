@@ -10,6 +10,23 @@ export const Timeline = (() => {
 
     let _timelineEl, _trackEl, _progressEl, _playheadEl, _timeLabelEl, _clipsContainerEl;
     let _timeStartEl, _timeEndEl;
+    let _documentTouchDragWired = false;
+
+    function attachDocumentTouchDrag() {
+        if (_documentTouchDragWired) return;
+        _documentTouchDragWired = true;
+        document.addEventListener('touchmove', onTouchMove, { passive: false });
+        document.addEventListener('touchend', onTouchEnd, { passive: true });
+        document.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    }
+
+    function detachDocumentTouchDrag() {
+        if (!_documentTouchDragWired) return;
+        _documentTouchDragWired = false;
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+        document.removeEventListener('touchcancel', onTouchEnd);
+    }
 
     function init() {
         _timelineEl = document.getElementById('custom-timeline');
@@ -33,9 +50,6 @@ export const Timeline = (() => {
         _timelineEl.addEventListener('touchstart', onTouchStart, { passive: false });
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
-        document.addEventListener('touchmove', onTouchMove, { passive: false });
-        document.addEventListener('touchend', onTouchEnd);
-        document.addEventListener('touchcancel', onTouchEnd);
 
         // Listen for state changes to re-render clips
         AppState.on('clipsUpdated', renderClips);
@@ -208,6 +222,7 @@ export const Timeline = (() => {
         if (!_timelineEl?.contains(e.target)) return;
         e.preventDefault();
         beginScrub(e);
+        attachDocumentTouchDrag();
     }
 
     function onTouchMove(e) {
@@ -249,6 +264,7 @@ export const Timeline = (() => {
         _dragType = null;
         _dragClipId = null;
         _lastDragSeekTs = 0;
+        detachDocumentTouchDrag();
     }
 
     function renderClips() {

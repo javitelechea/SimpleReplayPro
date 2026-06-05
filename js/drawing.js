@@ -28,6 +28,7 @@ export const DrawingTool = (() => {
     let _ctx = null;
     let _toolbar = null;
     let _active = false;
+    let _touchHandlersBound = false;
     let _drawing = false;
     let _playlistId = null;
     let _clipId = null;
@@ -160,12 +161,6 @@ export const DrawingTool = (() => {
         _canvas.addEventListener('mousemove', _onPointerMove);
         _canvas.addEventListener('mouseup', _onPointerUp);
         _canvas.addEventListener('mouseleave', _onPointerUp);
-
-        // Touch events
-        _canvas.addEventListener('touchstart', _onTouchStart, { passive: false });
-        _canvas.addEventListener('touchmove', _onTouchMove, { passive: false });
-        _canvas.addEventListener('touchend', _onTouchEnd);
-        _canvas.addEventListener('touchcancel', _onTouchEnd);
 
         // Toolbar buttons
         _toolbar.querySelector('[data-action="draw-save"]').addEventListener('click', save);
@@ -376,6 +371,8 @@ export const DrawingTool = (() => {
         // Resize canvas to match player container
         _resizeCanvas();
 
+        _bindTouchHandlers();
+
         // Show canvas & toolbar
         _canvas.classList.add('active');
         _toolbar.classList.add('active');
@@ -422,6 +419,7 @@ export const DrawingTool = (() => {
         _toolbar.classList.remove('presentation-mode');
         _applyToolbarMode();
         window.removeEventListener('resize', _resizeCanvas);
+        _unbindTouchHandlers();
         _strokes = [];
         _currentStroke = null;
         // Clear description field
@@ -664,6 +662,24 @@ export const DrawingTool = (() => {
         _lineMode = false;
         _lineStart = null;
         _syncDrawingToPopout();
+    }
+
+    function _bindTouchHandlers() {
+        if (!_canvas || _touchHandlersBound) return;
+        _touchHandlersBound = true;
+        _canvas.addEventListener('touchstart', _onTouchStart, { passive: false });
+        _canvas.addEventListener('touchmove', _onTouchMove, { passive: false });
+        _canvas.addEventListener('touchend', _onTouchEnd, { passive: true });
+        _canvas.addEventListener('touchcancel', _onTouchEnd, { passive: true });
+    }
+
+    function _unbindTouchHandlers() {
+        if (!_canvas || !_touchHandlersBound) return;
+        _touchHandlersBound = false;
+        _canvas.removeEventListener('touchstart', _onTouchStart);
+        _canvas.removeEventListener('touchmove', _onTouchMove);
+        _canvas.removeEventListener('touchend', _onTouchEnd);
+        _canvas.removeEventListener('touchcancel', _onTouchEnd);
     }
 
     // ── Touch events (mobile/tablet) ──
