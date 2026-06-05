@@ -1345,8 +1345,14 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             _mobileDefaultViewTimer = setTimeout(applyMobileDefaultViewMode, 120);
         };
 
-        window.addEventListener('resize', sync);
-        window.addEventListener('orientationchange', sync);
+        window.addEventListener('resize', () => {
+            sync();
+            syncLandscapeUiExitState();
+        });
+        window.addEventListener('orientationchange', () => {
+            sync();
+            syncLandscapeUiExitState();
+        });
 
         const mq = window.matchMedia('(max-width: 1024px)');
         if (typeof mq.addEventListener === 'function') {
@@ -1468,6 +1474,20 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         return isCoarsePointerDevice() || isMobileLayout();
     }
 
+    /** Móvil en horizontal: CSS oculta chrome y deja solo el video (sin pseudo-FS). */
+    function isLandscapePhoneVideoOnly() {
+        if (!AppState.get('currentGameId') && !AppState.get('activeCollection')) return false;
+        if (!isMobileLayout()) return false;
+        return window.matchMedia('(orientation: landscape) and (max-height: 520px) and (max-width: 932px)').matches;
+    }
+
+    function syncLandscapeUiExitState() {
+        if (!isLandscapePhoneVideoOnly()) {
+            document.documentElement.classList.remove('sr-landscape-ui-visible');
+        }
+        syncPlayerFsExitUi();
+    }
+
     function isMobileChromeAutoHide() {
         return isMobileLayout() && !isPlayerFullscreen();
     }
@@ -1557,7 +1577,10 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         window.visualViewport?.addEventListener('resize', sync);
         window.visualViewport?.addEventListener('scroll', sync);
         window.addEventListener('resize', sync);
-        window.addEventListener('orientationchange', sync);
+        window.addEventListener('orientationchange', () => {
+            sync();
+            syncLandscapeUiExitState();
+        });
     }
 
     function syncPseudoFsViewport() {
@@ -1647,6 +1670,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         const container = getPlayerContainer();
         if (!container) return false;
 
+        document.documentElement.classList.remove('sr-landscape-ui-visible');
         hideAppOverlaysForFullscreen();
         const mode = AppState.get('mode');
         const useImmersiveStack = isMobileLayout() || mode === 'analyze';
@@ -1728,6 +1752,44 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         };
         fsBtn.addEventListener('pointerup', onFsActivate);
         fsBtn.addEventListener('click', onFsActivate);
+    }
+
+    async function handlePlayerFsExit() {
+        if (isPlayerFullscreen()) {
+            await exitPlayerFullscreen();
+        }
+        if (isLandscapePhoneVideoOnly()) {
+            document.documentElement.classList.add('sr-landscape-ui-visible');
+        } else {
+            document.documentElement.classList.remove('sr-landscape-ui-visible');
+        }
+        syncPlayerFsExitUi();
+        window.dispatchEvent(new Event('resize'));
+    }
+
+    function wirePlayerFsExit() {
+        const btn = $('#player-fs-exit');
+        if (!btn || btn.dataset.wired === '1') return;
+        btn.dataset.wired = '1';
+        const onExit = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            void handlePlayerFsExit();
+        };
+        btn.addEventListener('touchstart', onExit, { passive: false });
+        btn.addEventListener('click', onExit);
+        btn.addEventListener('pointerup', onExit);
+        btn.addEventListener('mousedown', (ev) => ev.stopPropagation());
+        btn.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+    }
+
+    function syncPlayerFsExitUi() {
+        const btn = $('#player-fs-exit');
+        if (!btn) return;
+        const inFsImmersive = isPlayerFullscreen() && shouldUseImmersiveFsControls();
+        const inLandscapePhone = isLandscapePhoneVideoOnly()
+            && !document.documentElement.classList.contains('sr-landscape-ui-visible');
+        btn.classList.toggle('hidden', !(inFsImmersive || inLandscapePhone));
     }
 
     function onPlayerFullscreenChange() {
@@ -2351,16 +2413,18 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function syncPlayerChromeUi() {
+        syncPlayerFsExitUi();
         const chrome = $('#player-chrome');
         const container = $('#player-container');
         const inAnalyzeFs = AppState.get('mode') === 'analyze' && isPlayerFullscreen() && !!AppState.get('currentGameId');
+        const immersiveFs = shouldUseImmersiveFsControls();
         if (chrome && inAnalyzeFs) {
             chrome.classList.remove('hidden');
             container?.classList.add('sr-fs-controls-visible');
         }
         const tagFsExit = $('#tag-bar-fs-exit');
         const tagFsToggle = $('#tag-bar-fs-toggle');
-        if (tagFsExit) tagFsExit.style.display = inAnalyzeFs ? 'inline-flex' : 'none';
+        if (tagFsExit) tagFsExit.style.display = (inAnalyzeFs && !immersiveFs) ? 'inline-flex' : 'none';
         if (tagFsToggle) tagFsToggle.style.display = inAnalyzeFs ? 'inline-flex' : 'none';
         if (!chrome || chrome.classList.contains('hidden')) return;
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
@@ -2991,6 +3055,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         });
 
         wireFullscreenButton();
+        wirePlayerFsExit();
+        syncLandscapeUiExitState();
         wirePseudoFsViewport();
 
         document.addEventListener('fullscreenchange', onPlayerFullscreenChange);
@@ -3067,6 +3133,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             if (evTarget.closest('.fullscreen-analyze-rail')) return false;
             if (evTarget.closest('#clip-view-toolbar')) return false;
             if (evTarget.closest('#drawing-toolbar')) return false;
+            if (evTarget.closest('#player-fs-exit')) return false;
             // Chat y previews de dibujo viven dentro de #player-container: no deben disparar play/pause del tap.
             if (evTarget.closest('#video-chat-panel')) return false;
             if (evTarget.closest('#drawing-preview-overlay')) return false;

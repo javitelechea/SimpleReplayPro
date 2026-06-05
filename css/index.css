@@ -1370,6 +1370,54 @@ body.collection-only-mode .mode-slider {
   display: none !important;
 }
 
+/* Salir de pantalla completa — siempre visible (no depende de controles auto-ocultos) */
+.player-fs-exit {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  left: max(8px, env(safe-area-inset-left, 0px));
+  z-index: 10120;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  background: rgba(8, 10, 16, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: rgba(232, 234, 240, 0.92);
+  font-size: 1.15rem;
+  line-height: 1;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.player-fs-exit:not(.hidden) {
+  display: inline-flex;
+}
+
+html.sr-immersive-fs #player-container .player-fs-exit:not(.hidden),
+html.sr-player-fs-active #player-container .player-fs-exit:not(.hidden),
+#player-container:fullscreen .player-fs-exit:not(.hidden),
+#player-container:-webkit-full-screen .player-fs-exit:not(.hidden) {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.player-fs-exit:hover,
+.player-fs-exit:focus-visible {
+  background: rgba(18, 22, 32, 0.72);
+  outline: none;
+}
+
 #player-container:hover .player-chrome:not(.hidden),
 #player-container:focus-within .player-chrome:not(.hidden) {
   opacity: 1;
@@ -1776,25 +1824,20 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Rail compacto en móvil (fullscreen) */
-@media (max-width: 768px) {
-  .fullscreen-clip-rail.is-compact {
-    right: 8px;
-    bottom: 52px;
-    width: max-content;
-    max-width: min(148px, 62vw);
-    gap: 2px;
-  }
-
+/* Rail compacto en móvil (fullscreen) — botones táctiles ≥44px */
+@media (max-width: 1024px) {
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__head {
-    gap: 3px;
+    gap: 6px;
     width: auto;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle {
-    padding: 3px 6px;
-    font-size: 0.6rem;
-    min-width: 0;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 0.72rem;
+    justify-content: center;
+    align-items: center;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle-label {
@@ -1802,9 +1845,25 @@ button.fullscreen-clip-rail__row:not(:disabled):hover {
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle--draw {
-    min-width: 28px;
-    padding: 3px 5px;
-    font-size: 0.78rem;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__toggle-icon {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .fullscreen-clip-rail.is-compact {
+    right: 8px;
+    bottom: 52px;
+    width: max-content;
+    max-width: min(148px, 62vw);
+    gap: 2px;
   }
 
   .fullscreen-clip-rail.is-compact .fullscreen-clip-rail__body {
@@ -5615,17 +5674,6 @@ body.read-only-mode.playlist-only-mode #btn-save-project {
   transform: translateX(-50%) translateY(0);
 }
 
-.draw-toolbar-presentation-hint {
-  font-size: 0.65rem;
-  color: rgba(232, 234, 240, 0.62);
-  white-space: nowrap;
-  padding: 0 2px;
-}
-
-.draw-toolbar-presentation-hint.hidden {
-  display: none;
-}
-
 .draw-toolbar-close-btn {
   min-width: 24px;
   min-height: 24px;
@@ -5814,14 +5862,45 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
 }
 
 .drawing-toolbar [data-action="draw-save"] {
-  padding: 2px 8px;
-  font-size: 0.68rem;
+  min-width: 24px;
+  padding: 2px 6px;
+  font-size: 0.85rem;
 }
 
 .drawing-toolbar [data-action="draw-clear"] {
   font-size: 0.8rem;
   line-height: 1;
   padding: 2px 4px;
+}
+
+/* Barra de dibujo en pantalla completa retrato: sin texto, cabe en pantalla */
+@media (max-width: 768px) and (orientation: portrait) {
+  html.sr-player-fs-active #player-container .drawing-toolbar.active,
+  html.sr-immersive-fs #player-container .drawing-toolbar.active,
+  #player-container:fullscreen .drawing-toolbar.active,
+  #player-container:-webkit-full-screen .drawing-toolbar.active {
+    top: max(6px, env(safe-area-inset-top, 0px));
+    left: 6px;
+    right: 6px;
+    width: auto;
+    max-width: calc(100% - 12px);
+    transform: none !important;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    row-gap: 4px;
+    column-gap: 3px;
+    border-radius: 10px;
+    padding: 5px 6px;
+    box-sizing: border-box;
+  }
+
+  html.sr-player-fs-active #player-container .drawing-toolbar .draw-toolbar-actions,
+  html.sr-immersive-fs #player-container .drawing-toolbar .draw-toolbar-actions,
+  #player-container:fullscreen .drawing-toolbar .draw-toolbar-actions,
+  #player-container:-webkit-full-screen .drawing-toolbar .draw-toolbar-actions {
+    display: none !important;
+  }
 }
 
 /* Auto-show drawing overlays (during playback) */
@@ -6757,6 +6836,49 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
   #player-container #player-chrome-yt-native,
   #player-container .fullscreen-clip-rail {
     display: none !important;
+  }
+
+  #player-container .player-fs-exit:not(.hidden) {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    position: fixed !important;
+    z-index: 10120 !important;
+  }
+}
+
+/* Restaurar chrome de la app en horizontal tras pulsar ✕ */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 932px) {
+  html.sr-landscape-ui-visible #app-header,
+  html.sr-landscape-ui-visible .side-panel,
+  html.sr-landscape-ui-visible .btn-expand,
+  html.sr-landscape-ui-visible #clip-view-toolbar,
+  html.sr-landscape-ui-visible #custom-timeline,
+  html.sr-landscape-ui-visible #tag-bar,
+  html.sr-landscape-ui-visible #nav-arrows {
+    display: revert !important;
+  }
+
+  html.sr-landscape-ui-visible #app-main {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  html.sr-landscape-ui-visible #video-area {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    z-index: auto !important;
+  }
+
+  html.sr-landscape-ui-visible #player-container .fullscreen-clip-rail:not(.hidden) {
+    display: flex !important;
   }
 }
 

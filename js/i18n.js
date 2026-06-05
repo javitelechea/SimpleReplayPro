@@ -143,7 +143,8 @@ es: {
     'draw.namePlaceholder': 'Nombre',
     'draw.descPlaceholder': 'Descripción del dibujo…',
     'draw.save': 'Guardar (⌘S)',
-    'draw.saveBtn': '💾 Guardar',
+    'draw.saveAria': 'Guardar dibujo',
+    'draw.saveBtn': '💾',
     'draw.close': 'Cerrar dibujo (Esc)',
     'draw.closeAria': 'Cerrar dibujo',
 
@@ -811,7 +812,8 @@ en: {
     'draw.namePlaceholder': 'Name',
     'draw.descPlaceholder': 'Drawing description…',
     'draw.save': 'Save (⌘S)',
-    'draw.saveBtn': '💾 Save',
+    'draw.saveAria': 'Save drawing',
+    'draw.saveBtn': '💾',
     'draw.close': 'Close drawing (Esc)',
     'draw.closeAria': 'Close drawing',
 

@@ -47,7 +47,7 @@ export const Timeline = (() => {
 
         // Event listeners
         _timelineEl.addEventListener('mousedown', onMouseDown);
-        _timelineEl.addEventListener('touchstart', onTouchStart, { passive: false });
+        _timelineEl.addEventListener('touchstart', onTouchStart, { passive: true });
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
 
@@ -222,7 +222,6 @@ export const Timeline = (() => {
 
     function onTouchStart(e) {
         if (!_timelineEl?.contains(e.target)) return;
-        e.preventDefault();
         beginScrub(e);
         attachDocumentTouchDrag();
     }

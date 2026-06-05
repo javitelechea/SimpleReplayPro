@@ -228,11 +228,10 @@
             </button>
             <button class="btn btn-xs btn-ghost draw-tool-btn" data-action="draw-clear" title="Limpiar todo (⌘7)" data-i18n-title="draw.clearAll">🗑️</button>
           </div>
-          <span class="draw-toolbar-presentation-hint hidden" id="draw-presentation-hint" data-i18n="draw.presentationHint">Presentación — no se guarda</span>
           <div class="draw-toolbar-group draw-toolbar-actions">
             <input type="text" id="draw-author" class="draw-description-input draw-author-input" placeholder="Nombre" autocomplete="off" data-i18n-placeholder="draw.namePlaceholder" />
             <input type="text" id="draw-description" class="draw-description-input" placeholder="Descripción del dibujo…" autocomplete="off" data-i18n-placeholder="draw.descPlaceholder" />
-            <button class="btn btn-xs btn-primary" data-action="draw-save" title="Guardar (⌘S)" data-i18n-title="draw.save" data-i18n-html="draw.saveBtn">💾 Guardar</button>
+            <button class="btn btn-xs btn-primary" data-action="draw-save" title="Guardar (⌘S)" aria-label="Guardar dibujo" data-i18n-title="draw.save" data-i18n-aria="draw.saveAria">💾</button>
           </div>
           <div class="draw-toolbar-group draw-toolbar-close">
             <button type="button" class="btn btn-xs btn-ghost draw-toolbar-close-btn" data-action="draw-cancel" title="Cerrar dibujo (Esc)" aria-label="Cerrar dibujo" data-i18n-title="draw.close" data-i18n-aria="draw.closeAria">✕</button>
@@ -247,6 +246,7 @@
         </div>
         <!-- Chat Overlay (over video, bottom) -->
         <div id="video-chat-panel" class="video-chat-panel" style="display:none;"></div>
+        <button type="button" id="player-fs-exit" class="player-fs-exit hidden" title="Salir de pantalla completa" aria-label="Salir de pantalla completa" data-i18n-title="player.exitFullscreen" data-i18n-aria="player.exitFullscreen">✕</button>
       </div>
 
       <!-- Custom Timeline -->

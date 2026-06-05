@@ -190,15 +190,12 @@ export const DrawingTool = (() => {
     function _applyToolbarMode() {
         if (!_toolbar) return;
         const actions = _toolbar.querySelector('.draw-toolbar-actions');
-        const hint = _toolbar.querySelector('#draw-presentation-hint');
         const cancelBtn = _toolbar.querySelector('[data-action="draw-cancel"]');
         _toolbar.classList.toggle('presentation-mode', _presentationMode);
         if (_presentationMode) {
             if (actions) actions.style.display = 'none';
-            if (hint) hint.classList.remove('hidden');
         } else {
             if (actions) actions.style.display = '';
-            if (hint) hint.classList.add('hidden');
         }
         if (cancelBtn) {
             cancelBtn.textContent = '✕';

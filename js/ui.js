@@ -1139,12 +1139,11 @@ export const UI = (() => {
             try { onPlay(); } catch (err) { console.warn('clip play:', err); }
         };
         if (isMobileViewLayout()) {
-            el.addEventListener('touchend', (e) => {
+            el.addEventListener('touchstart', (e) => {
                 if (_shouldIgnoreClipItemTap(e.target)) return;
                 touchHandledAt = Date.now();
-                e.preventDefault();
                 run();
-            }, { passive: false });
+            }, { passive: true });
         }
         el.addEventListener('click', (e) => {
             if (_shouldIgnoreClipItemTap(e.target)) return;
