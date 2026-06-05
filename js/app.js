@@ -1234,6 +1234,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     const PSEUDO_FS_CLASS = 'sr-player-fs-active';
     /** True while our container or document is in the browser Fullscreen API (not pseudo-FS alone). */
     let _playerFsNativeActive = false;
+    /** Usuario entró en FS inmersivo en móvil; se mantiene al rotar aunque el FS nativo caiga. */
+    let _mobileFsSessionActive = false;
 
     function setPlayerNativeFsActive(active) {
         _playerFsNativeActive = !!active;
@@ -1246,6 +1248,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function completePlayerFullscreenExit() {
+        _mobileFsSessionActive = false;
         setPlayerNativeFsActive(false);
         if (isPseudoPlayerFullscreen()) exitPseudoPlayerFullscreen();
         document.body.classList.remove('sr-analyze-fs');
@@ -1468,6 +1471,39 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         return isCoarsePointerDevice() || isMobileLayout();
     }
 
+    const LANDSCAPE_PHONE_MQ = '(orientation: landscape) and (max-width: 932px)';
+
+    /** Móvil en horizontal: el CSS deja solo el video (con o sin pseudo-FS). */
+    function isLandscapePhoneVideoOnly() {
+        if (!isMobileLayout()) return false;
+        if (!window.matchMedia(LANDSCAPE_PHONE_MQ).matches) return false;
+        // Misma intención que el CSS (max-height: 520px), con margen por barras del navegador.
+        return window.matchMedia('(orientation: landscape) and (max-height: 520px) and (max-width: 932px)').matches
+            || window.innerHeight <= 560;
+    }
+
+    function shouldShowPlayerFsExit() {
+        if (!isPlayerFullscreen() || !shouldUseImmersiveFsControls()) return false;
+        // Apaisado móvil: el layout ya es solo vídeo; FS y no-FS se ven igual — sin ✕.
+        if (isLandscapePhoneVideoOnly()) return false;
+        return true;
+    }
+
+    function ensurePlayerFsExitPortal() {
+        const btn = $('#player-fs-exit');
+        if (!btn || btn.parentElement === document.body) return;
+        document.body.appendChild(btn);
+    }
+
+    function reconcileMobileFsAfterLayoutChange() {
+        if (isLandscapePhoneVideoOnly() && isPlayerFullscreen()) {
+            _mobileFsSessionActive = false;
+            void exitPlayerFullscreen();
+            return;
+        }
+        syncPlayerFsExitUi();
+    }
+
     function isMobileChromeAutoHide() {
         return isMobileLayout() && !isPlayerFullscreen();
     }
@@ -1574,6 +1610,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             videoArea.style.left = '0';
             videoArea.style.width = '100%';
             videoArea.style.height = '100dvh';
+            syncPlayerFsExitUi();
             return;
         }
 
@@ -1605,6 +1642,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function enterPseudoPlayerFullscreen() {
+        if (isMobileLayout()) _mobileFsSessionActive = true;
         hideAppOverlaysForFullscreen();
         if (isMobileLayout()) {
             window.scrollTo(0, 1);
@@ -1646,6 +1684,9 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     async function enterPlayerFullscreen() {
         const container = getPlayerContainer();
         if (!container) return false;
+
+        // Apaisado móvil: ya ocupa casi toda la pantalla; el FS no aporta nada.
+        if (isLandscapePhoneVideoOnly()) return true;
 
         hideAppOverlaysForFullscreen();
         const mode = AppState.get('mode');
@@ -1732,6 +1773,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
     async function handlePlayerFsExit() {
         if (!isPlayerFullscreen()) return;
+        _mobileFsSessionActive = false;
         const keepMode = AppState.get('mode');
         await exitPlayerFullscreen();
         if (keepMode === 'view' && AppState.get('mode') !== 'view') {
@@ -1755,21 +1797,51 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         btn.addEventListener('pointerup', onExit);
         btn.addEventListener('mousedown', (ev) => ev.stopPropagation());
         btn.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+        ensurePlayerFsExitPortal();
+        const syncExitOnLayout = () => setTimeout(reconcileMobileFsAfterLayoutChange, 120);
+        window.addEventListener('orientationchange', syncExitOnLayout);
+        window.addEventListener('resize', syncExitOnLayout);
+        window.visualViewport?.addEventListener('resize', syncExitOnLayout);
+        const landscapeMq = window.matchMedia(LANDSCAPE_PHONE_MQ);
+        const onLandscapeMq = () => syncExitOnLayout();
+        if (typeof landscapeMq.addEventListener === 'function') {
+            landscapeMq.addEventListener('change', onLandscapeMq);
+        } else if (typeof landscapeMq.addListener === 'function') {
+            landscapeMq.addListener(onLandscapeMq);
+        }
     }
 
     function syncPlayerFsExitUi() {
         const btn = $('#player-fs-exit');
         if (!btn) return;
-        const show = isPlayerFullscreen() && shouldUseImmersiveFsControls();
+        ensurePlayerFsExitPortal();
+        const show = shouldShowPlayerFsExit();
         btn.classList.toggle('hidden', !show);
+        btn.dataset.visible = show ? 'true' : 'false';
+        btn.setAttribute('aria-hidden', show ? 'false' : 'true');
     }
 
     function onPlayerFullscreenChange() {
         const nativeEl = getNativeFullscreenElement();
         const nativeIsOurs = isOurNativeFullscreenElement(nativeEl);
 
-        // Browser Esc / UI exited native FS while pseudo-FS (or chrome state) is still active.
+        // Rotación u otras causas pueden cerrar el FS nativo.
         if (_playerFsNativeActive && !nativeIsOurs) {
+            setPlayerNativeFsActive(false);
+            if (isLandscapePhoneVideoOnly()) {
+                completePlayerFullscreenExit();
+                syncPlayerFsExitUi();
+                return;
+            }
+            if (isMobileLayout() && (_mobileFsSessionActive || isPseudoPlayerFullscreen())) {
+                if (!isPseudoPlayerFullscreen()) enterPseudoPlayerFullscreen();
+                syncImmersiveFsUi();
+                syncAnalyzeFsUi();
+                syncPlayerChromeUi();
+                syncFullscreenClipRail();
+                syncPlayerFsExitUi();
+                return;
+            }
             completePlayerFullscreenExit();
             return;
         }

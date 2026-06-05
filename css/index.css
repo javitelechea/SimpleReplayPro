@@ -1370,12 +1370,12 @@ body.collection-only-mode .mode-slider {
   display: none !important;
 }
 
-/* Salir de pantalla completa — siempre visible (no depende de controles auto-ocultos) */
-.player-fs-exit {
+/* Salir de pantalla completa — portal en body; no depende de controles auto-ocultos */
+#player-fs-exit.player-fs-exit {
   position: fixed;
   top: max(8px, env(safe-area-inset-top, 0px));
   left: max(8px, env(safe-area-inset-left, 0px));
-  z-index: 10120;
+  z-index: 102000;
   display: none;
   align-items: center;
   justify-content: center;
@@ -1398,14 +1398,17 @@ body.collection-only-mode .mode-slider {
   touch-action: manipulation;
 }
 
-.player-fs-exit:not(.hidden) {
-  display: inline-flex;
+#player-fs-exit.player-fs-exit[data-visible="true"] {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
-html.sr-immersive-fs #player-container .player-fs-exit:not(.hidden),
-html.sr-player-fs-active #player-container .player-fs-exit:not(.hidden),
-#player-container:fullscreen .player-fs-exit:not(.hidden),
-#player-container:-webkit-full-screen .player-fs-exit:not(.hidden) {
+html.sr-immersive-fs #player-fs-exit.player-fs-exit[data-visible="true"],
+html.sr-player-fs-active #player-fs-exit.player-fs-exit[data-visible="true"],
+#player-container:fullscreen ~ #player-fs-exit.player-fs-exit[data-visible="true"],
+#player-container:-webkit-full-screen ~ #player-fs-exit.player-fs-exit[data-visible="true"] {
   display: inline-flex !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -6838,6 +6841,11 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     display: none !important;
   }
 
+  #player-fs-exit.player-fs-exit {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
 }
 
 @media (orientation: landscape) {
