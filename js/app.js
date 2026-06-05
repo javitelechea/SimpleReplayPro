@@ -1469,17 +1469,12 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function isMobileChromeAutoHide() {
-        return isMobileLayout() && !isPlayerFullscreen() && !shouldPreferMobileYoutubeNative();
+        return isMobileLayout() && !isPlayerFullscreen();
     }
 
-    /** Móvil + modo Ver + YouTube: controles nativos del iframe (sin barra propia). */
+    /** Móvil: siempre controles de la app (no nativos de YouTube). */
     function shouldPreferMobileYoutubeNative() {
-        if (!isMobileLayout()) return false;
-        if (AppState.get('mode') !== 'view') return false;
-        if (isPlayerFullscreen()) return false;
-        if (typeof YTPlayer?.getSourceType !== 'function') return false;
-        if (typeof YTPlayer.isReady === 'function' && !YTPlayer.isReady()) return false;
-        return YTPlayer.getSourceType() === 'youtube';
+        return false;
     }
 
     let _mobileNativeSyncBusy = false;
@@ -1487,16 +1482,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         if (_mobileNativeSyncBusy) return;
         _mobileNativeSyncBusy = true;
         try {
-            const preferNative = shouldPreferMobileYoutubeNative();
-            document.body.classList.toggle('mobile-yt-native', preferNative);
-            const container = getPlayerContainer();
-            if (preferNative) {
-                hideMobileChrome(container);
-                if (typeof YTPlayer.setYoutubeNativeControlsEnabled === 'function'
-                    && !YTPlayer.isYoutubeNativeControlsEnabled()) {
-                    await YTPlayer.setYoutubeNativeControlsEnabled(true);
-                }
-            } else if (
+            document.body.classList.remove('mobile-yt-native');
+            if (
                 isMobileLayout()
                 && typeof YTPlayer?.isYoutubeNativeControlsEnabled === 'function'
                 && YTPlayer.isYoutubeNativeControlsEnabled()
@@ -2365,7 +2352,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function syncPlayerChromeUi() {
         const chrome = $('#player-chrome');
         const container = $('#player-container');
-        const mobileYtNative = document.body.classList.contains('mobile-yt-native');
         const inAnalyzeFs = AppState.get('mode') === 'analyze' && isPlayerFullscreen() && !!AppState.get('currentGameId');
         if (chrome && inAnalyzeFs) {
             chrome.classList.remove('hidden');
@@ -2375,10 +2361,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         const tagFsToggle = $('#tag-bar-fs-toggle');
         if (tagFsExit) tagFsExit.style.display = inAnalyzeFs ? 'inline-flex' : 'none';
         if (tagFsToggle) tagFsToggle.style.display = inAnalyzeFs ? 'inline-flex' : 'none';
-        if (mobileYtNative && chrome) {
-            chrome.classList.add('hidden');
-            return;
-        }
         if (!chrome || chrome.classList.contains('hidden')) return;
         if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady()) return;
         const nativeYoutubeControlsOn =
@@ -2943,8 +2925,17 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             showPlayerSeekFeedback(dir, step);
         };
 
-        $('#player-chrome-seek-back')?.addEventListener('click', () => navigateClipFromChrome(-1));
-        $('#player-chrome-seek-fwd')?.addEventListener('click', () => navigateClipFromChrome(1));
+        const extendMobileChrome = () => {
+            if (isMobileChromeAutoHide()) revealMobileChrome(getPlayerContainer(), 2200);
+        };
+        $('#player-chrome-seek-back')?.addEventListener('click', () => {
+            navigateClipFromChrome(-1);
+            extendMobileChrome();
+        });
+        $('#player-chrome-seek-fwd')?.addEventListener('click', () => {
+            navigateClipFromChrome(1);
+            extendMobileChrome();
+        });
 
         $('#player-chrome-play')?.addEventListener('click', (ev) => {
             if (isPopoutPlayerConnected()) {
@@ -3018,7 +3009,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         const DOUBLE_TAP_MAX_DELTA_X = 140;
 
         const canHandleSurfaceGesture = (evTarget) => {
-            if (shouldPreferMobileYoutubeNative()) return false;
             if (!AppState.get('currentGameId')) return false;
             if (typeof YTPlayer === 'undefined' || !YTPlayer.isReady() || !YTPlayer.seekTo) return false;
             if (!evTarget) return false;
@@ -3135,6 +3125,15 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 lastTapX = 0;
                 return;
             }
+            suppressSingleClickUntil = Date.now() + 400;
+            if (singleClickTimer) clearTimeout(singleClickTimer);
+            singleClickTimer = setTimeout(() => {
+                if (typeof YTPlayer !== 'undefined' && YTPlayer.togglePlay) {
+                    YTPlayer.togglePlay();
+                    syncPlayerChromeUi();
+                }
+                singleClickTimer = null;
+            }, 260);
             lastTapTs = now;
             lastTapX = touch.clientX;
         }, { passive: true });
