@@ -3,6 +3,7 @@ import {
     getDocs,
     query,
     where,
+    orderBy,
     limit as limitDocs,
     doc,
     updateDoc,
@@ -155,6 +156,7 @@ async function loadTopActiveUsers7d() {
         const projectsSnap = await getDocs(query(
             collection(db, 'projects'),
             where('updatedAt', '>=', Timestamp.fromDate(fromDate)),
+            orderBy('updatedAt', 'desc'),
             limitDocs(500)
         ));
         const countByUid = new Map();
@@ -726,7 +728,11 @@ async function loadDbCollection() {
     try {
         const [usersSnap, projectsSnap] = await Promise.all([
             getDocs(collection(db, 'users')),
-            getDocs(query(collection(db, 'projects'), limitDocs(lim))),
+            getDocs(query(
+                collection(db, 'projects'),
+                orderBy('updatedAt', 'desc'),
+                limitDocs(lim)
+            )),
         ]);
 
         const emailByUid = new Map();
@@ -755,7 +761,7 @@ async function loadDbCollection() {
 
         renderDbRows(items);
         if (meta) {
-            meta.textContent = `${collectionName}: ${items.length} proyecto(s) (límite ${lim}).`;
+            meta.textContent = `${collectionName}: ${items.length} proyecto(s) más recientes por updatedAt (límite ${lim}).`;
         }
     } catch (e) {
         console.error(e);
