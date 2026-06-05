@@ -139,15 +139,29 @@ export const AppState = (() => {
     return state.tagTypes.find(t => t.id === id);
   }
 
-  /** Botonera activa + tags solo en state.tagTypes (p. ej. import XML). Para filtros en modo Ver sin llenar la botonera. */
-  function getTagTypesForFilter() {
-    const active = getActiveTagTypes();
-    const byId = new Map();
-    active.forEach(t => byId.set(t.id, t));
-    state.tagTypes.forEach(t => {
-      if (!byId.has(t.id)) byId.set(t.id, t);
+  /** Mismo orden visual que la botonera: fila propia (top) y luego rival (bottom). */
+  function orderTagsLikeBotonera(tags) {
+    const top = [];
+    const bottom = [];
+    (tags || []).forEach((t) => {
+      if (!t || t.isHidden) return;
+      if (t.row === 'bottom') bottom.push(t);
+      else top.push(t);
     });
-    return Array.from(byId.values());
+    return [...top, ...bottom];
+  }
+
+  /** Botonera activa en orden de botonera; al final, tags del catálogo que no están en la botonera (p. ej. XML). */
+  function getTagTypesForFilter() {
+    const botonera = getActiveTagTypes();
+    const botoneraIds = new Set(botonera.map((t) => t.id));
+    const ordered = orderTagsLikeBotonera(botonera);
+    const extras = [];
+    state.tagTypes.forEach((t) => {
+      if (!botoneraIds.has(t.id)) extras.push(t);
+    });
+    if (extras.length) ordered.push(...orderTagsLikeBotonera(extras));
+    return ordered;
   }
 
   function getFilteredClips() {
@@ -985,6 +999,15 @@ export const AppState = (() => {
   }
 
   // ── Cloud save/load ──
+  async function persistViewerFeedback() {
+    const projectId = state.currentProjectId;
+    if (!projectId) return;
+    await FirebaseData.saveViewerFeedback(projectId, {
+      clipFlags: state.clipFlags,
+      playlistComments: state.playlistComments,
+    });
+  }
+
   async function saveToCloud() {
     // Generate an editKey on first save
     if (!state.editKey) {
@@ -1418,7 +1441,7 @@ export const AppState = (() => {
     setActiveButtonboards,
     togglePanel, toggleFocusView, navigateClip,
     init, setFeatureFlags, hasFeature, setAuthenticatedUser,
-    clearProject, saveToCloud, loadFromCloud, importXML, exportXML,
+    clearProject, saveToCloud, persistViewerFeedback, loadFromCloud, importXML, exportXML,
     exportProjectData, importProjectData,
     addComment, getComments, removeComment, persistChatMutation, getClipNumber, getClipMarkSec, getLastChronologicalClip, getLastCreatedClip, getPreferredChatName,
     addActivity, getActivityLog,

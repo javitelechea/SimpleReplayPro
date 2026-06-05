@@ -534,8 +534,18 @@
       <div id="panel-view" class="panel-content hidden">
         <!-- Source selector: compact, collapsible -->
         <div class="panel-section panel-section-fixed" id="view-source-selector">
+          <div class="mobile-filter-compact">
+            <button type="button" id="btn-toggle-view-filters" class="mobile-filter-toggle" aria-expanded="false">
+              <span data-i18n="view.filters">Filtros</span>
+              <span class="mobile-filter-chevron" aria-hidden="true">▾</span>
+            </button>
+            <span id="mobile-active-filter-summary" class="mobile-filter-summary" data-i18n="view.allClips">Todos los clips</span>
+            <button type="button" id="btn-reset-mobile-filters" class="mobile-filter-clear" title="Limpiar filtros" data-i18n-title="view.clearAllFilters" hidden>✕</button>
+          </div>
+          <p class="mobile-tag-filter-label" data-i18n="view.filterByTag">Filtrar por tag</p>
           <div class="source-selector">
             <div class="source-group" id="source-group-tags">
+              <span class="mobile-filter-row-label" data-i18n="view.tags">Tags</span>
               <button class="source-group-toggle" data-toggle="source-tags-list">
                 <span class="toggle-arrow">▸</span> <span data-i18n="view.tags">Tags</span>
               </button>
@@ -545,6 +555,7 @@
               </div>
             </div>
             <div class="source-group" id="source-group-flags">
+              <span class="mobile-filter-row-label" data-i18n="view.flags">Flags</span>
               <button class="source-group-toggle" data-toggle="source-flags-list">
                 <span class="toggle-arrow">▸</span> <span data-i18n="view.flags">Flags</span>
               </button>
@@ -559,6 +570,8 @@
               </div>
             </div>
             <div class="source-group" id="source-group-playlists">
+              <span class="mobile-filter-row-label" data-i18n="view.playlists">Playlists</span>
+              <p class="mobile-playlist-filter-label" data-i18n="view.playlists">Playlists</p>
               <button class="source-group-toggle" data-toggle="source-playlists-list">
                 <span class="toggle-arrow">▸</span> <span data-i18n="view.playlists">Playlists</span>
               </button>
@@ -607,12 +620,31 @@
           </div>
         </div>
 
+        <!-- Jugador / solo lectura: flags + chat del clip activo (móvil) -->
+        <div id="view-player-actions" class="view-player-actions hidden" aria-label="Tu opinión sobre el clip" data-i18n-aria="view.yourFeedback">
+          <span class="view-player-actions-label" data-i18n="view.yourFeedback">Tu opinión</span>
+          <div class="view-player-flags clip-toolbar-flags">
+            <button type="button" class="flag-btn-mini" data-action="view-flag" data-flag="bueno" title="Bueno" data-i18n-title="view.flagGood">👍</button>
+            <button type="button" class="flag-btn-mini" data-action="view-flag" data-flag="acorregir" title="A corregir" data-i18n-title="view.flagFix">⚠️</button>
+            <button type="button" class="flag-btn-mini" data-action="view-flag" data-flag="duda" title="Duda" data-i18n-title="view.flagQuestion">❓</button>
+            <button type="button" class="flag-btn-mini" data-action="view-flag" data-flag="importante" title="Importante" data-i18n-title="view.flagImportant">⭐</button>
+          </div>
+          <button type="button" id="btn-view-player-chat" class="btn btn-sm btn-primary view-player-chat-btn" title="Chat" data-i18n-title="clip.chat">💬</button>
+        </div>
+
         <!-- Clips (scrolls independently) -->
         <div class="panel-section flex-grow">
-          <h3 class="section-title">
-            <span data-i18n="view.clips">Clips</span>
-            <span id="view-clip-count" class="badge">0</span>
-          </h3>
+          <div class="view-clips-head">
+            <h3 class="section-title">
+              <span data-i18n="view.clips">Clips</span>
+              <span id="view-clip-count" class="badge">0</span>
+            </h3>
+            <div id="view-clip-nav" class="view-clip-nav" aria-label="Navegación de clips" data-i18n-aria="view.clipNav">
+              <button type="button" id="btn-view-prev-clip" class="view-clip-nav-btn" title="Clip anterior" data-i18n-title="view.prevClip" aria-label="Clip anterior" data-i18n-aria="view.prevClip" disabled>◀</button>
+              <span id="view-clip-nav-label" class="view-clip-nav-label">—</span>
+              <button type="button" id="btn-view-next-clip" class="view-clip-nav-btn" title="Clip siguiente" data-i18n-title="view.nextClip" aria-label="Clip siguiente" data-i18n-aria="view.nextClip" disabled>▶</button>
+            </div>
+          </div>
           <div id="view-clip-list" class="clip-list"></div>
           <!-- Selection action bar -->
           <div id="view-selection-bar" class="view-selection-bar" style="display:none;">

@@ -333,8 +333,19 @@ export const FirebaseData = (() => {
         await deleteDoc(doc(db, 'collections', colId));
     }
 
+    /** Solo flags y comentarios — para jugadores con enlace de solo lectura. */
+    async function saveViewerFeedback(projectId, data) {
+        if (!projectId) return;
+        await updateDoc(doc(db, 'projects', projectId), {
+            clipFlags: data.clipFlags || {},
+            playlistComments: data.playlistComments || {},
+            updatedAt: serverTimestamp(),
+        });
+    }
+
     return {
         saveProject,
+        saveViewerFeedback,
         loadProject,
         markProjectOpened,
         deleteProjectCloud,

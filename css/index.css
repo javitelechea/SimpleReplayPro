@@ -4415,6 +4415,52 @@ body.is-dragging-clip .clip-item * {
   color: var(--text-muted);
 }
 
+.mobile-filter-compact,
+.mobile-filter-row-label,
+.mobile-tag-filter-label,
+.mobile-playlist-filter-label {
+  display: none;
+}
+
+.view-player-actions {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  padding: 6px 0 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+body.mode-view .view-player-actions:not(.hidden) {
+  display: flex;
+}
+
+.view-player-actions-label {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.view-player-flags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.view-player-chat-btn {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 4px 10px !important;
+  font-size: 0.8rem !important;
+}
+
 /* ═══════════════════════════════════════════
    SOURCE SELECTOR & FLAGS
    ═══════════════════════════════════════════ */
@@ -6149,9 +6195,250 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     overscroll-behavior: contain;
   }
 
-  /* Mobile simplificado: ocultar playlists */
+  /* Modo Ver móvil: barra compacta de filtros (colapsada por defecto) */
+  body.mode-view #view-source-selector {
+    display: block !important;
+    flex-shrink: 0;
+    margin-bottom: 4px;
+    padding: 0;
+  }
+
+  body.mode-view #panel-view .panel-content {
+    padding-top: 6px;
+  }
+
+  body.mode-view .mobile-filter-compact {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 2px 0 4px;
+  }
+
+  body.mode-view .mobile-filter-toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+
+  body.mode-view .mobile-filter-summary {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.mode-view .mobile-filter-clear {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  body.mode-view .mobile-tag-filter-label,
+  body.mode-view .mobile-playlist-filter-label,
+  body.mode-view #btn-reset-all-filters {
+    display: none !important;
+  }
+
+  body.mode-view #view-source-selector:not(.filters-expanded) .source-selector {
+    display: none;
+  }
+
+  body.mode-view #view-source-selector.filters-expanded .source-selector {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    overflow: visible;
+    max-height: none;
+    margin-bottom: 4px;
+    padding-bottom: 2px;
+  }
+
+  #view-source-selector .source-group-toggle {
+    display: none;
+  }
+
+  #source-tags-list,
+  #source-flags-list,
+  #source-playlists-list,
+  #source-tags-list.collapsed,
+  #source-flags-list.collapsed,
+  #source-playlists-list.collapsed,
+  .source-group-body.collapsed#source-tags-list,
+  .source-group-body.collapsed#source-flags-list,
+  .source-group-body.collapsed#source-playlists-list {
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  body.mode-view #view-source-selector.filters-expanded .mobile-filter-row-label {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+    line-height: 1.2;
+  }
+
+  body.mode-view #view-source-selector.filters-expanded #source-group-tags,
+  body.mode-view #view-source-selector.filters-expanded #source-group-flags,
+  body.mode-view #view-source-selector.filters-expanded #source-group-playlists:not(.is-empty) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex-shrink: 0;
+    gap: 2px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+
+  body.mode-view #view-source-selector.filters-expanded #source-group-tags {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  #source-group-playlists.is-empty {
+    display: none !important;
+  }
+
+  body.mode-view #view-source-selector.filters-expanded #source-playlists,
+  body.mode-view #view-source-selector.filters-expanded #source-tags.tag-filter-grid,
+  body.mode-view #view-source-selector.filters-expanded #flag-filter-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 2px;
+    max-height: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+  }
+
+  #source-playlists-list .playlist-create-row,
+  #view-tag-search {
+    display: none !important;
+  }
+
+  #source-playlists .source-btn,
+  #source-tags .source-btn {
+    flex: 0 0 auto;
+    min-height: 28px;
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    border-radius: 999px;
+    scroll-snap-align: start;
+  }
+
+  #source-tags .source-btn-all {
+    font-weight: 600;
+  }
+
+  body.mode-view #flag-filter-bar .flag-btn {
+    min-width: 30px;
+    min-height: 28px;
+    padding: 2px 6px;
+    font-size: 0.9rem;
+  }
+
+  #active-filter-chip {
+    display: none !important;
+  }
+
+  /* Cabecera clips + navegación en una sola línea */
+  body.mode-view .view-clips-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2px;
+  }
+
+  body.mode-view .view-clips-head .section-title {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 0.78rem;
+    gap: 4px;
+  }
+
+  body.mode-view .view-clips-head .badge {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+  }
+
+  .view-clip-nav {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: none;
+  }
+
+  body.mode-view .view-clip-nav {
+    display: flex;
+  }
+
+  .view-clip-nav-btn {
+    flex: 0 0 auto;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0 6px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  .view-clip-nav-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .view-clip-nav-label {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Mobile simplificado: ocultar playlists en Analizar */
   #panel-analyze .panel-section.panel-section-fixed,
-  #source-group-playlists,
   #active-playlist-header,
   #btn-add-selected-to-playlist {
     display: none !important;
@@ -6260,8 +6547,7 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     letter-spacing: 0.5px;
   }
 
-  /* Read-only shared links: mismo scroll interno en la lista (flex + min-height: 0). */
-  body.read-only-mode #view-source-selector,
+  /* Read-only: ocultar cabeceras de playlist/colección; los tags siguen visibles en móvil. */
   body.read-only-mode #active-playlist-header,
   body.read-only-mode #active-collection-bar {
     display: none !important;

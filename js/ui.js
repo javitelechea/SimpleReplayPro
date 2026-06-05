@@ -26,7 +26,29 @@ export const UI = (() => {
             const col = AppState.get('activeCollection');
             if (col?.id) pl = col.id;
         }
+        if (!pl) {
+            const clipId = AppState.get('currentClipId');
+            const playlistItems = AppState.get('playlistItems') || {};
+            const playlists = AppState.get('playlists') || [];
+            if (clipId) {
+                for (const p of playlists) {
+                    const items = playlistItems[p.id] || [];
+                    if (items.some((it) => it.clip_id === clipId)) return p.id;
+                }
+            }
+            const withClips = playlists.filter((p) => (playlistItems[p.id] || []).length > 0);
+            if (withClips.length === 1) return withClips[0].id;
+        }
         return pl || null;
+    }
+
+    function isViewerFeedbackShell() {
+        return document.body.classList.contains('read-only-mode');
+    }
+
+    function shouldShowViewPlayerActions() {
+        if (AppState.get('mode') !== 'view' || !AppState.get('currentClipId')) return false;
+        return isViewerFeedbackShell() || isMobileViewLayout();
     }
 
     /** Botón: clic → siguiente tecla A–Z queda como atajo; muestra la letra o — */
@@ -593,16 +615,15 @@ export const UI = (() => {
         const sendBtn = panel.querySelector('.chat-send-btn');
         const nameInput = panel.querySelector('.chat-name-input');
         const sendMessage = () => {
-            if (document.body.classList.contains('read-only-mode')) {
-                toast(t('toast.readOnlyNoComment'), 'error');
-                return;
-            }
             const name = nameInput.value.trim();
             const text = textInput.value.trim();
             if (!name) { toast(t('toast.chatWriteName'), 'error'); nameInput.focus(); return; }
             if (!text) return;
             localStorage.setItem('sr_chat_name', name);
             AppState.addComment(playlistId, clipId, name, text);
+            if (isViewerFeedbackShell()) {
+                toast(t('toast.viewerFeedbackSaved'), 'success');
+            }
             // Re-render the panel with the new comment
             showVideoChatPanel(playlistId, clipId);
         };
@@ -991,6 +1012,7 @@ export const UI = (() => {
 
         if (!items.length) {
             container.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">${t('js.collectionEmpty')}</p>`;
+            updateViewClipNav();
             return;
         }
 
@@ -1038,6 +1060,8 @@ export const UI = (() => {
                 }
             });
         });
+
+        updateViewClipNav();
     }
 
     function _attachCollectionDrag(container, colId) {
@@ -1119,6 +1143,7 @@ export const UI = (() => {
         if (clips.length === 0) {
             container.innerHTML = `<p style="color:var(--text-muted);font-size:0.8rem;padding:8px;">${t('js.noClipsForSelection')}</p>`;
             updateSelectionBar();
+            updateViewClipNav();
             return;
         }
 
@@ -1348,6 +1373,86 @@ export const UI = (() => {
         }
 
         updateSelectionBar();
+        updateViewClipNav();
+
+        if (isMobileViewLayout() && currentClipId) {
+            const activeEl = container.querySelector('.clip-item.active');
+            if (activeEl) {
+                requestAnimationFrame(() => {
+                    activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                });
+            }
+        }
+    }
+
+    function updateViewClipNav() {
+        const bar = $('#view-clip-nav');
+        if (!bar) return;
+
+        const mode = AppState.get('mode');
+        const mobileView = isMobileViewLayout();
+        bar.style.display = mobileView && mode === 'view' ? 'flex' : 'none';
+        if (!mobileView || mode !== 'view') return;
+
+        const prevBtn = $('#btn-view-prev-clip');
+        const nextBtn = $('#btn-view-next-clip');
+        const label = $('#view-clip-nav-label');
+        const collection = AppState.get('activeCollection');
+
+        if (collection) {
+            const items = collection.items || [];
+            const idx = AppState.get('activeCollectionItemIdx');
+            const total = items.length;
+
+            if (!total) {
+                if (label) label.textContent = '—';
+                if (prevBtn) prevBtn.disabled = true;
+                if (nextBtn) nextBtn.disabled = true;
+                return;
+            }
+
+            const pos = idx >= 0 ? idx + 1 : 0;
+            const item = idx >= 0 ? items[idx] : null;
+            if (label) {
+                if (item) {
+                    const tagLabel = item.tagLabel || 'Clip';
+                    label.textContent = `${tagLabel} · ${pos}/${total}`;
+                } else {
+                    label.textContent = `${t('view.pickClip')} · ${total}`;
+                }
+            }
+            if (prevBtn) prevBtn.disabled = idx <= 0;
+            if (nextBtn) nextBtn.disabled = idx < 0 || idx >= total - 1;
+            return;
+        }
+
+        const clips = AppState.getFilteredClips();
+        const idx = AppState.get('currentClipIndex');
+        const clip = AppState.getCurrentClip();
+
+        if (!clips.length) {
+            if (label) label.textContent = '—';
+            if (prevBtn) prevBtn.disabled = true;
+            if (nextBtn) nextBtn.disabled = true;
+            return;
+        }
+
+        const pos = idx >= 0 ? idx + 1 : 0;
+        const total = clips.length;
+
+        if (label) {
+            if (clip) {
+                const tag = AppState.getTagType(clip.tag_type_id);
+                const clipNum = AppState.getClipNumber(clip);
+                const dlabel = tag ? _resolveTagDisplayLabel(tag) : 'Clip';
+                label.textContent = `${dlabel} ${clipNum} · ${pos}/${total}`;
+            } else {
+                label.textContent = `${t('view.pickClip')} · ${total}`;
+            }
+        }
+
+        if (prevBtn) prevBtn.disabled = idx <= 0;
+        if (nextBtn) nextBtn.disabled = idx < 0 || idx >= clips.length - 1;
     }
 
     function updateSelectionBar() {
@@ -1466,6 +1571,39 @@ export const UI = (() => {
                 clearDrawingOverlays();
             }
         }
+        updateViewPlayerActions();
+    }
+
+    function updateViewPlayerActions() {
+        const bar = $('#view-player-actions');
+        if (!bar) return;
+
+        const show = shouldShowViewPlayerActions();
+        bar.classList.toggle('hidden', !show);
+        document.body.classList.toggle('view-player-actions-visible', show);
+        if (!show) return;
+
+        const clipId = AppState.get('currentClipId');
+        const flags = clipId ? AppState.getClipUserFlags(clipId) : [];
+        bar.querySelectorAll('[data-action="view-flag"]').forEach((btn) => {
+            const flag = btn.dataset.flag;
+            btn.classList.toggle('active', flags.includes(flag));
+        });
+
+        const chatScopeId = getChatScopePlaylistId();
+        const chatBtn = $('#btn-view-player-chat');
+        if (chatBtn) {
+            const enabled = !!chatScopeId;
+            chatBtn.disabled = !enabled;
+            chatBtn.style.opacity = enabled ? '' : '0.45';
+            chatBtn.title = enabled ? t('clip.chat') : t('js.chatRequiresPlaylist');
+            if (enabled && clipId) {
+                const n = AppState.getComments(chatScopeId, clipId).length;
+                chatBtn.textContent = n > 0 ? `💬 ${n}` : '💬';
+            } else {
+                chatBtn.textContent = '💬';
+            }
+        }
     }
 
     // ═══ PLAYLISTS (Analyze) ═══
@@ -1524,6 +1662,90 @@ export const UI = (() => {
         }
     }
 
+    function isMobileViewLayout() {
+        return window.matchMedia('(max-width: 1024px)').matches;
+    }
+
+    function collapseMobileViewFilters() {
+        const selector = $('#view-source-selector');
+        const toggle = $('#btn-toggle-view-filters');
+        if (!selector) return;
+        selector.classList.remove('filters-expanded');
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', 'false');
+            const chevron = toggle.querySelector('.mobile-filter-chevron');
+            if (chevron) chevron.textContent = '▾';
+        }
+    }
+
+    function updateMobileFilterSummary() {
+        const summary = $('#mobile-active-filter-summary');
+        const clearBtn = $('#btn-reset-mobile-filters');
+        if (!summary) return;
+
+        const mobileView = isMobileViewLayout() && AppState.get('mode') === 'view';
+        if (!mobileView) {
+            if (clearBtn) clearBtn.hidden = true;
+            return;
+        }
+
+        const activeTagIds = AppState.get('activeTagFilters');
+        const activePlaylistId = AppState.get('activePlaylistId');
+        const filterFlags = AppState.get('filterFlags') || [];
+        const tags = AppState.getTagTypesForFilter();
+        const playlists = AppState.get('playlists');
+        const parts = [];
+
+        activeTagIds.forEach((id) => {
+            const tag = tags.find((tg) => tg.id === id);
+            if (tag) parts.push(tag.label);
+        });
+
+        if (activePlaylistId) {
+            const pl = playlists.find((p) => p.id === activePlaylistId);
+            if (pl) parts.push(`📁 ${pl.name}`);
+        }
+
+        if (filterFlags.length) {
+            parts.push(filterFlags.map((f) => FLAG_EMOJI[f] || f).join(' '));
+        }
+
+        summary.textContent = parts.length ? parts.join(' · ') : t('view.allClips');
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const isReadOnly = urlParams.get('mode') === 'view';
+        const sharedPlaylistId = urlParams.get('playlist');
+        const isOnlyLockedPlaylist = isReadOnly && sharedPlaylistId &&
+            activePlaylistId === sharedPlaylistId &&
+            activeTagIds.length === 0 &&
+            filterFlags.length === 0;
+
+        if (clearBtn) {
+            const hasFilters = activeTagIds.length > 0 || activePlaylistId || filterFlags.length > 0;
+            clearBtn.hidden = !hasFilters || isOnlyLockedPlaylist;
+        }
+    }
+
+    function wireMobileViewFilters() {
+        const toggle = $('#btn-toggle-view-filters');
+        const selector = $('#view-source-selector');
+        const clearBtn = $('#btn-reset-mobile-filters');
+        if (!toggle || !selector || toggle.dataset.wired) return;
+        toggle.dataset.wired = '1';
+
+        toggle.addEventListener('click', () => {
+            const open = !selector.classList.contains('filters-expanded');
+            selector.classList.toggle('filters-expanded', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            const chevron = toggle.querySelector('.mobile-filter-chevron');
+            if (chevron) chevron.textContent = open ? '▴' : '▾';
+        });
+
+        clearBtn?.addEventListener('click', () => {
+            $('#btn-reset-all-filters')?.click();
+        });
+    }
+
     // ═══ SOURCE SELECTOR (View — Multi-tag) ═══
     function renderViewSources() {
         const tagsContainer = $('#source-tags');
@@ -1532,11 +1754,27 @@ export const UI = (() => {
         const playlists = AppState.get('playlists');
         const activeTagIds = AppState.get('activeTagFilters');
         const activePlaylistId = AppState.get('activePlaylistId');
+        const mobileView = isMobileViewLayout();
 
         tagsContainer.innerHTML = '';
         playlistsContainer.innerHTML = '';
 
         const allClips = AppState.get('clips');
+
+        if (mobileView) {
+            $('#source-tags-list')?.classList.remove('collapsed');
+            $('#source-flags-list')?.classList.remove('collapsed');
+            $('#source-playlists-list')?.classList.remove('collapsed');
+            document.querySelector('[data-toggle="source-tags-list"]')?.classList.add('open');
+            document.querySelector('[data-toggle="source-flags-list"]')?.classList.add('open');
+            document.querySelector('[data-toggle="source-playlists-list"]')?.classList.add('open');
+            const allBtn = document.createElement('button');
+            allBtn.type = 'button';
+            allBtn.className = 'source-btn source-btn-all' + (activeTagIds.length === 0 ? ' active' : '');
+            allBtn.textContent = t('view.allTags');
+            allBtn.addEventListener('click', () => AppState.clearTagFilters());
+            tagsContainer.appendChild(allBtn);
+        }
 
         tags.forEach(tag => {
             // Only show tags that have associated clips in View mode to avoid clutter
@@ -1550,15 +1788,16 @@ export const UI = (() => {
             btn.dataset.source = tag.id;
             btn.textContent = tag.label;
             btn.addEventListener('click', (e) => {
-                const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+                const isMulti = !mobileView && (e.ctrlKey || e.metaKey || e.shiftKey);
                 AppState.toggleTagFilter(tag.id, isMulti);
+                if (mobileView) collapseMobileViewFilters();
             });
             tagsContainer.appendChild(btn);
         });
 
         // Tag search functionality
         const tagSearchInput = $('#view-tag-search');
-        if (tagSearchInput) {
+        if (tagSearchInput && !mobileView) {
             // Restore search value if we just re-rendered
             const currentSearch = tagSearchInput.value.toLowerCase();
 
@@ -1581,9 +1820,47 @@ export const UI = (() => {
         const isReadOnly = urlParams.get('mode') === 'view';
         const sharedPlaylistId = urlParams.get('playlist');
 
+        const playlistItems = AppState.get('playlistItems');
+
         playlists.forEach(pl => {
             // In read-only mode, if a specific playlist is shared, only show that one
             if (isReadOnly && sharedPlaylistId && pl.id !== sharedPlaylistId) {
+                return;
+            }
+
+            const items = playlistItems[pl.id] || [];
+            if (!items.length) return;
+
+            const isActive = activePlaylistId === pl.id;
+            const isLockedPlaylist = isReadOnly && sharedPlaylistId && pl.id === sharedPlaylistId;
+
+            const onPlaylistChipClick = () => {
+                if (isLockedPlaylist) {
+                    UI.toast(t('toast.sharedPlaylistFilterLocked'), 'info');
+                    return;
+                }
+                if (isActive) {
+                    AppState.clearPlaylistFilter();
+                } else {
+                    AppState.setPlaylistFilter(pl.id);
+                }
+                if (mobileView) collapseMobileViewFilters();
+                if (!mobileView) {
+                    const body = document.getElementById('source-playlists-list');
+                    const toggle = body?.previousElementSibling;
+                    if (body) body.classList.add('collapsed');
+                    if (toggle) toggle.classList.remove('open');
+                }
+            };
+
+            if (mobileView) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'source-btn source-btn-playlist' + (isActive ? ' active' : '');
+                btn.dataset.source = pl.id;
+                btn.textContent = pl.name;
+                btn.addEventListener('click', onPlaylistChipClick);
+                playlistsContainer.appendChild(btn);
                 return;
             }
 
@@ -1593,29 +1870,11 @@ export const UI = (() => {
             wrap.style.gap = '4px';
 
             const btn = document.createElement('button');
-            const isActive = activePlaylistId === pl.id;
             btn.className = 'source-btn' + (isActive ? ' active' : '');
             btn.dataset.source = pl.id;
             btn.style.flex = '1';
             btn.textContent = pl.name;
-            const isLockedPlaylist = isReadOnly && sharedPlaylistId && pl.id === sharedPlaylistId;
-
-            btn.addEventListener('click', () => {
-                if (isLockedPlaylist) {
-                    UI.toast(t('toast.sharedPlaylistFilterLocked'), 'info');
-                    return; // Lock it
-                }
-
-                if (isActive) {
-                    AppState.clearPlaylistFilter();
-                } else {
-                    AppState.setPlaylistFilter(pl.id);
-                }
-                const body = document.getElementById('source-playlists-list');
-                const toggle = body?.previousElementSibling;
-                if (body) body.classList.add('collapsed');
-                if (toggle) toggle.classList.remove('open');
-            });
+            btn.addEventListener('click', onPlaylistChipClick);
 
             wrap.appendChild(btn);
 
@@ -1643,6 +1902,11 @@ export const UI = (() => {
             playlistsContainer.appendChild(wrap);
         });
 
+        $('#source-group-playlists')?.classList.toggle(
+            'is-empty',
+            mobileView && !playlistsContainer.children.length
+        );
+
         // Update active playlist header
         const plHeader = $('#active-playlist-header');
         const plNameEl = $('#active-playlist-name');
@@ -1666,6 +1930,7 @@ export const UI = (() => {
 
         // Render filter chips
         renderFilterChips(tags, playlists, activeTagIds, activePlaylistId);
+        updateMobileFilterSummary();
     }
 
     function renderFilterChips(tags, playlists, activeTagIds, activePlaylistId) {
@@ -1991,6 +2256,10 @@ export const UI = (() => {
         document.body.classList.toggle('mode-analyze', mode === 'analyze');
         document.body.classList.toggle('mode-share', mode === 'share');
         updateClipEditControls();
+        updateViewClipNav();
+        wireMobileViewFilters();
+        updateMobileFilterSummary();
+        if (mode !== 'view') collapseMobileViewFilters();
 
         // Slider animation (2 botones: Ver+Compartir, sin Analizar)
         if (slider) {
@@ -3027,7 +3296,9 @@ export const UI = (() => {
         updateClipEditControls,
         renderAnalyzePlaylists,
         renderViewSources, updateFlagFilterBar, updateFlagButtons,
-        updateFocusView, updatePanelState, updateMode,
+        updateFocusView, updatePanelState, updateMode, updateViewClipNav, updateViewPlayerActions,
+        getChatScopePlaylistId, showVideoChatPanel, hideVideoChatPanel,
+        updateMobileFilterSummary, collapseMobileViewFilters, wireMobileViewFilters,
         updateNoGameOverlay,
         showAddToPlaylistModal, renderPlaylistModalList,
         renderCollectionsTab, renderExportCollectionList, renderCollectionItems, updateCollectionBar,

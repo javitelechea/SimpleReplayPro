@@ -1295,10 +1295,60 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     }
 
+    const MOBILE_PREFER_ANALYZE_KEY = 'sr-mobile-prefer-analyze';
+
     function isMobileLayout() {
-        return window.matchMedia('(max-width: 768px)').matches
+        // Alineado con el breakpoint móvil del CSS (1024px)
+        return window.matchMedia('(max-width: 1024px)').matches
             || isCoarsePointerDevice()
             || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    }
+
+    function shouldPreferAnalyzeOnMobile() {
+        if (new URLSearchParams(window.location.search).get('mode') === 'analyze') return true;
+        try {
+            return sessionStorage.getItem(MOBILE_PREFER_ANALYZE_KEY) === '1';
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function markMobilePreferAnalyze() {
+        try { sessionStorage.setItem(MOBILE_PREFER_ANALYZE_KEY, '1'); } catch (_) { /* noop */ }
+    }
+
+    function clearMobilePreferAnalyze() {
+        try { sessionStorage.removeItem(MOBILE_PREFER_ANALYZE_KEY); } catch (_) { /* noop */ }
+    }
+
+    /** En móvil/tablet, Ver es el modo por defecto (salvo ?mode=analyze o elección explícita del usuario). */
+    function applyMobileDefaultViewMode() {
+        if (!isMobileLayout()) return;
+        if (shouldPreferAnalyzeOnMobile()) return;
+        if (AppState.get('mode') !== 'analyze') return;
+        AppState.setMode('view');
+    }
+
+    let _mobileDefaultViewTimer = null;
+
+    function wireMobileDefaultViewMode() {
+        if (wireMobileDefaultViewMode._wired) return;
+        wireMobileDefaultViewMode._wired = true;
+
+        const sync = () => {
+            clearTimeout(_mobileDefaultViewTimer);
+            _mobileDefaultViewTimer = setTimeout(applyMobileDefaultViewMode, 120);
+        };
+
+        window.addEventListener('resize', sync);
+        window.addEventListener('orientationchange', sync);
+
+        const mq = window.matchMedia('(max-width: 1024px)');
+        if (typeof mq.addEventListener === 'function') {
+            mq.addEventListener('change', sync);
+        } else if (typeof mq.addListener === 'function') {
+            mq.addListener(sync);
+        }
     }
 
     function isIosDevice() {
@@ -3118,6 +3168,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 closeMenu();
                 return;
             }
+            if (mode === 'analyze') markMobilePreferAnalyze();
+            if (mode === 'view') clearMobilePreferAnalyze();
             if (mode) AppState.setMode(mode);
             closeMenu();
         };
@@ -3199,7 +3251,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         u.searchParams.delete('collection');
         const qs = u.searchParams.toString();
         history.replaceState({}, '', u.pathname + (qs ? `?${qs}` : '') + u.hash);
-        AppState.setMode('analyze');
+        AppState.setMode(isMobileLayout() ? 'view' : 'analyze');
         syncReadOnlyCapabilitiesClass();
         UI.updateMode();
     }
@@ -3315,7 +3367,31 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
     AppState.on('commentAdded', () => {
         markUnsaved();
+        UI.updateViewPlayerActions?.();
     });
+
+    let _viewerFeedbackSaveTimer = null;
+    let _viewerFeedbackSavePending = false;
+    function scheduleViewerFeedbackSave() {
+        if (!document.body.classList.contains('read-only-mode')) return;
+        if (!AppState.get('currentProjectId')) return;
+        clearTimeout(_viewerFeedbackSaveTimer);
+        _viewerFeedbackSaveTimer = setTimeout(async () => {
+            if (_viewerFeedbackSavePending) return;
+            _viewerFeedbackSavePending = true;
+            try {
+                await AppState.persistViewerFeedback();
+            } catch (err) {
+                console.warn('persistViewerFeedback:', err);
+                UI.toast(t('toast.viewerFeedbackSaveFailed'), 'error');
+            } finally {
+                _viewerFeedbackSavePending = false;
+            }
+        }, 700);
+    }
+
+    AppState.on('flagsUpdated', scheduleViewerFeedbackSave);
+    AppState.on('commentAdded', scheduleViewerFeedbackSave);
 
     AppState.on('activityLogUpdated', () => {
         markUnsaved();
@@ -3602,6 +3678,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         UI.renderAnalyzeClips();
         UI.renderViewClips();
         UI.updateFocusView();
+        UI.updateViewPlayerActions?.();
     });
 
     AppState.on('viewFiltersChanged', () => {
@@ -3625,6 +3702,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
         const resetBtn = UI.$('#btn-reset-all-filters');
         if (resetBtn) resetBtn.style.display = (hasFilters && !isOnlyLockedPlaylist) ? 'inline-flex' : 'none';
+        UI.updateMobileFilterSummary?.();
     });
 
     AppState.on('panelToggled', () => {
@@ -3659,9 +3737,13 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     // Mode toggle
     $('#btn-mode-analyze')?.addEventListener('click', () => {
         if (AppState.get('activeCollection')) return;
+        if (isMobileLayout()) markMobilePreferAnalyze();
         AppState.setMode('analyze');
     });
-    $('#btn-mode-view').addEventListener('click', () => AppState.setMode('view'));
+    $('#btn-mode-view').addEventListener('click', () => {
+        clearMobilePreferAnalyze();
+        AppState.setMode('view');
+    });
     const btnModeShare = $('#btn-mode-share');
     if (btnModeShare) {
         btnModeShare.addEventListener('click', () => {
@@ -5650,6 +5732,38 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         navigateToClipAndPlay('next');
     });
 
+    $('#btn-view-prev-clip')?.addEventListener('click', () => {
+        navigateToClipAndPlay('prev');
+    });
+
+    $('#btn-view-next-clip')?.addEventListener('click', () => {
+        navigateToClipAndPlay('next');
+    });
+
+    $('#view-player-actions')?.addEventListener('click', (e) => {
+        const flagBtn = e.target.closest('[data-action="view-flag"]');
+        if (flagBtn) {
+            const clipId = AppState.get('currentClipId');
+            if (!clipId) return;
+            AppState.toggleFlag(clipId, flagBtn.dataset.flag);
+            return;
+        }
+        if (e.target.closest('#btn-view-player-chat')) {
+            const clipId = AppState.get('currentClipId');
+            const scopeId = UI.getChatScopePlaylistId?.();
+            if (!clipId || !scopeId) {
+                UI.toast(t('toast.needPlaylistForChat'), 'warning');
+                return;
+            }
+            const panel = $('#video-chat-panel');
+            if (panel && panel.style.display !== 'none') {
+                UI.hideVideoChatPanel?.();
+            } else {
+                UI.showVideoChatPanel?.(scopeId, clipId, { focusInput: true });
+            }
+        }
+    });
+
     // ═══════════════════════════════════════
     // KEYBOARD SHORTCUTS
     // ═══════════════════════════════════════
@@ -6765,6 +6879,9 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             AppState.setMode('view');
             AppState.setPlaylistFilter(playlistIdFromUrl);
         }
+
+        wireMobileDefaultViewMode();
+        applyMobileDefaultViewMode();
 
         // Render initial UI
         UI.refreshAll();
