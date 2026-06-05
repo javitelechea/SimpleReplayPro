@@ -6838,48 +6838,6 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     display: none !important;
   }
 
-  #player-container .player-fs-exit:not(.hidden) {
-    display: inline-flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    position: fixed !important;
-    z-index: 10120 !important;
-  }
-}
-
-/* Restaurar chrome de la app en horizontal tras pulsar ✕ */
-@media (orientation: landscape) and (max-height: 520px) and (max-width: 932px) {
-  html.sr-landscape-ui-visible #app-header,
-  html.sr-landscape-ui-visible .side-panel,
-  html.sr-landscape-ui-visible .btn-expand,
-  html.sr-landscape-ui-visible #clip-view-toolbar,
-  html.sr-landscape-ui-visible #custom-timeline,
-  html.sr-landscape-ui-visible #tag-bar,
-  html.sr-landscape-ui-visible #nav-arrows {
-    display: revert !important;
-  }
-
-  html.sr-landscape-ui-visible #app-main {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-  }
-
-  html.sr-landscape-ui-visible #video-area {
-    position: relative !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    height: auto !important;
-    max-height: none !important;
-    z-index: auto !important;
-  }
-
-  html.sr-landscape-ui-visible #player-container .fullscreen-clip-rail:not(.hidden) {
-    display: flex !important;
-  }
 }
 
 @media (orientation: landscape) {

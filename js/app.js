@@ -1345,14 +1345,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             _mobileDefaultViewTimer = setTimeout(applyMobileDefaultViewMode, 120);
         };
 
-        window.addEventListener('resize', () => {
-            sync();
-            syncLandscapeUiExitState();
-        });
-        window.addEventListener('orientationchange', () => {
-            sync();
-            syncLandscapeUiExitState();
-        });
+        window.addEventListener('resize', sync);
+        window.addEventListener('orientationchange', sync);
 
         const mq = window.matchMedia('(max-width: 1024px)');
         if (typeof mq.addEventListener === 'function') {
@@ -1474,20 +1468,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         return isCoarsePointerDevice() || isMobileLayout();
     }
 
-    /** Móvil en horizontal: CSS oculta chrome y deja solo el video (sin pseudo-FS). */
-    function isLandscapePhoneVideoOnly() {
-        if (!AppState.get('currentGameId') && !AppState.get('activeCollection')) return false;
-        if (!isMobileLayout()) return false;
-        return window.matchMedia('(orientation: landscape) and (max-height: 520px) and (max-width: 932px)').matches;
-    }
-
-    function syncLandscapeUiExitState() {
-        if (!isLandscapePhoneVideoOnly()) {
-            document.documentElement.classList.remove('sr-landscape-ui-visible');
-        }
-        syncPlayerFsExitUi();
-    }
-
     function isMobileChromeAutoHide() {
         return isMobileLayout() && !isPlayerFullscreen();
     }
@@ -1577,10 +1557,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         window.visualViewport?.addEventListener('resize', sync);
         window.visualViewport?.addEventListener('scroll', sync);
         window.addEventListener('resize', sync);
-        window.addEventListener('orientationchange', () => {
-            sync();
-            syncLandscapeUiExitState();
-        });
+        window.addEventListener('orientationchange', sync);
     }
 
     function syncPseudoFsViewport() {
@@ -1670,7 +1647,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         const container = getPlayerContainer();
         if (!container) return false;
 
-        document.documentElement.classList.remove('sr-landscape-ui-visible');
         hideAppOverlaysForFullscreen();
         const mode = AppState.get('mode');
         const useImmersiveStack = isMobileLayout() || mode === 'analyze';
@@ -1755,16 +1731,14 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     async function handlePlayerFsExit() {
-        if (isPlayerFullscreen()) {
-            await exitPlayerFullscreen();
-        }
-        if (isLandscapePhoneVideoOnly()) {
-            document.documentElement.classList.add('sr-landscape-ui-visible');
-        } else {
-            document.documentElement.classList.remove('sr-landscape-ui-visible');
+        if (!isPlayerFullscreen()) return;
+        const keepMode = AppState.get('mode');
+        await exitPlayerFullscreen();
+        if (keepMode === 'view' && AppState.get('mode') !== 'view') {
+            AppState.setMode('view');
+            if (typeof UI !== 'undefined' && typeof UI.updateMode === 'function') UI.updateMode();
         }
         syncPlayerFsExitUi();
-        window.dispatchEvent(new Event('resize'));
     }
 
     function wirePlayerFsExit() {
@@ -1786,10 +1760,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function syncPlayerFsExitUi() {
         const btn = $('#player-fs-exit');
         if (!btn) return;
-        const inFsImmersive = isPlayerFullscreen() && shouldUseImmersiveFsControls();
-        const inLandscapePhone = isLandscapePhoneVideoOnly()
-            && !document.documentElement.classList.contains('sr-landscape-ui-visible');
-        btn.classList.toggle('hidden', !(inFsImmersive || inLandscapePhone));
+        const show = isPlayerFullscreen() && shouldUseImmersiveFsControls();
+        btn.classList.toggle('hidden', !show);
     }
 
     function onPlayerFullscreenChange() {
@@ -3056,7 +3028,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
 
         wireFullscreenButton();
         wirePlayerFsExit();
-        syncLandscapeUiExitState();
         wirePseudoFsViewport();
 
         document.addEventListener('fullscreenchange', onPlayerFullscreenChange);
