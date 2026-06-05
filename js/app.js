@@ -116,19 +116,13 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         },
     });
 
-    function getLastClip() {
-        const clips = AppState.get('clips') || [];
-        if (!clips.length) return null;
-        const withTs = clips.filter(c => c && c.created_at);
-        if (withTs.length) {
-            return withTs.reduce((acc, c) => {
-                const accTs = Date.parse(acc.created_at || 0) || 0;
-                const cTs = Date.parse(c.created_at || 0) || 0;
-                return cTs >= accTs ? c : acc;
-            }, withTs[0]);
+    /** Clip al que apunta el menú rápido (⇧⌘M): último creado en el partido actual. */
+    function getQuickClipTargetClip() {
+        if (typeof AppState.getLastCreatedClip === 'function') {
+            const last = AppState.getLastCreatedClip();
+            if (last) return last;
         }
-        // Fallback for legacy clips without created_at
-        return clips[clips.length - 1];
+        return AppState.getCurrentClip();
     }
 
     function closeQuickClipMenu() {
@@ -142,7 +136,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function refreshQuickClipMenu() {
-        const clip = getLastClip();
+        const clip = getQuickClipTargetClip();
         const meta = $('#quick-clip-meta');
         if (!clip) {
             if (meta) meta.textContent = t('quick.noClipSelected');
@@ -209,7 +203,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 anchorEl = list.querySelector(`.clip-item[data-clip-id="${activeClipId}"]`);
             }
             if (!anchorEl && list) {
-                const lastClip = getLastClip();
+                const lastClip = getQuickClipTargetClip();
                 if (lastClip) {
                     anchorEl = list.querySelector(`.clip-item[data-clip-id="${lastClip.id}"]`);
                 }
@@ -231,7 +225,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function openQuickClipMenu() {
         const mode = AppState.get('mode');
         if (mode !== 'analyze') return;
-        const clip = getLastClip();
+        const clip = getQuickClipTargetClip();
         if (!clip) {
             UI.toast(t('toast.noClipsToEdit'), 'info');
             return;
@@ -248,7 +242,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function addCurrentQuickClipToPlaylist(playlistId) {
-        const clip = getLastClip();
+        const clip = getQuickClipTargetClip();
         if (!clip || !playlistId) return;
         const items = AppState.get('playlistItems')[playlistId] || [];
         if (items.includes(clip.id)) {
@@ -266,7 +260,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         const picker = $('#quick-playlist-picker');
         const listEl = $('#quick-playlist-list');
         if (!picker || !listEl) return;
-        const clip = getLastClip();
+        const clip = getQuickClipTargetClip();
         const playlists = getQuickPlaylists();
         if (!clip) {
             listEl.innerHTML = `<div class="quick-playlist-help">${t('quick.noClip')}</div>`;
@@ -315,15 +309,29 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         addCurrentQuickClipToPlaylist(pl.id);
     }
 
+    function toggleQuickClipFlag(flag) {
+        const clip = getQuickClipTargetClip();
+        if (!clip) {
+            UI.toast(t('toast.noClipsToEdit'), 'info');
+            return;
+        }
+        AppState.toggleFlag(clip.id, flag);
+        const flags = AppState.getClipUserFlags(clip.id);
+        const emoji = UI.FLAG_EMOJI[flag];
+        const has = flags.includes(flag);
+        UI.toast(`${emoji} ${has ? 'agregado' : 'quitado'}`, has ? 'success' : '');
+        refreshQuickClipMenu();
+    }
+
     function quickActionByKey(k) {
-        const clip = getLastClip();
+        const clip = getQuickClipTargetClip();
         if (!clip) return;
         const activePlaylistId = AppState.get('activePlaylistId');
         switch ((k || '').toLowerCase()) {
-            case '1': AppState.toggleFlag(clip.id, 'bueno'); break;
-            case '2': AppState.toggleFlag(clip.id, 'acorregir'); break;
-            case '3': AppState.toggleFlag(clip.id, 'duda'); break;
-            case '4': AppState.toggleFlag(clip.id, 'importante'); break;
+            case '1': toggleQuickClipFlag('bueno'); return;
+            case '2': toggleQuickClipFlag('acorregir'); return;
+            case '3': toggleQuickClipFlag('duda'); return;
+            case '4': toggleQuickClipFlag('importante'); return;
             case '5': {
                 const text = prompt(t('prompt.quickComment'));
                 if (!text || !text.trim()) break;
@@ -1501,7 +1509,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             void exitPlayerFullscreen();
             return;
         }
-        syncPlayerFsExitUi();
+        syncPlayerChromeUi();
     }
 
     function isMobileChromeAutoHide() {
@@ -2312,7 +2320,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function shouldShowClipRail() {
         if (AppState.get('mode') !== 'view') return false;
         if (!AppState.get('currentGameId') && !AppState.get('activeCollection')) return false;
-        return isPlayerFullscreen() || isPopoutPlayerConnected();
+        return isPlayerFullscreen() || isPopoutPlayerConnected() || isLandscapePhoneVideoOnly();
     }
 
     function buildClipRailPopoutPayload(ctx) {
@@ -2391,7 +2399,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             return;
         }
 
-        if (isPlayerFullscreen()) {
+        const showOnSurface = isPlayerFullscreen() || isLandscapePhoneVideoOnly();
+        if (showOnSurface) {
             rail.classList.remove('hidden');
             rail.hidden = false;
         } else {
@@ -6055,7 +6064,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         if (e.button !== 0 || e.detail <= 0) return;
         const btn = e.target.closest('button');
         if (!btn || btn.disabled) return;
-        if (btn.closest('.tag-bar--analyze-overlay, .fullscreen-analyze-rail, .analyze-fs-panel-toggle')) return;
+        if (btn.closest('.tag-bar--analyze-overlay, .fullscreen-analyze-rail, .analyze-fs-panel-toggle, #quick-clip-menu')) return;
         e.preventDefault();
     }, true);
 
@@ -6197,6 +6206,16 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 YTPlayer.seekTo(t + step);
                 showPlayerSeekFeedback(1, step);
                 return;
+            }
+
+            // 1–4: flags del último clip (prioridad sobre hotkeys de etiquetas numéricas)
+            if (!e.metaKey && !e.ctrlKey && !e.altKey && !_quickClipMenuOpen) {
+                const flagMap = { '1': 'bueno', '2': 'acorregir', '3': 'duda', '4': 'importante' };
+                if (flagMap[e.key] && getQuickClipTargetClip()) {
+                    e.preventDefault();
+                    toggleQuickClipFlag(flagMap[e.key]);
+                    return;
+                }
             }
 
             // Check for tag hotkeys (solo tecla suelta; no Cmd/Ctrl/Alt + letra)

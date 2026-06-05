@@ -244,12 +244,19 @@ export const DrawingTool = (() => {
         if (sizeSlider) sizeSlider.value = String(_lineWidth);
     }
 
+    function _isLandscapePhoneVideoOnly() {
+        if (!window.matchMedia('(orientation: landscape) and (max-width: 932px)').matches) return false;
+        return window.matchMedia('(orientation: landscape) and (max-height: 520px) and (max-width: 932px)').matches
+            || window.innerHeight <= 560;
+    }
+
     function _isPlayerFullscreen() {
         const container = document.getElementById('player-container');
         const nativeEl = document.fullscreenElement || document.webkitFullscreenElement || null;
         if (nativeEl === document.documentElement) return true;
         if (container && nativeEl === container) return true;
-        return document.documentElement.classList.contains('sr-player-fs-active');
+        if (document.documentElement.classList.contains('sr-player-fs-active')) return true;
+        return AppState.get('mode') === 'view' && _isLandscapePhoneVideoOnly();
     }
 
     /** Ver + FS: Space limpia el lienzo, sale del dibujo y reanuda el video. */
