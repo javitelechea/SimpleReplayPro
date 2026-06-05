@@ -3229,6 +3229,7 @@ html.sr-analyze-fs #player-container .custom-timeline--analyze-fs-overlay .timel
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
   padding: var(--sp-lg) var(--sp-md) var(--sp-md);
 }
@@ -6092,6 +6093,9 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     height: auto;
     border-left: none;
     border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
     overflow: hidden;
   }
 
@@ -6103,15 +6107,46 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     border-top: 1px solid var(--border);
   }
 
-  .panel-content {
-    height: 100%;
+  .panel-content,
+  #panel-view,
+  #panel-analyze {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
     overflow: hidden;
     padding: 10px 8px 8px;
   }
 
+  #analyze-tab-clips,
+  .analyze-tab-pane--clips {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-section.flex-grow {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-section.flex-grow .section-title,
+  .panel-section.flex-grow #view-selection-bar {
+    flex-shrink: 0;
+  }
+
   .panel-section.flex-grow .clip-list {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
   }
 
   /* Mobile simplificado: ocultar playlists */
@@ -6225,57 +6260,14 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     letter-spacing: 0.5px;
   }
 
-  /*
-   * Read-only shared links: let the document scroll (nested flex + overflow:hidden
-   * breaks touch scroll on many mobile browsers).
-   */
-  body.read-only-mode #app-main {
-    height: auto;
-    min-height: calc(100dvh - 52px);
-    max-height: none;
-    overflow: visible;
-    display: flex;
-    flex-direction: column;
-  }
-
-  body.read-only-mode #video-area {
-    flex: 0 0 auto;
-    width: 100%;
-  }
-
-  body.read-only-mode .side-panel {
-    flex: 0 0 auto;
-    width: 100% !important;
-    min-height: 0;
-    overflow: visible;
-    display: flex;
-    flex-direction: column;
-    border-top: 1px solid var(--border);
-  }
-
-  body.read-only-mode #panel-view {
-    flex: 0 0 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: visible;
-    padding-top: 8px;
-  }
-
-  body.read-only-mode #panel-view .panel-section.flex-grow {
-    flex: 0 0 auto;
-    min-height: 0;
-    margin-bottom: 0;
-    overflow: visible;
+  /* Read-only shared links: mismo scroll interno en la lista (flex + min-height: 0). */
+  body.read-only-mode #view-source-selector,
+  body.read-only-mode #active-playlist-header,
+  body.read-only-mode #active-collection-bar {
+    display: none !important;
   }
 
   body.read-only-mode #panel-view .panel-section.flex-grow .clip-list {
-    flex: 0 0 auto;
-    overflow: visible;
-    max-height: none;
-  }
-
-  body.read-only-mode #view-clip-list {
     padding-bottom: 10px;
   }
 
@@ -6448,7 +6440,24 @@ html.sr-immersive-fs #player-container .drawing-canvas.active {
     top: calc(var(--mobile-header-h) + var(--mobile-video-h)) !important;
     bottom: 0 !important;
     height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
     overflow: hidden !important;
+  }
+
+  body.read-only-mode #panel-view {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.read-only-mode #panel-view .panel-section.flex-grow .clip-list {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
   }
 }
 
