@@ -89,9 +89,18 @@ function isTapoStreamUrl(url) {
   return false;
 }
 
+function isLocalhostStreamUrl(url) {
+  const u = String(url || '').toLowerCase();
+  return /127\.0\.0\.1|localhost/.test(u);
+}
+
 function shouldShowPanel(url, kind) {
   if (kind !== 'ip') return false;
-  if (isTapoStreamUrl(url)) return true;
+  if (isTapoStreamUrl(url)) {
+    // En producción, la URL tapo por defecto (127.0.0.1) no aplica — evita PTZ fuera de dev local.
+    if (!isLocalDev() && isLocalhostStreamUrl(url)) return false;
+    return true;
+  }
   if (isLocalDev() && !url) return true;
   return false;
 }
@@ -346,6 +355,7 @@ export function initTapoRinkZones(opts) {
   }
 
   function setKbdArmed(on) {
+    if (!on && !kbdArmed) return;
     if (on && gamepadArmed) setGamepadArmed(false);
     kbdArmed = on;
     kbdToggle?.classList.toggle('is-active', on);
@@ -543,11 +553,14 @@ export function initTapoRinkZones(opts) {
     const url = opts.getStreamUrl();
     const kind = opts.getSourceKind();
     const show = shouldShowPanel(url, kind);
+    const wasVisible = !host.classList.contains('hidden');
     host.classList.toggle('hidden', !show);
     if (!show) {
-      setKbdArmed(false);
-      setGamepadArmed(false);
-      setGamepadTest(false);
+      if (wasVisible || kbdArmed || gamepadArmed) {
+        setKbdArmed(false);
+        setGamepadArmed(false);
+        setGamepadTest(false);
+      }
       return;
     }
     checkPtzServer();
@@ -613,13 +626,16 @@ export function initTapoRinkZones(opts) {
   }
 
   async function endPtzHold() {
+    const hadMovement = activeDir !== null || gamepadStickActive || dragPointerId !== null;
     ptzHoldId += 1;
     gamepadStickActive = false;
     clearPtzUi();
+    if (!hadMovement) return;
+    if (host.classList.contains('hidden')) return;
     try {
       await ptzApi('/camera/stop');
     } catch (err) {
-      setStatus(err.message, true);
+      if (!host.classList.contains('hidden')) setStatus(err.message, true);
     }
   }
 
@@ -812,6 +828,7 @@ export function initTapoRinkZones(opts) {
   }
 
   function setGamepadArmed(on) {
+    if (!on && !gamepadArmed) return;
     if (!navigator.getGamepads) {
       setStatus('Este navegador no soporta joystick', true);
       return;

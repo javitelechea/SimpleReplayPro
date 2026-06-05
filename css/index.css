@@ -1555,11 +1555,43 @@ html.sr-player-fs-active #player-container .fullscreen-clip-rail:not(.hidden) {
   }
 }
 
-/* En táctil, mostrar siempre la barra de controles — excepto en fullscreen inmersivo */
-@media (hover: none) and (pointer: coarse) {
-  html:not(.sr-immersive-fs) #player-container .player-chrome:not(.hidden) {
+/* Móvil fuera de fullscreen: controles solo al tocar el video (sr-mobile-chrome-visible en JS) */
+@media (max-width: 1024px) {
+  html:not(.sr-immersive-fs):not(.sr-player-fs-active) #player-container .player-chrome:not(.hidden) {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  html:not(.sr-immersive-fs):not(.sr-player-fs-active) #player-container:hover .player-chrome:not(.hidden),
+  html:not(.sr-immersive-fs):not(.sr-player-fs-active) #player-container:focus-within .player-chrome:not(.hidden) {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+  }
+
+  html:not(.sr-immersive-fs):not(.sr-player-fs-active) #player-container.sr-mobile-chrome-visible .player-chrome:not(.hidden) {
     opacity: 1;
     transform: translateY(0);
+    pointer-events: none;
+  }
+
+  html:not(.sr-immersive-fs):not(.sr-player-fs-active) #player-container.sr-mobile-chrome-visible .player-chrome__bar {
+    pointer-events: auto;
+  }
+
+  #app-header {
+    isolation: isolate;
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  #player-container .player-chrome__bar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(12, 14, 20, 0.88);
   }
 }
 

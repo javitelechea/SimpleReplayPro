@@ -1435,6 +1435,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         document.documentElement.style.removeProperty('--sr-fs-vv-top');
         document.documentElement.style.removeProperty('--sr-fs-vv-height');
         hideFsControls(getPlayerContainer());
+        hideMobileChrome(getPlayerContainer());
         clearPseudoFsViewportStyles();
     }
 
@@ -1460,6 +1461,32 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         if (!isPlayerFullscreen()) return false;
         if (isPseudoPlayerFullscreen()) return true;
         return isCoarsePointerDevice() || isMobileLayout();
+    }
+
+    function isMobileChromeAutoHide() {
+        return isMobileLayout() && !isPlayerFullscreen();
+    }
+
+    function revealMobileChrome(container, autoHideMs = 3500) {
+        if (!container || !isMobileChromeAutoHide()) return;
+        container.classList.add('sr-mobile-chrome-visible');
+        clearTimeout(container._mobileChromeHideTimer);
+        if (autoHideMs > 0) {
+            container._mobileChromeHideTimer = setTimeout(() => {
+                hideMobileChrome(container);
+            }, autoHideMs);
+        }
+    }
+
+    function hideMobileChrome(container) {
+        if (!container) container = getPlayerContainer();
+        if (!container) return;
+        clearTimeout(container._mobileChromeHideTimer);
+        container.classList.remove('sr-mobile-chrome-visible');
+        const active = document.activeElement;
+        if (active && container.contains(active)) {
+            try { active.blur(); } catch (_) { /* noop */ }
+        }
     }
 
     function syncImmersiveFsUi() {
@@ -2666,7 +2693,9 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 lines.push(t('live.ipCameraActive'));
             }
             if (statusEl) statusEl.innerHTML = lines.length ? lines.join('<br/>') : '';
-            _tapoRinkRef?.refresh?.();
+            if (isCaptureProject) {
+                _tapoRinkRef?.refresh?.();
+            }
         }
 
         btnSetupDevices?.addEventListener('click', async () => {
@@ -2702,7 +2731,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 setLiveSourceKind(next);
                 if (next === 'ip') {
                     const streamIn = $('#livecapture-stream-url');
-                    if (streamIn && !String(streamIn.value || '').trim()) {
+                    if (streamIn && !String(streamIn.value || '').trim() && isLocalDevHost()) {
                         streamIn.value = 'http://127.0.0.1:8888/tapo/';
                     }
                 }
@@ -2867,11 +2896,15 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         $('#player-chrome-seek-back')?.addEventListener('click', () => navigateClipFromChrome(-1));
         $('#player-chrome-seek-fwd')?.addEventListener('click', () => navigateClipFromChrome(1));
 
-        $('#player-chrome-play')?.addEventListener('click', () => {
+        $('#player-chrome-play')?.addEventListener('click', (ev) => {
             if (isPopoutPlayerConnected()) {
                 YTPlayer.togglePlay();
                 _popoutMirrorPlaying = YTPlayer.isPlaying ? !!YTPlayer.isPlaying() : false;
                 syncPlayerChromeUi();
+                ev.currentTarget?.blur?.();
+                if (isMobileChromeAutoHide()) {
+                    revealMobileChrome(getPlayerContainer(), 2200);
+                }
                 return;
             }
             if (typeof DrawingTool !== 'undefined' && DrawingTool.hasPlaybackOverlays()) {
@@ -2881,7 +2914,15 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 YTPlayer.togglePlay();
             }
             syncPlayerChromeUi();
+            ev.currentTarget?.blur?.();
+            if (isMobileChromeAutoHide()) {
+                revealMobileChrome(getPlayerContainer(), 2200);
+            }
         });
+
+        $('#player-chrome')?.addEventListener('pointerdown', () => {
+            revealMobileChrome(getPlayerContainer(), 4000);
+        }, { passive: true });
 
         $('#player-chrome-yt-native')?.addEventListener('click', async () => {
             if (typeof YTPlayer.setYoutubeNativeControlsEnabled !== 'function') return;
@@ -2978,6 +3019,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             if (!canHandleSurfaceGesture(ev.target)) return;
             if (shouldUseImmersiveFsControls()) {
                 revealFullscreenOverlays(container, 8000);
+            } else {
+                revealMobileChrome(container, 3500);
             }
             if (typeof YTPlayer === 'undefined' || !YTPlayer.togglePlay) return;
             if (singleClickTimer) clearTimeout(singleClickTimer);
@@ -3019,6 +3062,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             if (!canHandleSurfaceGesture(ev.target)) return;
             if (shouldUseImmersiveFsControls()) {
                 revealFullscreenOverlays(container, 8000);
+            } else {
+                revealMobileChrome(container, 3500);
             }
             const now = Date.now();
             const dt = now - lastTapTs;
