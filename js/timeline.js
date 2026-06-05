@@ -204,6 +204,8 @@ export const Timeline = (() => {
         _isDragging = true;
         _dragType = 'playhead';
         _lastDragSeekTs = 0;
+        _progressEl?.style.setProperty('transition', 'none');
+        _playheadEl?.style.setProperty('transition', 'none');
 
         const sec = getSecFromEvent(e);
         YTPlayer.seekTo(sec);
@@ -264,6 +266,8 @@ export const Timeline = (() => {
         _dragType = null;
         _dragClipId = null;
         _lastDragSeekTs = 0;
+        _progressEl?.style.removeProperty('transition');
+        _playheadEl?.style.removeProperty('transition');
         detachDocumentTouchDrag();
     }
 

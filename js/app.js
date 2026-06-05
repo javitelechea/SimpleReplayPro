@@ -1499,6 +1499,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function revealMobileChrome(container, autoHideMs = 3500) {
+        if (!container) container = getPlayerContainer();
         if (!container || !isMobileChromeAutoHide()) return;
         container.classList.add('sr-mobile-chrome-visible');
         clearTimeout(container._mobileChromeHideTimer);
@@ -2997,6 +2998,54 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         setInterval(syncPlayerChromeUi, 450);
     }
 
+    function useTouchOnlySurfaceTap() {
+        return isCoarsePointerDevice();
+    }
+
+    function handlePlayerSurfaceTap(container) {
+        if (!container) container = getPlayerContainer();
+        if (!container) return;
+
+        if (shouldUseImmersiveFsControls()) {
+            const fsVisible = container.classList.contains('sr-fs-controls-visible');
+            const playing = typeof YTPlayer?.isPlaying === 'function' && YTPlayer.isPlaying();
+            if (fsVisible) {
+                hideFsControls(container);
+                return;
+            }
+            if (playing) {
+                revealFsControls(container, 4000);
+                return;
+            }
+            if (typeof YTPlayer?.play === 'function') YTPlayer.play();
+            revealFsControls(container, 4000);
+            syncPlayerChromeUi();
+            return;
+        }
+
+        if (isMobileChromeAutoHide()) {
+            const chromeVisible = container.classList.contains('sr-mobile-chrome-visible');
+            const playing = typeof YTPlayer?.isPlaying === 'function' && YTPlayer.isPlaying();
+            if (chromeVisible) {
+                hideMobileChrome(container);
+                return;
+            }
+            if (playing) {
+                revealMobileChrome(container, 3500);
+                return;
+            }
+            if (typeof YTPlayer?.play === 'function') YTPlayer.play();
+            revealMobileChrome(container, 3500);
+            syncPlayerChromeUi();
+            return;
+        }
+
+        if (typeof YTPlayer?.togglePlay === 'function') {
+            YTPlayer.togglePlay();
+            syncPlayerChromeUi();
+        }
+    }
+
     function wirePlayerSurfaceToggle() {
         const container = $('#player-container');
         if (!container || container.dataset.surfaceToggleWired === '1') return;
@@ -3058,16 +3107,14 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 return;
             }
             if (!canHandleSurfaceGesture(ev.target)) return;
+            if (useTouchOnlySurfaceTap()) return;
             if (shouldUseImmersiveFsControls()) {
                 revealFullscreenOverlays(container, 8000);
-            } else {
-                revealMobileChrome(container, 3500);
             }
             if (typeof YTPlayer === 'undefined' || !YTPlayer.togglePlay) return;
             if (singleClickTimer) clearTimeout(singleClickTimer);
             singleClickTimer = setTimeout(() => {
-                YTPlayer.togglePlay();
-                syncPlayerChromeUi();
+                handlePlayerSurfaceTap(container);
                 singleClickTimer = null;
             }, 260);
         });
@@ -3101,11 +3148,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                 return;
             }
             if (!canHandleSurfaceGesture(ev.target)) return;
-            if (shouldUseImmersiveFsControls()) {
-                revealFullscreenOverlays(container, 8000);
-            } else {
-                revealMobileChrome(container, 3500);
-            }
             const now = Date.now();
             const dt = now - lastTapTs;
             const dx = Math.abs(touch.clientX - lastTapX);
@@ -3114,26 +3156,21 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
                     clearTimeout(singleClickTimer);
                     singleClickTimer = null;
                 }
-                suppressSingleClickUntil = Date.now() + 350;
+                suppressSingleClickUntil = Date.now() + 500;
                 if (shouldUseImmersiveFsControls() && AppState.get('mode') === 'view' && AppState.get('currentClipId')) {
                     navigateToClipAndPlay(resolveDirectionFromX(touch.clientX) < 0 ? 'prev' : 'next');
                     revealFsControls(container);
                 } else {
                     seekBySurface(resolveDirectionFromX(touch.clientX));
+                    if (isMobileChromeAutoHide()) revealMobileChrome(container, 3500);
+                    else if (shouldUseImmersiveFsControls()) revealFsControls(container, 4000);
                 }
                 lastTapTs = 0;
                 lastTapX = 0;
                 return;
             }
-            suppressSingleClickUntil = Date.now() + 400;
-            if (singleClickTimer) clearTimeout(singleClickTimer);
-            singleClickTimer = setTimeout(() => {
-                if (typeof YTPlayer !== 'undefined' && YTPlayer.togglePlay) {
-                    YTPlayer.togglePlay();
-                    syncPlayerChromeUi();
-                }
-                singleClickTimer = null;
-            }, 260);
+            suppressSingleClickUntil = Date.now() + 500;
+            handlePlayerSurfaceTap(container);
             lastTapTs = now;
             lastTapX = touch.clientX;
         }, { passive: true });
@@ -3675,6 +3712,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             } catch (_) {
                 /* noop */
             }
+        } else if (isMobileChromeAutoHide()) {
+            hideMobileChrome(getPlayerContainer());
         }
         try {
             DrawingTool.dismissDrawingPreview?.();

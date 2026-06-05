@@ -1124,6 +1124,35 @@ export const UI = (() => {
     // ═══ CLIP LIST (View) ═══
     let _selectedClipIds = new Set();
 
+    function _shouldIgnoreClipItemTap(target) {
+        if (!target) return true;
+        if (target.classList.contains('clip-checkbox')) return true;
+        if (target.classList.contains('drag-handle')) return true;
+        if (target.closest('.clip-action-btn')) return true;
+        if (target.closest('.clip-action-icon')) return true;
+        return false;
+    }
+
+    function _wireClipItemPlay(el, onPlay) {
+        let touchHandledAt = 0;
+        const run = () => {
+            try { onPlay(); } catch (err) { console.warn('clip play:', err); }
+        };
+        if (isMobileViewLayout()) {
+            el.addEventListener('touchend', (e) => {
+                if (_shouldIgnoreClipItemTap(e.target)) return;
+                touchHandledAt = Date.now();
+                e.preventDefault();
+                run();
+            }, { passive: false });
+        }
+        el.addEventListener('click', (e) => {
+            if (_shouldIgnoreClipItemTap(e.target)) return;
+            if (Date.now() - touchHandledAt < 500) return;
+            run();
+        });
+    }
+
     function renderViewClips() {
         if (AppState.get('activeCollection')) {
             renderCollectionItems();
@@ -1278,15 +1307,9 @@ export const UI = (() => {
                 handle.addEventListener('mouseleave', () => el.draggable = false);
             }
 
-            el.addEventListener('click', (e) => {
-                if (e.target.classList.contains('clip-checkbox')) return;
-                if (e.target.closest('.clip-action-btn')) return;
-                if (e.target.closest('.clip-action-icon')) return;
-                if (e.target.classList.contains('drag-handle')) return;
-
+            _wireClipItemPlay(el, () => {
                 AppState.setCurrentClip(clip.id);
                 YTPlayer.playClip(clip.start_sec, clip.end_sec);
-                
                 if (activePlaylistId) {
                     DrawingTool.startPlaybackWatch(activePlaylistId, clip.id);
                 }
