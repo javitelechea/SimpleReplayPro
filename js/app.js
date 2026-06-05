@@ -1326,6 +1326,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function dismissActiveClipForFullscreen() {
+        // En Ver las flechas y el rail dependen del clip activo; no deseleccionar al entrar en FS.
+        if (AppState.get('mode') === 'view') return;
         if (!AppState.get('currentClipId')) return;
         try {
             if (typeof YTPlayer !== 'undefined') YTPlayer.clearClipEnd?.();
