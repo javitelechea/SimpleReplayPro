@@ -3163,8 +3163,12 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         let suppressSingleClickUntil = 0;
         let lastTapTs = 0;
         let lastTapX = 0;
+        let surfaceTouchStartX = 0;
+        let surfaceTouchStartY = 0;
+        let surfaceTouchMoved = false;
         const DOUBLE_TAP_MS = 320;
         const DOUBLE_TAP_MAX_DELTA_X = 140;
+        const SURFACE_TAP_SLOP_PX = 14;
 
         const canHandleSurfaceGesture = (evTarget) => {
             if (!AppState.get('currentGameId')) return false;
@@ -3246,9 +3250,40 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             seekBySurface(resolveDirectionFromX(ev.clientX));
         });
 
+        container.addEventListener('touchstart', (ev) => {
+            const touch = ev.touches && ev.touches[0];
+            if (!touch) return;
+            surfaceTouchStartX = touch.clientX;
+            surfaceTouchStartY = touch.clientY;
+            surfaceTouchMoved = false;
+        }, { passive: true });
+
+        container.addEventListener('touchmove', (ev) => {
+            if (surfaceTouchMoved) return;
+            const touch = ev.touches && ev.touches[0];
+            if (!touch) return;
+            if (
+                Math.abs(touch.clientX - surfaceTouchStartX) > SURFACE_TAP_SLOP_PX
+                || Math.abs(touch.clientY - surfaceTouchStartY) > SURFACE_TAP_SLOP_PX
+            ) {
+                surfaceTouchMoved = true;
+            }
+        }, { passive: true });
+
+        container.addEventListener('touchcancel', () => {
+            surfaceTouchMoved = true;
+        }, { passive: true });
+
         container.addEventListener('touchend', (ev) => {
             const touch = ev.changedTouches && ev.changedTouches[0];
             if (!touch) return;
+            if (surfaceTouchMoved) return;
+            if (
+                Math.abs(touch.clientX - surfaceTouchStartX) > SURFACE_TAP_SLOP_PX
+                || Math.abs(touch.clientY - surfaceTouchStartY) > SURFACE_TAP_SLOP_PX
+            ) {
+                return;
+            }
             if (
                 isLocalVideoSource() &&
                 isPlayerFullscreen() &&

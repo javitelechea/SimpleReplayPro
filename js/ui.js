@@ -1139,8 +1139,46 @@ export const UI = (() => {
             try { onPlay(); } catch (err) { console.warn('clip play:', err); }
         };
         if (isMobileViewLayout()) {
+            const TAP_SLOP_PX = 12;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchMoved = false;
+
             el.addEventListener('touchstart', (e) => {
                 if (_shouldIgnoreClipItemTap(e.target)) return;
+                const t = e.touches && e.touches[0];
+                if (!t) return;
+                touchStartX = t.clientX;
+                touchStartY = t.clientY;
+                touchMoved = false;
+            }, { passive: true });
+
+            el.addEventListener('touchmove', (e) => {
+                if (touchMoved) return;
+                const t = e.touches && e.touches[0];
+                if (!t) return;
+                if (
+                    Math.abs(t.clientX - touchStartX) > TAP_SLOP_PX
+                    || Math.abs(t.clientY - touchStartY) > TAP_SLOP_PX
+                ) {
+                    touchMoved = true;
+                }
+            }, { passive: true });
+
+            const cancelTouchTap = () => { touchMoved = true; };
+            el.addEventListener('touchcancel', cancelTouchTap, { passive: true });
+
+            el.addEventListener('touchend', (e) => {
+                if (_shouldIgnoreClipItemTap(e.target)) return;
+                if (touchMoved) return;
+                const t = e.changedTouches && e.changedTouches[0];
+                if (!t) return;
+                if (
+                    Math.abs(t.clientX - touchStartX) > TAP_SLOP_PX
+                    || Math.abs(t.clientY - touchStartY) > TAP_SLOP_PX
+                ) {
+                    return;
+                }
                 touchHandledAt = Date.now();
                 run();
             }, { passive: true });
