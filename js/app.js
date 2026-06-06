@@ -4461,32 +4461,144 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         }
     });
 
-    // Relink local video
-    const btnRelink = $('#btn-relink-video');
-    const inputRelink = $('#input-relink-video');
-    if (btnRelink && inputRelink) {
-        btnRelink.addEventListener('click', () => {
-            if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) { UI.toast(getProFeatureMessage(), 'info'); return; }
-            inputRelink.click();
+    // Change video source (YouTube ↔ local)
+    let activeChangeVideoSource = 'yt';
+
+    function _gameUsesLocalVideo(game) {
+        if (!game) return false;
+        if (game.local_video_url) return true;
+        if (AppState.getLocalVideoFile?.()) return true;
+        if (_localVideoFileForCurrentGame) return true;
+        return false;
+    }
+
+    function _setChangeVideoSource(source) {
+        activeChangeVideoSource = source === 'local' ? 'local' : 'yt';
+        document.querySelectorAll('#modal-change-video .new-project-source-chip').forEach((chip) => {
+            chip.classList.toggle('active', chip.dataset.changeVideoSource === activeChangeVideoSource);
         });
-        inputRelink.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const url = _objectUrlFromFile(file);
-            const game = AppState.getCurrentGame();
-            if (game) {
-                game.local_video_url = url;
-                if (game.video_source === 'liveCapture') {
-                    delete game.video_source;
-                }
-                _localVideoFileForCurrentGame = file;
-                AppState.setLocalVideoFile(file);
-                YTPlayer.loadLocalVideo(url, file);
-                UI.toast(t('toast.videoRelinked'), 'success');
-                syncAnalyzeLiveCaptureTabVisibility();
-            }
+        document.querySelectorAll('#modal-change-video .new-project-source-block').forEach((block) => {
+            block.classList.toggle('hidden', block.dataset.changeVideoBlock !== activeChangeVideoSource);
         });
     }
+
+    function openChangeVideoModal() {
+        const game = AppState.getCurrentGame();
+        if (!game) {
+            UI.toast(t('toast.selectMatchFirst'), 'error');
+            return;
+        }
+        if (isLiveRecordingActive()) {
+            UI.toast(
+                'Hay una grabación en vivo activa. Detené la grabación antes de cambiar el video.',
+                'error'
+            );
+            return;
+        }
+
+        const ytInput = $('#input-change-video-yt');
+        const localInput = $('#input-change-video-local');
+        if (ytInput) ytInput.value = game.youtube_video_id || '';
+        if (localInput) localInput.value = '';
+
+        _setChangeVideoSource(_gameUsesLocalVideo(game) ? 'local' : (game.youtube_video_id ? 'yt' : 'local'));
+        UI.showModal('modal-change-video');
+    }
+
+    function applyChangeVideoSource() {
+        const game = AppState.getCurrentGame();
+        if (!game) return;
+        if (isLiveRecordingActive()) {
+            UI.toast(
+                'Hay una grabación en vivo activa. Detené la grabación antes de cambiar el video.',
+                'error'
+            );
+            return;
+        }
+
+        if (activeChangeVideoSource === 'yt') {
+            const rawYtInput = ($('#input-change-video-yt')?.value || '').trim();
+            if (!rawYtInput) {
+                UI.toast(t('toast.enterYoutubeLink'), 'error');
+                return;
+            }
+            const ytId = extractYouTubeId(rawYtInput);
+            if (!ytId) {
+                UI.toast(t('toast.youtubeIdError'), 'error');
+                return;
+            }
+
+            _revokeMainLocalObjectUrl();
+            game.local_video_url = null;
+            game.youtube_video_id = ytId;
+            _localVideoFileForCurrentGame = null;
+            AppState.setLocalVideoFile(null);
+            if (game.video_source === 'liveCapture') {
+                delete game.video_source;
+            }
+
+            closePopoutPlayer();
+            YTPlayer.loadVideo(ytId);
+            UI.hideModal('modal-change-video');
+            UI.toast(t('toast.videoSourceYoutube'), 'success');
+        } else {
+            if (!AppState.hasFeature(FEATURES.LOCAL_VIDEO)) {
+                UI.toast(getProFeatureMessage(), 'info');
+                return;
+            }
+            const file = $('#input-change-video-local')?.files?.[0];
+            if (!file) {
+                UI.toast(t('toast.selectLocalVideo'), 'error');
+                return;
+            }
+            const url = _objectUrlFromFile(file);
+            game.local_video_url = url;
+            game.youtube_video_id = '';
+            if (game.video_source === 'liveCapture') {
+                delete game.video_source;
+            }
+            _localVideoFileForCurrentGame = file;
+            AppState.setLocalVideoFile(file);
+
+            closePopoutPlayer();
+            YTPlayer.loadLocalVideo(url, file);
+            UI.hideModal('modal-change-video');
+            UI.toast(t('toast.videoRelinked'), 'success');
+        }
+
+        markUnsaved();
+        UI.updateProjectTitle();
+        syncAnalyzeLiveCaptureTabVisibility();
+        setTimeout(syncPlayerChromeUi, 0);
+        setTimeout(() => { void syncMobileYoutubeNativeMode(); }, 600);
+    }
+
+    const btnRelink = $('#btn-relink-video');
+    const inputRelink = $('#input-relink-video');
+    if (btnRelink) {
+        btnRelink.addEventListener('click', () => {
+            openChangeVideoModal();
+        });
+    }
+    if (inputRelink) {
+        // Legacy hidden input — local file is chosen in modal-change-video
+        inputRelink.addEventListener('change', (e) => {
+            e.target.value = '';
+        });
+    }
+
+    document.querySelectorAll('#modal-change-video .new-project-source-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+            const src = chip.dataset.changeVideoSource;
+            if (src === 'local' && !AppState.hasFeature(FEATURES.LOCAL_VIDEO)) {
+                UI.toast(getProFeatureMessage(), 'info');
+                return;
+            }
+            _setChangeVideoSource(src);
+        });
+    });
+    $('#btn-cancel-change-video')?.addEventListener('click', () => UI.hideModal('modal-change-video'));
+    $('#btn-apply-change-video')?.addEventListener('click', () => applyChangeVideoSource());
 
     // Panel collapse
     $('#btn-collapse-panel').addEventListener('click', () => AppState.togglePanel());

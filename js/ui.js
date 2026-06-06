@@ -175,8 +175,7 @@ export const UI = (() => {
         const relinkBtn = $('#btn-relink-video');
         if (game) {
             titleEl.textContent = game.title;
-            // Show relink button if it's a local video project (no YouTube ID)
-            if (relinkBtn) relinkBtn.style.display = (!game.youtube_video_id) ? '' : 'none';
+            if (relinkBtn) relinkBtn.style.display = '';
         } else {
             titleEl.textContent = '';
             if (relinkBtn) relinkBtn.style.display = 'none';

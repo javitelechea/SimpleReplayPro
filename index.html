@@ -840,6 +840,52 @@
     </div>
   </div>
 
+  <!-- ═══════ CHANGE VIDEO SOURCE MODAL ═══════ -->
+  <div id="modal-change-video" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box modal-sm">
+      <h2 data-i18n="modal.changeVideoTitle">Cambiar video</h2>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;" data-i18n="modal.changeVideoDesc">
+        Elegí la fuente del video. Los clips y marcas del proyecto se mantienen.
+      </p>
+      <div class="form-label">
+        <span class="new-project-source-label" data-i18n="modal.videoSource">Fuente del video</span>
+        <div class="new-project-source-picker" role="group" aria-label="Fuente del video">
+          <button type="button" class="new-project-source-chip active" data-change-video-source="yt">
+            <span class="new-project-source-chip__icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none"/>
+              </svg>
+            </span>
+            <span class="new-project-source-chip__text" data-i18n="modal.youtube">YouTube</span>
+          </button>
+          <button type="button" class="new-project-source-chip" data-change-video-source="local">
+            <span class="new-project-source-chip__icon" aria-hidden="true">📂</span>
+            <span class="new-project-source-chip__text" data-i18n="modal.localFile">Archivo local</span>
+          </button>
+        </div>
+      </div>
+      <div id="change-video-block-yt" class="new-project-source-block" data-change-video-block="yt">
+        <label class="form-label" style="margin-top: 12px;">
+          <span data-i18n="modal.youtubeLink">Enlace de YouTube</span>
+          <input id="input-change-video-yt" type="text" class="input" placeholder="Pegá el link de YouTube acá" data-i18n-placeholder="modal.youtubePlaceholder" />
+          <span style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; display: block;" data-i18n="modal.youtubeHint">Podés pegar el link completo o solo el ID del video</span>
+        </label>
+      </div>
+      <div id="change-video-block-local" class="new-project-source-block hidden" data-change-video-block="local">
+        <label class="form-label" style="margin-top: 12px;">
+          <span data-i18n="modal.localVideo">Video local</span>
+          <input id="input-change-video-local" type="file" class="input" accept="video/*" />
+        </label>
+      </div>
+      <div class="modal-actions" style="margin-top: 18px;">
+        <button id="btn-cancel-change-video" type="button" class="btn btn-ghost" data-i18n="modal.cancel">Cancelar</button>
+        <button id="btn-apply-change-video" type="button" class="btn btn-primary" data-i18n="modal.apply">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════ ADD TO PLAYLIST MODAL ═══════ -->
   <div id="modal-add-to-playlist" class="modal hidden">
     <div class="modal-backdrop"></div>

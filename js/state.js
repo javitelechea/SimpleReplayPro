@@ -140,11 +140,11 @@ export const AppState = (() => {
   }
 
   /** Mismo orden visual que la botonera: fila propia (top) y luego rival (bottom). */
-  function orderTagsLikeBotonera(tags) {
+  function orderTagsLikeBotonera(tags, { includeHidden = false } = {}) {
     const top = [];
     const bottom = [];
     (tags || []).forEach((t) => {
-      if (!t || t.isHidden) return;
+      if (!t || (!includeHidden && t.isHidden)) return;
       if (t.row === 'bottom') bottom.push(t);
       else top.push(t);
     });
@@ -155,12 +155,12 @@ export const AppState = (() => {
   function getTagTypesForFilter() {
     const botonera = getActiveTagTypes();
     const botoneraIds = new Set(botonera.map((t) => t.id));
-    const ordered = orderTagsLikeBotonera(botonera);
+    const ordered = orderTagsLikeBotonera(botonera, { includeHidden: true });
     const extras = [];
     state.tagTypes.forEach((t) => {
       if (!botoneraIds.has(t.id)) extras.push(t);
     });
-    if (extras.length) ordered.push(...orderTagsLikeBotonera(extras));
+    if (extras.length) ordered.push(...orderTagsLikeBotonera(extras, { includeHidden: true }));
     return ordered;
   }
 
