@@ -1311,6 +1311,11 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
         return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     }
 
+    /** Escritorio con mouse/trackpad: no aplicar gestos ni chrome auto-oculto de móvil. */
+    function isDesktopPointerLayout() {
+        return window.matchMedia('(min-width: 1025px)').matches && !isCoarsePointerDevice();
+    }
+
     const MOBILE_PREFER_ANALYZE_KEY = 'sr-mobile-prefer-analyze';
 
     function isMobileLayout() {
@@ -1513,7 +1518,8 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     }
 
     function isMobileChromeAutoHide() {
-        return isMobileLayout() && !isPlayerFullscreen();
+        if (isDesktopPointerLayout()) return false;
+        return window.matchMedia('(max-width: 1024px)').matches && !isPlayerFullscreen();
     }
 
     /** Móvil: siempre controles de la app (no nativos de YouTube). */
@@ -3123,44 +3129,21 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function handlePlayerSurfaceTap(container) {
         if (!container) container = getPlayerContainer();
         if (!container) return;
+        if (typeof YTPlayer?.togglePlay !== 'function') return;
+
+        const wasPlaying = typeof YTPlayer.isPlaying === 'function' && YTPlayer.isPlaying();
+        YTPlayer.togglePlay();
+        syncPlayerChromeUi();
 
         if (shouldUseImmersiveFsControls()) {
-            const fsVisible = container.classList.contains('sr-fs-controls-visible');
-            const playing = typeof YTPlayer?.isPlaying === 'function' && YTPlayer.isPlaying();
-            if (fsVisible) {
-                hideFsControls(container);
-                return;
-            }
-            if (playing) {
-                revealFsControls(container, 4000);
-                return;
-            }
-            if (typeof YTPlayer?.play === 'function') YTPlayer.play();
-            revealFsControls(container, 4000);
-            syncPlayerChromeUi();
+            if (wasPlaying) hideFsControls(container);
+            else revealFsControls(container, 4000);
             return;
         }
 
         if (isMobileChromeAutoHide()) {
-            const chromeVisible = container.classList.contains('sr-mobile-chrome-visible');
-            const playing = typeof YTPlayer?.isPlaying === 'function' && YTPlayer.isPlaying();
-            if (chromeVisible) {
-                hideMobileChrome(container);
-                return;
-            }
-            if (playing) {
-                revealMobileChrome(container, 3500);
-                return;
-            }
-            if (typeof YTPlayer?.play === 'function') YTPlayer.play();
-            revealMobileChrome(container, 3500);
-            syncPlayerChromeUi();
-            return;
-        }
-
-        if (typeof YTPlayer?.togglePlay === 'function') {
-            YTPlayer.togglePlay();
-            syncPlayerChromeUi();
+            if (wasPlaying) hideMobileChrome(container);
+            else revealMobileChrome(container, 3500);
         }
     }
 
@@ -3195,6 +3178,7 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
             if (evTarget.closest('#drawing-preview-overlay')) return false;
             if (evTarget.closest('.drawing-auto-overlay')) return false;
             if (evTarget.closest('video')) {
+                if (isDesktopPointerLayout()) return true;
                 if (isLocalVideoSource() && isPlayerFullscreen()) return false;
                 return false;
             }
