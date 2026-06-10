@@ -593,9 +593,6 @@ import { t, onLangChange, applyTranslations, getLang, getBuiltinTagLabel } from 
     function updateLiveEdgeButton() {
         const btn = $('#btn-live-edge');
         if (!btn) return;
-        // Live-edge control temporarily disabled (will be reintroduced with deterministic config).
-        btn.classList.add('hidden');
-        return;
 
         const mode = AppState.get('mode');
         const game = AppState.getCurrentGame();
